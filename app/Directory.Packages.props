@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!--
+      Only the WinUI component of the Windows App SDK. The Microsoft.WindowsAppSDK
+      metapackage would also pull in the AI, ML, Widgets and Search components.
+      Versions match the Windows App SDK 2.4.0 release. The Runtime version is
+      the minimum Windows App Runtime the app needs at run time, so keep the
+      two in step when upgrading.
+    -->
+    <PackageVersion Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.6" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.9" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.6" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.Runtime" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Windows.CppWinRT" Version="2.0.250303.1" />
+    <PackageVersion Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
+  </ItemGroup>
+</Project>

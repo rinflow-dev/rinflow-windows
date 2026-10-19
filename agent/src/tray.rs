@@ -1,0 +1,188 @@
+//! Notification-area icon. Keeping the tray in the agent means the settings
+//! app only runs while its window is open.
+
+use crate::win::wide;
+use std::io;
+use std::path::PathBuf;
+use std::ptr::{null, null_mut};
+use std::sync::atomic::{AtomicU32, Ordering};
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::UI::Shell::{
+    NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW, Shell_NotifyIconW,
+};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
+    DispatchMessageW, GetCursorPos, GetMessageW, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
+    MF_STRING, MSG, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow,
+    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP,
+    WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
+};
+
+const WM_TRAY: u32 = WM_APP + 1;
+const TRAY_ID: u32 = 1;
+const MENU_OPEN: usize = 1;
+const MENU_QUIT: usize = 2;
+
+/// Explorer broadcasts this after it restarts; the icon must be re-added.
+static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+
+/// Creates the tray icon and runs the message loop until the user quits.
+pub fn run() -> io::Result<()> {
+    let class_name = wide("LinkCursorAgentTray");
+    let taskbar_created = wide("TaskbarCreated");
+    // SAFETY: plain Win32 calls with valid, null-terminated strings. The
+    // window is hidden; a top-level window is needed (rather than a
+    // message-only one) to receive the TaskbarCreated broadcast.
+    unsafe {
+        TASKBAR_CREATED.store(
+            RegisterWindowMessageW(taskbar_created.as_ptr()),
+            Ordering::Relaxed,
+        );
+        let instance = GetModuleHandleW(null());
+        let class = WNDCLASSW {
+            lpfnWndProc: Some(window_proc),
+            hInstance: instance,
+            lpszClassName: class_name.as_ptr(),
+            ..std::mem::zeroed()
+        };
+        if RegisterClassW(&class) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let window = CreateWindowExW(
+            0,
+            class_name.as_ptr(),
+            class_name.as_ptr(),
+            WS_OVERLAPPED,
+            0,
+            0,
+            0,
+            0,
+            null_mut(),
+            null_mut(),
+            instance,
+            null(),
+        );
+        if window.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        if !add_icon(window) {
+            return Err(io::Error::last_os_error());
+        }
+
+        let mut message: MSG = std::mem::zeroed();
+        while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    Ok(())
+}
+
+unsafe extern "system" fn window_proc(
+    window: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match message {
+        WM_TRAY => {
+            match lparam as u32 {
+                WM_LBUTTONUP => open_settings(),
+                WM_RBUTTONUP => show_menu(window),
+                _ => {}
+            }
+            0
+        }
+        WM_DESTROY => {
+            // SAFETY: removes the icon this window added; harmless if absent.
+            unsafe {
+                Shell_NotifyIconW(NIM_DELETE, &icon_data(window));
+                PostQuitMessage(0);
+            }
+            0
+        }
+        _ if message == TASKBAR_CREATED.load(Ordering::Relaxed) && message != 0 => {
+            add_icon(window);
+            0
+        }
+        // SAFETY: default handling for everything else.
+        _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
+    }
+}
+
+fn icon_data(window: HWND) -> NOTIFYICONDATAW {
+    // SAFETY: NOTIFYICONDATAW is a plain C struct; all-zero is a valid start.
+    let mut data: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
+    data.cbSize = size_of::<NOTIFYICONDATAW>() as u32;
+    data.hWnd = window;
+    data.uID = TRAY_ID;
+    data
+}
+
+fn add_icon(window: HWND) -> bool {
+    let mut data = icon_data(window);
+    data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    data.uCallbackMessage = WM_TRAY;
+    // SAFETY: loads a shared system icon that must not be destroyed.
+    data.hIcon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
+    for (slot, unit) in data.szTip.iter_mut().zip("LinkCursor".encode_utf16()) {
+        *slot = unit;
+    }
+    // SAFETY: `data` is fully initialised for NIM_ADD.
+    unsafe { Shell_NotifyIconW(NIM_ADD, &data) != 0 }
+}
+
+fn show_menu(window: HWND) {
+    let open = wide("打开 LinkCursor");
+    let quit = wide("退出");
+    // SAFETY: the menu is created, shown modally and destroyed here.
+    unsafe {
+        let menu = CreatePopupMenu();
+        if menu.is_null() {
+            return;
+        }
+        AppendMenuW(menu, MF_STRING, MENU_OPEN, open.as_ptr());
+        AppendMenuW(menu, MF_SEPARATOR, 0, null());
+        AppendMenuW(menu, MF_STRING, MENU_QUIT, quit.as_ptr());
+
+        let mut cursor = POINT { x: 0, y: 0 };
+        GetCursorPos(&mut cursor);
+        // Without this the menu does not close when the user clicks elsewhere.
+        SetForegroundWindow(window);
+        let command = TrackPopupMenu(
+            menu,
+            TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY,
+            cursor.x,
+            cursor.y,
+            0,
+            window,
+            null(),
+        );
+        DestroyMenu(menu);
+
+        match command as usize {
+            MENU_OPEN => open_settings(),
+            MENU_QUIT => {
+                DestroyWindow(window);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Launches the settings app: `LINKCURSOR_APP_PATH`, or `LinkCursor.exe`
+/// next to the agent (the layout produced by the app's build).
+fn open_settings() {
+    let path = std::env::var_os("LINKCURSOR_APP_PATH")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|dir| dir.join("LinkCursor.exe")))
+        });
+    let Some(path) = path else { return };
+    if let Err(error) = std::process::Command::new(&path).spawn() {
+        eprintln!("linkcursor-agent: cannot open {}: {error}", path.display());
+    }
+}

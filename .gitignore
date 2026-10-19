@@ -1,0 +1,17 @@
+# Rust agent
+/agent/target/
+
+# MSBuild / C++ app (outputs, intermediates, NuGet restore)
+/app/x64/
+/app/ARM64/
+/app/LinkCursor/
+/app/obj/
+/app/Generated Files/
+*.vcxproj.user
+.vs/
+
+# Local environment and OS metadata
+.env
+.env.*
+!.env.example
+Thumbs.db

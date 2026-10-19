@@ -1,0 +1,14 @@
+namespace LinkCursor
+{
+    // One row in the nearby-device list. Rows are rebuilt from every agent
+    // state snapshot, so the properties are read-only.
+    runtimeclass PeerItem
+    {
+        PeerItem(String id, String name, String detail, String actionText, Boolean canAct);
+        String Id{ get; };
+        String Name{ get; };
+        String Detail{ get; };
+        String ActionText{ get; };
+        Boolean CanAct{ get; };
+    }
+}
