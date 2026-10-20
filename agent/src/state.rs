@@ -114,6 +114,15 @@ impl SharedState {
         self.0.subscribe()
     }
 
+    /// Whether a session with the peer is established.
+    pub fn is_connected(&self, peer_id: &str) -> bool {
+        self.0
+            .borrow()
+            .sessions
+            .iter()
+            .any(|session| session.peer_id == peer_id && session.status == SessionStatus::Connected)
+    }
+
     /// `reload` bumps the revision so the settings app re-reads the values.
     pub fn set_effect(&self, effect: EffectParams, reload: bool) {
         self.0.send_if_modified(|snapshot| {

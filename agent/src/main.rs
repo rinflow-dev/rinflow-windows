@@ -2,8 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod arrangement;
-mod demo;
+mod capture;
 mod displays;
+mod edge;
 mod effect;
 mod identity;
 mod inject;
@@ -95,12 +96,27 @@ fn main() {
         eprintln!("linkcursor-agent: cannot watch display changes: {error}");
     }
 
+    // Watches the pointer at the portals: crossing into peers, and the demo.
+    let edge = match edge::EdgeThread::start(
+        overlay.handle(),
+        effects.clone(),
+        state.clone(),
+        arrangement.clone(),
+        Arc::downgrade(&core),
+    ) {
+        Ok(edge) => edge,
+        Err(error) => {
+            eprintln!("linkcursor-agent: cannot watch the screen edges: {error}");
+            return;
+        }
+    };
+
     let services = Arc::new(Services::new(
         Arc::downgrade(&core),
         state,
         effects,
         overlay.handle(),
-        arrangement,
+        edge.handle(),
     ));
     ipc::spawn(&identity.user_sid, services.clone());
 
@@ -109,6 +125,8 @@ fn main() {
     }
 
     let _ = services.set_effect_demo(false);
+    // Gives back the keyboard and mouse if a peer is being driven.
+    drop(edge);
     drop(overlay);
     // The IPC thread only holds a weak reference, so this stops the core and
     // lets connected peers see a clean disconnect before the process exits.

@@ -1,26 +1,32 @@
-//! Single-machine demo of the push-through effect, for tuning it.
+//! The edge thread: watches the pointer at the arrangement's portals.
 //!
-//! While enabled, the portals of the arrangement (where placed peers touch
-//! this PC; the whole right edge if nothing is placed) behave as if the peer
-//! were there and the screen wrapped around. Push against one to feel the
-//! resistance; after crossing, the cursor comes out of the opposite edge as
-//! it would on the other device. That edge then leads back without
-//! resistance, like returning to the local machine.
+//! Pushing against the portal of a connected peer feels the resistance of
+//! the edge effect and then crosses into the peer, handing this PC's
+//! keyboard and mouse to [`crate::capture`] until the pointer comes back.
+//!
+//! With the effect demo on, the portals (the whole right edge if nothing is
+//! placed) instead behave as if the peer were there and the screen wrapped
+//! around, for tuning the effect on one machine: after crossing, the cursor
+//! comes out of the opposite edge, which then leads back without resistance.
 //!
 //! Push strength comes from raw input, which keeps reporting motion while the
-//! cursor is pinned against the edge.
+//! cursor is pinned against the edge. A process can register raw mouse input
+//! for one window only, so crossing and the demo share this thread.
 
 use crate::arrangement::Arrangement;
+use crate::capture::{self, Ended, WM_END_CAPTURE};
+use crate::displays::PhysicalPortal;
 use crate::effect::EffectStore;
 use crate::overlay::{Command, ENTRY_INSET, Edge, EdgePoint, OverlayHandle};
 use crate::state::{DemoSide, SharedState};
 use crate::win::wide;
+use linkcursor_core::Core;
 use linkcursor_core::layout::Side;
 use std::cell::RefCell;
 use std::io;
 use std::ptr::{null, null_mut};
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::{Arc, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
@@ -38,33 +44,51 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetCursorPos, GetMessageW,
     GetSystemMetrics, KillTimer, MSG, PM_NOREMOVE, PeekMessageW, PostThreadMessageW,
     RegisterClassW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    SetCursorPos, SetTimer, TranslateMessage, WM_INPUT, WM_QUIT, WM_TIMER, WNDCLASSW,
+    SetCursorPos, SetTimer, TranslateMessage, WM_APP, WM_INPUT, WM_QUIT, WM_TIMER, WNDCLASSW,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 
-/// Stands in for a peer when nothing is placed in the arrangement yet.
+/// Stands in for a peer in the demo when nothing is placed yet.
 const FALLBACK_EDGE: Edge = Edge::Right;
-/// Raw counts that return to the local side; returning has no resistance.
+/// Raw counts that return to the local side in the demo; no resistance.
 const RETURN_PUSH: f32 = 3.0;
 /// Ignore pushes right after a crossing so leftover motion cannot bounce back.
 const CROSS_COOLDOWN: Duration = Duration::from_millis(250);
 const RELEASE_TIMER: usize = 1;
+/// Thread message: the demo was turned on (wparam 1) or off.
+const WM_SET_DEMO: u32 = WM_APP + 1;
 
-pub struct EdgeDemo {
-    thread_id: u32,
+pub struct EdgeThread {
+    handle: EdgeHandle,
     join: Option<JoinHandle<()>>,
 }
 
-impl EdgeDemo {
+/// Turns the demo on and off from other threads.
+#[derive(Clone, Copy)]
+pub struct EdgeHandle {
+    thread_id: u32,
+}
+
+impl EdgeHandle {
+    pub fn set_demo(&self, enabled: bool) {
+        // SAFETY: posts to the edge thread's message queue.
+        unsafe {
+            PostThreadMessageW(self.thread_id, WM_SET_DEMO, usize::from(enabled), 0);
+        }
+    }
+}
+
+impl EdgeThread {
     pub fn start(
         overlay: OverlayHandle,
         store: EffectStore,
         state: SharedState,
         arrangement: Arc<Arrangement>,
+        core: Weak<Core>,
     ) -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
-            .name("linkcursor-edge-demo".to_owned())
+            .name("linkcursor-edge".to_owned())
             .spawn(move || {
                 // SAFETY: creates the message queue before publishing the id.
                 let thread_id = unsafe {
@@ -80,18 +104,31 @@ impl EdgeDemo {
                     }
                 };
                 let _ = ready_tx.send(Ok(thread_id));
-                state.set_demo_side(DemoSide::Local);
                 TRACKER.with(|tracker| {
-                    *tracker.borrow_mut() =
-                        Some(Tracker::new(overlay.clone(), store, state, arrangement));
+                    *tracker.borrow_mut() = Some(Tracker::new(
+                        overlay.clone(),
+                        store,
+                        state,
+                        arrangement,
+                        core,
+                        window,
+                    ));
                 });
                 // SAFETY: standard message loop; the window lives on this thread.
                 unsafe {
                     let mut message: MSG = std::mem::zeroed();
                     while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
+                        if message.hwnd.is_null() && message.message == WM_SET_DEMO {
+                            let enabled = message.wParam != 0;
+                            with_tracker(|tracker| tracker.set_demo(enabled));
+                            continue;
+                        }
                         TranslateMessage(&message);
                         DispatchMessageW(&message);
                     }
+                    // Never leave the keyboard and mouse captured.
+                    capture::release();
+                    capture::finish();
                     remove_input_window(window);
                 }
                 TRACKER.with(|tracker| {
@@ -102,20 +139,25 @@ impl EdgeDemo {
             })?;
         match ready_rx.recv() {
             Ok(Ok(thread_id)) => Ok(Self {
-                thread_id,
+                handle: EdgeHandle { thread_id },
                 join: Some(join),
             }),
             Ok(Err(error)) => Err(error),
-            Err(_) => Err(io::Error::other("edge demo thread exited during start-up")),
+            Err(_) => Err(io::Error::other("edge thread exited during start-up")),
         }
+    }
+
+    pub fn handle(&self) -> EdgeHandle {
+        self.handle
     }
 }
 
-impl Drop for EdgeDemo {
+impl Drop for EdgeThread {
     fn drop(&mut self) {
-        // SAFETY: asks the demo thread's message loop to finish.
+        // SAFETY: asks the edge thread's message loop to finish; it gives
+        // back the keyboard and mouse first if a peer is being driven.
         unsafe {
-            PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0);
+            PostThreadMessageW(self.handle.thread_id, WM_QUIT, 0, 0);
         }
         if let Some(join) = self.join.take() {
             let _ = join.join();
@@ -132,8 +174,12 @@ struct Tracker {
     store: EffectStore,
     state: SharedState,
     arrangement: Arc<Arrangement>,
+    core: Weak<Core>,
+    /// This thread's window, which hears when a capture ends.
+    window: HWND,
+    demo: bool,
     side: DemoSide,
-    /// The edge last crossed outward; the way back is the opposite edge.
+    /// The demo edge last crossed outward; the way back is the opposite edge.
     crossed: Edge,
     /// Raw counts pushed against the peer edge since the push began.
     push: f32,
@@ -155,6 +201,8 @@ impl Tracker {
         store: EffectStore,
         state: SharedState,
         arrangement: Arc<Arrangement>,
+        core: Weak<Core>,
+        window: HWND,
     ) -> Self {
         let now = Instant::now();
         Self {
@@ -162,6 +210,9 @@ impl Tracker {
             store,
             state,
             arrangement,
+            core,
+            window,
+            demo: false,
             side: DemoSide::Local,
             crossed: FALLBACK_EDGE,
             push: 0.0,
@@ -173,7 +224,19 @@ impl Tracker {
         }
     }
 
+    fn set_demo(&mut self, enabled: bool) {
+        self.cancel();
+        self.demo = enabled;
+        self.side = DemoSide::Local;
+        self.crossed = FALLBACK_EDGE;
+        self.state.set_demo_side(DemoSide::Local);
+    }
+
     fn on_motion(&mut self, dx: i32, dy: i32) {
+        // While a peer is driven, the capture hooks handle all input.
+        if capture::active() {
+            return;
+        }
         let now = Instant::now();
         if now < self.cooldown_until {
             return;
@@ -182,9 +245,10 @@ impl Tracker {
         let cursor = cursor_position();
         let hit = match self.side {
             DemoSide::Local => self.portal_hit(cursor, params.corner_dead_zone),
-            DemoSide::Remote => edge_hit(self.crossed.opposite(), cursor, params.corner_dead_zone),
+            DemoSide::Remote => edge_hit(self.crossed.opposite(), cursor, params.corner_dead_zone)
+                .map(|hit| (hit, None)),
         };
-        let Some(hit) = hit else {
+        let Some((hit, portal)) = hit else {
             self.cancel();
             return;
         };
@@ -196,14 +260,14 @@ impl Tracker {
                 if outward > 0.0 {
                     self.return_push += outward;
                     if self.return_push >= RETURN_PUSH {
-                        self.cross(&hit);
+                        self.cross(&hit, None);
                     }
                 }
             }
             DemoSide::Local => {
                 let warm = self.warm_until.is_some_and(|until| now < until);
                 if outward > 0.0 && warm {
-                    self.cross(&hit);
+                    self.cross(&hit, portal);
                     return;
                 }
                 if outward > 0.0 {
@@ -218,7 +282,7 @@ impl Tracker {
                 }
                 let progress = self.push / params.push_distance;
                 if progress >= 1.0 {
-                    self.cross(&hit);
+                    self.cross(&hit, portal);
                     return;
                 }
                 // Sliding along the edge also lands here and moves the bump.
@@ -235,6 +299,8 @@ impl Tracker {
         if self.pushing && self.last_push.elapsed().as_secs_f32() > self.store.get().release_delay {
             self.cancel();
         }
+        let state = &self.state;
+        capture::check(|peer_id| state.is_connected(peer_id));
     }
 
     fn cancel(&mut self) {
@@ -246,58 +312,128 @@ impl Tracker {
         self.return_push = 0.0;
     }
 
-    /// Where the cursor pushes against a placed peer: inside one of the
-    /// arrangement's portals. Without any placement, the whole right edge
-    /// stands in for a peer so the effect can still be tried.
-    fn portal_hit(&self, cursor: POINT, dead_zone: f32) -> Option<Hit> {
-        let portals = self.arrangement.portals();
+    /// Where the cursor pushes against a peer: inside a portal of a connected
+    /// peer, or in the demo of any placed peer. The demo falls back to the
+    /// whole right edge when nothing is placed.
+    fn portal_hit(&self, cursor: POINT, dead_zone: f32) -> Option<(Hit, Option<PhysicalPortal>)> {
+        let portals: Vec<PhysicalPortal> = self
+            .arrangement
+            .portals()
+            .into_iter()
+            .filter(|portal| self.demo || self.state.is_connected(&portal.peer_id))
+            .collect();
         if portals.is_empty() {
-            return edge_hit(FALLBACK_EDGE, cursor, dead_zone);
+            if !self.demo {
+                return None;
+            }
+            return edge_hit(FALLBACK_EDGE, cursor, dead_zone).map(|hit| (hit, None));
         }
-        portals.iter().find_map(|portal| {
-            let edge = match portal.side {
-                Side::Left => Edge::Left,
-                Side::Right => Edge::Right,
-                Side::Top => Edge::Top,
-                Side::Bottom => Edge::Bottom,
-            };
-            let hit = edge_hit(edge, cursor, dead_zone)?;
+        let (_, _, scale) = monitor_at(cursor);
+        portals.into_iter().find_map(|portal| {
+            // A short portal in a corner would otherwise lie entirely in the
+            // corner dead zone: let the dead zone take at most a quarter.
+            let length = (portal.to - portal.from) as f32 / scale;
+            let dead_zone = dead_zone.min(length / 4.0);
+            let hit = edge_hit(edge_of(portal.side), cursor, dead_zone)?;
             let (line, along) = if portal.side.is_vertical() {
                 (hit.point.x, hit.point.y)
             } else {
                 (hit.point.y, hit.point.x)
             };
-            (line == portal.line && (portal.from..portal.to).contains(&along)).then_some(hit)
+            (line == portal.line && (portal.from..portal.to).contains(&along))
+                .then_some((hit, Some(portal)))
         })
     }
 
-    fn cross(&mut self, hit: &Hit) {
+    fn cross(&mut self, hit: &Hit, portal: Option<PhysicalPortal>) {
         if self.pushing {
             self.overlay.send(Command::Pass);
-        }
-        if self.side == DemoSide::Local {
-            self.crossed = hit.point.edge;
         }
         self.pushing = false;
         self.push = 0.0;
         self.return_push = 0.0;
 
+        if !self.demo {
+            // Into the peer: from here the capture hooks drive.
+            if let Some(portal) = portal
+                && let Some(target) = self.arrangement.target(&portal.peer_id)
+            {
+                capture::begin(&self.core, target, &portal, cursor_position(), self.window);
+            }
+            return;
+        }
+
+        if self.side == DemoSide::Local {
+            self.crossed = hit.point.edge;
+        }
         let (entry, cursor) = wrap_around(hit);
         // SAFETY: moves the cursor to a point on the desktop.
         unsafe {
             SetCursorPos(cursor.x, cursor.y);
         }
         self.overlay.send(Command::Emerge { at: entry });
-
-        let now = Instant::now();
-        let warm = Duration::from_secs_f32(self.store.get().warm_seconds);
-        self.cooldown_until = now + CROSS_COOLDOWN;
-        self.warm_until = Some(now + warm);
+        self.start_cooldown();
         self.side = match self.side {
             DemoSide::Local => DemoSide::Remote,
             DemoSide::Remote => DemoSide::Local,
         };
         self.state.set_demo_side(self.side);
+    }
+
+    /// The pointer came back from a peer: show it coming in, and let it go
+    /// straight back for a while without pushing again.
+    fn returned(&mut self, ended: &Ended) {
+        if let Some(at) = self.entry_point(&ended.peer_id, ended.cursor) {
+            self.overlay.send(Command::Emerge { at });
+        }
+        self.start_cooldown();
+    }
+
+    fn start_cooldown(&mut self) {
+        let now = Instant::now();
+        let warm = Duration::from_secs_f32(self.store.get().warm_seconds);
+        self.cooldown_until = now + CROSS_COOLDOWN;
+        self.warm_until = Some(now + warm);
+    }
+
+    /// The point on the portal edge nearest to where the cursor came back.
+    fn entry_point(&self, peer_id: &str, cursor: POINT) -> Option<EdgePoint> {
+        self.arrangement
+            .portals()
+            .into_iter()
+            .filter(|portal| portal.peer_id == peer_id)
+            .filter_map(|portal| {
+                let (across, along) = if portal.side.is_vertical() {
+                    (cursor.x, cursor.y)
+                } else {
+                    (cursor.y, cursor.x)
+                };
+                (portal.from..portal.to)
+                    .contains(&along)
+                    .then(|| ((across - portal.line).abs(), portal))
+            })
+            .min_by_key(|(distance, _)| *distance)
+            .map(|(_, portal)| {
+                let (x, y) = if portal.side.is_vertical() {
+                    (portal.line, cursor.y)
+                } else {
+                    (cursor.x, portal.line)
+                };
+                EdgePoint {
+                    edge: edge_of(portal.side),
+                    x,
+                    y,
+                }
+            })
+    }
+}
+
+fn edge_of(side: Side) -> Edge {
+    match side {
+        Side::Left => Edge::Left,
+        Side::Right => Edge::Right,
+        Side::Top => Edge::Top,
+        Side::Bottom => Edge::Bottom,
     }
 }
 
@@ -314,8 +450,7 @@ fn outward(edge: Edge, dx: i32, dy: i32) -> i32 {
 /// The cursor's spot on `edge` if it is pinned against an outer edge of the
 /// desktop (no monitor continues past it) and outside the corner dead zones.
 fn edge_hit(edge: Edge, cursor: POINT, dead_zone: f32) -> Option<Hit> {
-    let (monitor, rect, scale) = monitor_at(cursor);
-    let _ = monitor;
+    let (_, rect, scale) = monitor_at(cursor);
     let dead = (dead_zone * scale).round() as i32;
     let (pinned, beyond, point, along, (low, high)) = match edge {
         Edge::Right => (
@@ -494,7 +629,7 @@ fn cursor_position() -> POINT {
 }
 
 fn create_input_window() -> io::Result<HWND> {
-    let class_name = wide("LinkCursorEdgeDemo");
+    let class_name = wide("LinkCursorEdge");
     // SAFETY: hidden window on this thread, registered for raw mouse input
     // even while other applications have focus. A message-only window
     // (HWND_MESSAGE) does not receive background raw input.
@@ -568,6 +703,12 @@ unsafe extern "system" fn window_proc(
             }
         }
         WM_TIMER if wparam == RELEASE_TIMER => with_tracker(Tracker::on_timer),
+        WM_END_CAPTURE => {
+            if let Some(ended) = capture::finish() {
+                with_tracker(|tracker| tracker.returned(&ended));
+            }
+            return 0;
+        }
         _ => {}
     }
     // SAFETY: WM_INPUT must reach DefWindowProc so the system frees the data.
@@ -600,7 +741,8 @@ fn read_relative_motion(lparam: LPARAM) -> Option<(i32, i32)> {
             return None;
         }
         let mouse = input.data.mouse;
-        // Absolute devices (pens, remote desktop) do not report pushes.
+        // Absolute devices (pens, remote desktop, a peer's played input) do
+        // not report pushes.
         if mouse.usFlags & MOUSE_MOVE_ABSOLUTE != 0 {
             return None;
         }

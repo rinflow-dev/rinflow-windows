@@ -119,17 +119,42 @@ pub fn same_layout(a: &[Monitor], b: &[Monitor]) -> bool {
             .all(|(a, b)| a.logical == b.logical && same_rect(&a.physical, &b.physical))
 }
 
+/// A physical pixel in logical points, through the monitor that contains it
+/// (or the nearest one).
+pub fn to_logical(monitors: &[Monitor], x: i32, y: i32) -> Option<(f64, f64)> {
+    let distance = |monitor: &&Monitor| {
+        let p = &monitor.physical;
+        let dx = i64::from((p.left - x).max(0).max(x - (p.right - 1)));
+        let dy = i64::from((p.top - y).max(0).max(y - (p.bottom - 1)));
+        dx * dx + dy * dy
+    };
+    let monitor = monitors.iter().min_by_key(distance)?;
+    let l = &monitor.logical;
+    let p = &monitor.physical;
+    Some((
+        l.x + f64::from(x - p.left) / l.scale,
+        l.y + f64::from(y - p.top) / l.scale,
+    ))
+}
+
 /// A portal on this PC's side in physical pixels: the edge `line` (exclusive
-/// for right and bottom, like `RECT`) and the range `from..to` along it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// for right and bottom, like `RECT`) and the range `from..to` along it,
+/// with the peer it leads to and the same portal in logical points.
+#[derive(Clone, Debug, PartialEq)]
 pub struct PhysicalPortal {
+    pub peer_id: String,
+    pub portal: Portal,
     pub side: Side,
     pub line: i32,
     pub from: i32,
     pub to: i32,
 }
 
-pub fn physical_portal(monitors: &[Monitor], portal: &Portal) -> Option<PhysicalPortal> {
+pub fn physical_portal(
+    monitors: &[Monitor],
+    peer_id: &str,
+    portal: &Portal,
+) -> Option<PhysicalPortal> {
     let monitor = monitors.get(portal.local_display)?;
     let (logical_start, physical_start) = if portal.side.is_vertical() {
         (monitor.logical.y, monitor.physical.top)
@@ -146,6 +171,8 @@ pub fn physical_portal(monitors: &[Monitor], portal: &Portal) -> Option<Physical
         Side::Bottom => monitor.physical.bottom,
     };
     Some(PhysicalPortal {
+        peer_id: peer_id.to_owned(),
+        portal: *portal,
         side: portal.side,
         line,
         from: convert(portal.from),
@@ -274,5 +301,8 @@ mod tests {
         // Outside every monitor: clamped into the nearest one.
         assert_eq!(to_physical(&monitors, -50.0, 100.0), Some((0, 200)));
         assert_eq!(to_physical(&[], 0.0, 0.0), None);
+        // And back.
+        assert_eq!(to_logical(&monitors, 1440, 960), Some((720.0, 480.0)));
+        assert_eq!(to_logical(&monitors, 2980, 50), Some((2980.0, 50.0)));
     }
 }

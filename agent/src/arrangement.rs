@@ -10,7 +10,7 @@ use crate::displays::{self, Monitor, PhysicalPortal};
 use crate::identity;
 use crate::state::{DeviceView, LayoutView, SharedState};
 use linkcursor_core::PlacementRecord;
-use linkcursor_core::layout::{self, Display, Offset};
+use linkcursor_core::layout::{self, Display, Offset, Portal};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -38,6 +38,13 @@ struct KnownDevice {
 pub struct Arrangement {
     inner: Mutex<Inner>,
     state: SharedState,
+}
+
+/// A placed peer as the pointer crosses into it.
+pub struct Target {
+    pub peer: Vec<Display>,
+    pub offset: Offset,
+    pub portals: Vec<Portal>,
 }
 
 struct Inner {
@@ -87,6 +94,31 @@ impl Arrangement {
             .lock()
             .map(|inner| inner.portals.clone())
             .unwrap_or_default()
+    }
+
+    /// What controlling a placed peer needs: its displays (in its space), its
+    /// offset in this PC's space, and every portal leading to it.
+    pub fn target(&self, peer_id: &str) -> Option<Target> {
+        let inner = self.inner.lock().ok()?;
+        let offset = inner
+            .saved
+            .placements
+            .iter()
+            .find(|record| record.peer_id == peer_id)?
+            .offset?;
+        let known = inner
+            .saved
+            .devices
+            .get(peer_id)
+            .cloned()
+            .unwrap_or_default();
+        let peer = layout::peer_or_default(&known.displays);
+        let portals = layout::portals(&displays::logical(&inner.monitors), &peer, offset);
+        Some(Target {
+            peer,
+            offset,
+            portals,
+        })
     }
 
     /// Picks peer descriptions and placement changes out of the core's events.
@@ -187,7 +219,7 @@ impl Arrangement {
             portals.extend(
                 touching
                     .iter()
-                    .filter_map(|portal| displays::physical_portal(&inner.monitors, portal)),
+                    .filter_map(|portal| displays::physical_portal(&inner.monitors, id, portal)),
             );
             devices.push(DeviceView {
                 peer_id: id.clone(),

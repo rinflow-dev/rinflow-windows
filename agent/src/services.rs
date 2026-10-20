@@ -1,20 +1,18 @@
 //! What the settings app can drive through IPC.
 
-use crate::arrangement::Arrangement;
-use crate::demo::EdgeDemo;
+use crate::edge::EdgeHandle;
 use crate::effect::{EffectParams, EffectStore};
 use crate::overlay::{Command, OverlayHandle};
 use crate::state::SharedState;
 use linkcursor_core::Core;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::Weak;
 
 pub struct Services {
     pub core: Weak<Core>,
     pub state: SharedState,
     pub effects: EffectStore,
     pub overlay: OverlayHandle,
-    pub arrangement: Arc<Arrangement>,
-    demo: Mutex<Option<EdgeDemo>>,
+    edge: EdgeHandle,
 }
 
 impl Services {
@@ -23,15 +21,14 @@ impl Services {
         state: SharedState,
         effects: EffectStore,
         overlay: OverlayHandle,
-        arrangement: Arc<Arrangement>,
+        edge: EdgeHandle,
     ) -> Self {
         Self {
             core,
             state,
             effects,
             overlay,
-            arrangement,
-            demo: Mutex::new(None),
+            edge,
         }
     }
 
@@ -49,21 +46,10 @@ impl Services {
         self.overlay.send(Command::Preview { hold });
     }
 
+    /// The demo runs on the edge thread, which also drives real crossings;
+    /// turning it off retracts any bump on screen.
     pub fn set_effect_demo(&self, enabled: bool) -> Result<(), String> {
-        let mut demo = self.demo.lock().map_err(|_| "demo state poisoned")?;
-        if enabled && demo.is_none() {
-            let started = EdgeDemo::start(
-                self.overlay.clone(),
-                self.effects.clone(),
-                self.state.clone(),
-                self.arrangement.clone(),
-            )
-            .map_err(|error| format!("cannot start the effect demo: {error}"))?;
-            *demo = Some(started);
-        } else if !enabled {
-            // Dropping stops the demo thread and retracts any bump on screen.
-            demo.take();
-        }
+        self.edge.set_demo(enabled);
         self.state.set_effect_demo(enabled);
         Ok(())
     }

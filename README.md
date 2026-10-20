@@ -18,10 +18,11 @@ The Windows client for LinkCursor. It is two programs:
 ```
 
 Status:
-- The agent discovers peers, connects to them, and plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app).
+- The agent discovers peers and connects to them.
+- It plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app).
+- It controls a peer when the pointer is pushed through the edge it is placed at, with the push-through effect on this PC's side.
 - Peers can be arranged around this PC's screens, and the arrangement syncs with them.
 - The edge effect can be tuned with a single-machine demo.
-- Local input is not captured yet, so this PC cannot control others, and the effect is not yet driven by a real peer.
 
 ## Layout
 
@@ -39,7 +40,8 @@ agent/
   src/effect.rs              effect parameters (%LOCALAPPDATA%\LinkCursor\effect.json)
   src/spring.rs              damped spring with SwiftUI-style response/damping
   src/overlay.rs             click-through overlay that draws the edge effect
-  src/demo.rs                single-machine demo: raw-input push tracking at the portals, wrap-around
+  src/edge.rs                edge thread: raw-input push tracking at the portals, crossing, the demo
+  src/capture.rs             while driving a peer: low-level hooks, hidden parked cursor, return
   src/tray.rs                notification-area icon and menu
   src/identity.rs            device ID (%LOCALAPPDATA%\LinkCursor\device-id) and name
   src/inject.rs              plays a controlling peer's input with SendInput
@@ -146,7 +148,7 @@ Core handles everything that is the same on every platform. The agent only trans
 
 | | Where | What |
 | --- | --- | --- |
-| Shortcuts | core (`remap.rs`) | From a Mac, ⌘ arrives as Ctrl, so ⌘C copies. The Mac's own Control stays Ctrl, so it never sends a lone Windows-key tap that opens Start. |
+| Shortcuts | core (`remap.rs`) | Keys keep their position by default: a Mac's ⌘ is the Windows key, as in Deskflow. With the core's `shortcut_remap` on, ⌘ arrives as Ctrl instead (⌘C copies) and the Mac's Control stays Ctrl. The agent leaves it at the default. |
 | Control start/end | core | `remote_control_started` / `remote_control_ended` events. When control ends or the connection drops, core first releases every key and button the peer still holds. |
 | Pointer motion | agent | Played as an absolute move on the virtual desktop: current position + delta × this monitor's scale. Windows does not accelerate it a second time, multi-monitor layouts and negative coordinates work, and sub-pixel movement is carried over. |
 | Arrival | agent | A move flagged `LC_INPUT_FLAG_ABSOLUTE_POSITION` (sent by the Mac when the pointer crosses over) is converted from logical points to pixels through the monitor that contains it, so the cursor appears at the matching point of this PC's edge. |
@@ -156,7 +158,26 @@ Core handles everything that is the same on every platform. The agent only trans
 | Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. |
 | No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
 
-Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The future capture hooks will use it to skip input the agent itself played.
+Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The capture hooks use it to skip input the agent itself played.
+
+## Controlling another device
+
+Push the pointer against the edge where a connected peer is placed (see [Arranging devices](#arranging-devices)). The edge resists with the push-through effect, then the pointer crosses: from there this PC's keyboard and mouse drive the peer.
+
+| | Where | What |
+| --- | --- | --- |
+| Crossing | agent ([edge.rs](agent/src/edge.rs)) | The edge thread measures the push with raw input at the portals of connected peers, like the demo. After crossing, it sends the peer an absolute move to the matching point of its edge, 2 points inside. |
+| While driving | agent ([capture.rs](agent/src/capture.rs)) | Low-level mouse and keyboard hooks, installed only while driving, swallow local input and send it through the core. The Windows cursor waits in the middle of its monitor, hidden by a tiny window with no cursor. Motion is measured from there, so Windows' own pointer speed and acceleration apply. Keys go by scan code (→ HID usage), auto-repeats are marked as repeats, and the wheel sends 10 points per notch. |
+| Where the pointer is | core (`layout::RemotePointer`) | Tracks the pointer in the peer's space as the peer plays the same motion. It slides along edges that lead nowhere. Moving out through a portal ends the crossing at the matching local point, 2 points inside the edge. |
+| Coming back | agent | The cursor reappears there with the effect's emerge animation. For the **连续切换免阻力** time, going back across needs no push. |
+| Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
+| Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
+
+The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
+
+Known limits:
+- The secure desktop (Ctrl+Alt+Del, UAC prompts) cannot be hooked; it takes input back from the hooks.
+- With mixed DPI across several monitors, logical monitor positions can leave gaps. A peer placed in such a gap is not reachable.
 
 Known limits: windows of elevated programs (such as Task Manager), UAC prompts and the lock screen ignore injected input until the LocalSystem service exists (M4). Scroll speeds and Mac function-key behavior still need checking against a real Mac.
 
@@ -270,7 +291,7 @@ The agent sends whole snapshots instead of individual events, so the app never h
 
 1. **Receive input (M1):** done; see [Being controlled by another device](#being-controlled-by-another-device). It still needs a pass with a real Mac for scroll speed and function keys.
 2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app uses it with a side menu; it has no drag canvas yet.
-3. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, crossing at the arrangement's portals, parking and hiding the local cursor while controlling a peer, a Ctrl+Alt+Esc release key, and detecting key repeats from keys already held (low-level hooks do not report repeats). Events marked with the `LCIN` value are skipped.
+3. **Send input (M2):** done; see [Controlling another device](#controlling-another-device). It still needs a pass with the real Mac for pointer speed and keys.
 4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
 5. **Productize (M4):** single-instance settings window, MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output.
 

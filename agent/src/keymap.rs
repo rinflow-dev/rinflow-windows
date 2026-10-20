@@ -144,9 +144,62 @@ pub fn windows_key(usage: u32) -> Option<WinKey> {
     }
 }
 
+/// The reverse of [`windows_key`], for keys captured on this PC: the HID
+/// usage of a key from a low-level hook's scan code, E0 flag and virtual key.
+pub fn hid_usage(scan_code: u32, extended: bool, virtual_key: u32) -> Option<u32> {
+    use std::collections::HashMap;
+    use std::sync::OnceLock;
+    struct Reverse {
+        scan: HashMap<(u16, bool), u32>,
+        virtual_key: HashMap<u16, u32>,
+    }
+    static REVERSE: OnceLock<Reverse> = OnceLock::new();
+    let reverse = REVERSE.get_or_init(|| {
+        let mut scan = HashMap::new();
+        let mut virtual_key = HashMap::new();
+        // Ascending, so a shared key position keeps its first usage (0x31
+        // over the ISO 0x32).
+        for usage in 0..=0xFF {
+            match windows_key(usage) {
+                Some(WinKey::Scan { code, extended }) => {
+                    scan.entry((code, extended)).or_insert(usage);
+                }
+                Some(WinKey::Virtual(key)) => {
+                    virtual_key.entry(key).or_insert(usage);
+                }
+                None => {}
+            }
+        }
+        Reverse { scan, virtual_key }
+    });
+    if let Ok(key) = u16::try_from(virtual_key)
+        && let Some(&usage) = reverse.virtual_key.get(&key)
+    {
+        return Some(usage);
+    }
+    let code = u16::try_from(scan_code).ok()?;
+    reverse.scan.get(&(code, extended)).copied()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{WinKey, windows_key};
+    use super::{WinKey, hid_usage, windows_key};
+
+    #[test]
+    fn captured_keys_map_back_to_the_usage_they_play() {
+        for usage in 0..=0xFF {
+            let back = match windows_key(usage) {
+                Some(WinKey::Scan { code, extended }) => hid_usage(code.into(), extended, 0),
+                Some(WinKey::Virtual(key)) => hid_usage(0, false, key.into()),
+                None => continue,
+            };
+            let expected = if usage == 0x32 { 0x31 } else { usage };
+            assert_eq!(back, Some(expected), "usage {usage:#x}");
+        }
+        // Left and right Control share a scan code; E0 tells them apart.
+        assert_eq!(hid_usage(0x1D, false, 0xA2), Some(0xE0));
+        assert_eq!(hid_usage(0x1D, true, 0xA3), Some(0xE4));
+    }
 
     fn code(usage: u32) -> (u16, bool) {
         match windows_key(usage) {
