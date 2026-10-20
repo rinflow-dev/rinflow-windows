@@ -144,7 +144,7 @@
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="同步剪贴板" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式和图片，最大 8 MB。密码管理器标记为隐私的内容不会同步。目前传输还没有加密，请只在可信的网络中开启。"
+                                Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。目前传输还没有加密，请只在可信的网络中开启。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <ToggleSwitch

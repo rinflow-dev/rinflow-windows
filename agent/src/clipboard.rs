@@ -6,18 +6,25 @@
 //! peers send. Text, HTML and images travel as UTF-8 text, a UTF-8 HTML
 //! fragment and PNG. Contents a password manager marks as private are never
 //! shared.
+//!
+//! Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`;
+//! the core turns them into a manifest and the peer pulls them. Files a peer
+//! copied land in Downloads\LinkCursor and are put on the clipboard as files,
+//! so Ctrl+V in Explorer copies them.
 
 use crate::win::wide;
 use linkcursor_core::{Clipboard, ClipboardFormat, Core, MIME_HTML, MIME_PNG, MIME_TEXT};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
-use std::sync::{Arc, Mutex, Weak, mpsc};
+use std::sync::{Arc, Mutex, OnceLock, Weak, mpsc};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use windows_sys::Win32::Foundation::{GlobalFree, HWND, LPARAM, LRESULT, WPARAM};
+use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::System::DataExchange::{
     AddClipboardFormatListener, CloseClipboard, EmptyClipboard, GetClipboardData,
     GetClipboardSequenceNumber, IsClipboardFormatAvailable, OpenClipboard,
@@ -28,14 +35,21 @@ use windows_sys::Win32::System::Memory::{
     GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
 };
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::UI::Shell::{FOLDERID_Downloads, SHGetKnownFolderPath};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, HWND_MESSAGE,
-    MSG, PostMessageW, PostThreadMessageW, RegisterClassW, TranslateMessage, WM_APP,
-    WM_CLIPBOARDUPDATE, WM_QUIT, WNDCLASSW,
+    IDYES, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MSG, MessageBoxW, PostMessageW,
+    PostThreadMessageW, RegisterClassW, TranslateMessage, WM_APP, WM_CLIPBOARDUPDATE, WM_QUIT,
+    WNDCLASSW,
 };
 
 const CF_UNICODETEXT: u32 = 13;
 const CF_DIB: u32 = 8;
+const CF_HDROP: u32 = 15;
+/// Copied files, as `file://` URLs one per line (the core's MIME type).
+const MIME_URI_LIST: &str = "text/uri-list";
+/// Files a peer copied are taken without asking up to this size in all.
+const AUTO_ACCEPT_BYTES: u64 = 512 * 1024 * 1024;
 /// A peer's clipboard is waiting in `Shared::incoming`.
 const WM_WRITE_CLIPBOARD: u32 = WM_APP + 1;
 /// Sharing was turned on or off: report the clipboard (or nothing) again.
@@ -53,6 +67,34 @@ struct Shared {
     /// The clipboard thread's window; 0 until it runs.
     window: AtomicIsize,
     incoming: Mutex<Option<Clipboard>>,
+    /// Set when the thread starts, for decisions on offered files.
+    core: OnceLock<Weak<Core>>,
+}
+
+/// Where files from peers go: Downloads\LinkCursor (the core creates it).
+pub fn download_directory() -> PathBuf {
+    let mut path: windows_sys::core::PWSTR = null_mut();
+    // SAFETY: asks for the user's Downloads folder; the string the shell
+    // allocates is copied and freed.
+    let downloads = unsafe {
+        let found = SHGetKnownFolderPath(&FOLDERID_Downloads, 0, null_mut(), &mut path) == 0
+            && !path.is_null();
+        let text = found.then(|| {
+            let length = (0..).take_while(|&i| *path.add(i) != 0).count();
+            String::from_utf16_lossy(std::slice::from_raw_parts(path, length))
+        });
+        if !path.is_null() {
+            CoTaskMemFree(path as *const _);
+        }
+        text
+    };
+    downloads
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("USERPROFILE").map(|home| PathBuf::from(home).join("Downloads"))
+        })
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("LinkCursor")
 }
 
 impl ClipboardHandle {
@@ -73,17 +115,73 @@ impl ClipboardHandle {
         self.post(WM_REPORT_CLIPBOARD);
     }
 
-    /// Picks a peer's clipboard out of the core's events.
+    /// Picks peers' clipboards and file offers out of the core's events.
     pub fn core_event(&self, json: &str) {
-        if !json.contains("\"clipboard\"") {
+        if !(json.contains("\"clipboard\"") || json.contains("\"files_offered\"")) {
             return;
         }
         let Ok(event) = serde_json::from_str::<Value>(json) else {
             return;
         };
-        if event["event"] != "clipboard" {
+        match event["event"].as_str() {
+            Some("clipboard") => self.peer_clipboard(&event),
+            Some("files_offered") => self.files_offered(&event),
+            _ => {}
+        }
+    }
+
+    /// Files a peer copied. The core waits for this decision on every
+    /// transfer (its own limit is set to 0): taken at once while sharing is
+    /// on and they are not too large, after asking when they are, and never
+    /// while sharing is off.
+    fn files_offered(&self, event: &Value) {
+        let Some(transfer) = event["transfer"]
+            .as_u64()
+            .and_then(|transfer| u32::try_from(transfer).ok())
+        else {
+            return;
+        };
+        let Some(core) = self.0.core.get().and_then(Weak::upgrade) else {
+            return;
+        };
+        if !self.enabled() {
+            let _ = core.cancel_files(transfer);
             return;
         }
+        let total = event["total_size"].as_u64().unwrap_or(0);
+        if total <= AUTO_ACCEPT_BYTES {
+            let _ = core.accept_files(transfer);
+            return;
+        }
+        let count = event["count"].as_u64().unwrap_or(0);
+        let core = Arc::downgrade(&core);
+        // Asked on a thread of its own: the core's callback must not wait.
+        std::thread::spawn(move || {
+            let text = wide(&format!(
+                "另一台设备复制了 {count} 个文件，共 {:.1} MB。\n\n现在接收到“下载\\LinkCursor”吗？",
+                total as f64 / (1024.0 * 1024.0)
+            ));
+            let caption = wide("LinkCursor");
+            // SAFETY: a modal message box with valid NUL-terminated strings.
+            let answer = unsafe {
+                MessageBoxW(
+                    null_mut(),
+                    text.as_ptr(),
+                    caption.as_ptr(),
+                    MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND,
+                )
+            };
+            if let Some(core) = core.upgrade() {
+                let _ = if answer == IDYES {
+                    core.accept_files(transfer)
+                } else {
+                    core.cancel_files(transfer)
+                };
+            }
+        });
+    }
+
+    fn peer_clipboard(&self, event: &Value) {
         if !self.enabled() {
             // The core keeps what it received as this PC's clipboard and
             // would pass it on to the next peer: clear that while sharing is
@@ -91,7 +189,7 @@ impl ClipboardHandle {
             self.post(WM_REPORT_CLIPBOARD);
             return;
         }
-        match Clipboard::from_json(&event) {
+        match Clipboard::from_json(event) {
             Ok(clipboard) => {
                 if let Ok(mut incoming) = self.0.incoming.lock() {
                     *incoming = Some(clipboard);
@@ -134,6 +232,7 @@ impl ClipboardThread {
                 };
                 // SAFETY: plain thread id query.
                 let _ = ready_tx.send(Ok(unsafe { GetCurrentThreadId() }));
+                let _ = handle.0.core.set(core.clone());
                 handle.0.window.store(window as isize, Ordering::SeqCst);
                 STATE.with(|state| {
                     *state.borrow_mut() = Some(State {
@@ -401,6 +500,33 @@ fn read(window: HWND) -> Clipboard {
     if is_private() {
         return Clipboard::default();
     }
+    // Files copied in Explorer: the files (the core turns the URLs into a
+    // manifest) and their names as text, never their icons.
+    if let Some(paths) = get_bytes(CF_HDROP).and_then(|data| drop_files(&data))
+        && !paths.is_empty()
+    {
+        let urls: Vec<String> = paths.iter().map(|path| file_url(path)).collect();
+        let names: Vec<String> = paths
+            .iter()
+            .map(|path| {
+                Path::new(path)
+                    .file_name()
+                    .map_or_else(|| path.clone(), |name| name.to_string_lossy().into_owned())
+            })
+            .collect();
+        return Clipboard {
+            formats: vec![
+                ClipboardFormat {
+                    mime: MIME_URI_LIST.to_owned(),
+                    data: urls.join("\r\n").into_bytes(),
+                },
+                ClipboardFormat {
+                    mime: MIME_TEXT.to_owned(),
+                    data: names.join("\r\n").into_bytes(),
+                },
+            ],
+        };
+    }
     let mut formats = Vec::new();
     if let Some(html) = get_bytes(register("HTML Format")).and_then(|data| html_fragment(&data)) {
         formats.push(ClipboardFormat {
@@ -434,6 +560,25 @@ fn write(window: HWND, clipboard: &Clipboard) -> bool {
     unsafe {
         EmptyClipboard();
     }
+    // Files received from the peer (a text/uri-list of their paths here): as
+    // files, so Ctrl+V in Explorer copies them.
+    if let Some(list) = clipboard
+        .formats
+        .iter()
+        .find(|format| format.mime == MIME_URI_LIST)
+    {
+        let paths: Vec<String> = String::from_utf8_lossy(&list.data)
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .filter_map(path_from_file_url)
+            .collect();
+        if !paths.is_empty() {
+            set_bytes(CF_HDROP, &drop_files_block(&paths));
+            // DROPEFFECT_COPY: pasting copies rather than moves.
+            set_bytes(register("Preferred DropEffect"), &1u32.to_le_bytes());
+        }
+    }
     for format in &clipboard.formats {
         match format.mime.as_str() {
             MIME_TEXT => {
@@ -454,6 +599,92 @@ fn write(window: HWND, clipboard: &Clipboard) -> bool {
         }
     }
     true
+}
+
+/// The paths in a `CF_HDROP` block (`DROPFILES` and NUL-separated names).
+fn drop_files(data: &[u8]) -> Option<Vec<String>> {
+    let u32_at = |at: usize| Some(u32::from_le_bytes(data.get(at..at + 4)?.try_into().ok()?));
+    let start = u32_at(0)? as usize;
+    // Only wide names; ANSI drop lists are a relic no current program makes.
+    if u32_at(16)? == 0 {
+        return None;
+    }
+    let units: Vec<u16> = data
+        .get(start..)?
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .collect();
+    Some(
+        units
+            .split(|&unit| unit == 0)
+            .take_while(|name| !name.is_empty())
+            .map(String::from_utf16_lossy)
+            .collect(),
+    )
+}
+
+/// A `CF_HDROP` block for `paths`: `DROPFILES` with wide names.
+fn drop_files_block(paths: &[String]) -> Vec<u8> {
+    let mut block = Vec::new();
+    block.extend_from_slice(&20u32.to_le_bytes()); // pFiles: names follow
+    block.extend_from_slice(&[0; 12]); // pt, fNC
+    block.extend_from_slice(&1u32.to_le_bytes()); // fWide
+    for path in paths {
+        for unit in path.encode_utf16().chain(Some(0)) {
+            block.extend_from_slice(&unit.to_le_bytes());
+        }
+    }
+    block.extend_from_slice(&[0, 0]); // the list ends with an empty name
+    block
+}
+
+/// `C:\Users\a b\x.txt` → `file:///C:/Users/a%20b/x.txt` (as the core reads
+/// and writes them; UNC paths become `file:////server/share/…`).
+fn file_url(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    let mut url = String::from("file:///");
+    for byte in path.trim_start_matches('/').bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
+            url.push(byte as char);
+        } else {
+            url.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    if path.starts_with("//") {
+        url.insert("file:///".len(), '/');
+    }
+    url
+}
+
+/// The reverse of [`file_url`]: a local path, or None for other URLs.
+fn path_from_file_url(url: &str) -> Option<String> {
+    let rest = url.strip_prefix("file://")?;
+    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    if !rest.starts_with('/') {
+        return None;
+    }
+    let bytes = rest.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            decoded.push(u8::from_str_radix(rest.get(index + 1..index + 3)?, 16).ok()?);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    let decoded = String::from_utf8(decoded).ok()?;
+    // `/C:/…` drops the slash before the drive; `//server/share/…` is UNC.
+    let path = if decoded.starts_with("//") {
+        &decoded[..]
+    } else {
+        &decoded[1..]
+    };
+    Some(path.replace('/', "\\"))
 }
 
 /// `CF_UNICODETEXT` bytes (UTF-16, NUL-terminated) as text; None if empty.
@@ -687,6 +918,28 @@ mod tests {
             &pixels[12..24],
             &[255, 255, 255, 255, 0, 0, 0, 255, 128, 128, 128, 255]
         );
+    }
+
+    #[test]
+    fn file_lists_survive_cf_hdrop_and_file_urls() {
+        let paths = vec![
+            r"C:\Users\a b\报告.pdf".to_owned(),
+            r"D:\x%y#z.txt".to_owned(),
+            r"\\server\share\dir".to_owned(),
+        ];
+        assert_eq!(drop_files(&drop_files_block(&paths)), Some(paths.clone()));
+
+        let urls: Vec<String> = paths.iter().map(|path| file_url(path)).collect();
+        assert_eq!(urls[0], "file:///C:/Users/a%20b/%E6%8A%A5%E5%91%8A.pdf");
+        assert_eq!(urls[1], "file:///D:/x%25y%23z.txt");
+        assert_eq!(urls[2], "file:////server/share/dir");
+        let back: Vec<String> = urls
+            .iter()
+            .filter_map(|url| path_from_file_url(url))
+            .collect();
+        assert_eq!(back, paths);
+        assert_eq!(path_from_file_url("https://example.com/x"), None);
+        assert_eq!(path_from_file_url("file://host/x"), None);
     }
 
     #[test]

@@ -74,6 +74,16 @@ fn main() {
         // Always offered to peers; whether this PC's clipboard is actually
         // shared is the user's setting, applied by `clipboard.rs`.
         clipboard: true,
+        // Copied files travel with the clipboard. Every incoming transfer
+        // waits for `clipboard.rs` (limit 0), which takes it or not
+        // according to the same setting.
+        files: true,
+        download_directory: Some(
+            clipboard::download_directory()
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        max_auto_receive_bytes: 0,
         ..CoreConfig::default()
     };
     let events = state.clone();

@@ -261,6 +261,11 @@ impl SharedState {
                 snapshot.last_error = event["message"].as_str().map(str::to_owned);
                 true
             }
+            "files_failed" => {
+                let reason = event["reason"].as_str().unwrap_or("unknown error");
+                snapshot.last_error = Some(format!("接收文件失败：{reason}"));
+                true
+            }
             _ => false,
         });
     }
