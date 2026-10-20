@@ -1,7 +1,9 @@
 // Release builds run without a console window; debug builds keep one for logs.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod arrangement;
 mod demo;
+mod displays;
 mod effect;
 mod identity;
 mod inject;
@@ -50,19 +52,25 @@ fn main() {
             return;
         }
     };
+    let monitors = displays::monitors();
+    let arrangement = arrangement::Arrangement::load(state.clone(), monitors.clone());
     let config = CoreConfig {
         device_id: identity.device_id.clone(),
         device_name: identity.device_name.clone(),
         platform: "windows".to_owned(),
+        displays: displays::logical(&monitors),
+        placements: arrangement.placements(),
         ..CoreConfig::default()
     };
     let events = state.clone();
+    let layout_events = arrangement.clone();
     let control = injector.handle();
     let input = injector.handle();
     let core = match Core::start(
         config,
         move |json| {
             events.apply_core_event(&json);
+            layout_events.core_event(&json);
             control.core_event(&json);
         },
         move |event| input.play(event),
@@ -74,11 +82,25 @@ fn main() {
         }
     };
 
+    // Resolution, scaling or monitor changes reach the core (which re-fits
+    // placements and tells peers) and the arrangement view.
+    let watched_core = Arc::downgrade(&core);
+    let watched_arrangement = arrangement.clone();
+    if let Err(error) = displays::watch(move |monitors| {
+        if let Some(core) = watched_core.upgrade() {
+            let _ = core.set_local_displays(displays::logical(&monitors));
+        }
+        watched_arrangement.set_monitors(monitors);
+    }) {
+        eprintln!("linkcursor-agent: cannot watch display changes: {error}");
+    }
+
     let services = Arc::new(Services::new(
         Arc::downgrade(&core),
         state,
         effects,
         overlay.handle(),
+        arrangement,
     ));
     ipc::spawn(&identity.user_sid, services.clone());
 

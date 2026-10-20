@@ -28,6 +28,14 @@ pub fn data_directory() -> PathBuf {
         .join("LinkCursor")
 }
 
+/// Replaces a settings file without ever leaving it half written: a crash or
+/// power loss mid-write would otherwise make it unreadable and lose it.
+pub fn write_file(path: &std::path::Path, text: &str) -> io::Result<()> {
+    let temporary = path.with_extension("tmp");
+    fs::write(&temporary, text)?;
+    fs::rename(&temporary, path)
+}
+
 fn load_or_create_device_id(directory: &std::path::Path) -> io::Result<String> {
     let path = directory.join("device-id");
     if let Ok(stored) = fs::read_to_string(&path) {

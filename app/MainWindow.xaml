@@ -39,7 +39,11 @@
                 Text="LinkCursor" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1">
+        <!-- ScrollView with vertical content: the page is laid out at the
+             viewport's width. A ScrollViewer would centre a page narrower
+             than the viewport by its desired width (the Devices tab's
+             content can be short) and push the 680-wide column off-centre. -->
+        <ScrollView Grid.Row="1" ContentOrientation="Vertical">
             <StackPanel MaxWidth="680" Padding="32,8,32,32" Spacing="20">
                 <StackPanel Spacing="4">
                     <TextBlock
@@ -54,6 +58,7 @@
 
                 <SelectorBar x:Name="Sections" Margin="-12,0,0,0">
                     <SelectorBarItem x:Name="DevicesItem" IsSelected="True" Text="设备" />
+                    <SelectorBarItem x:Name="ArrangementItem" Text="排列" />
                     <SelectorBarItem x:Name="EffectItem" Text="连接效果" />
                 </SelectorBar>
 
@@ -62,18 +67,15 @@
                 <!-- Devices -->
                 <StackPanel x:Name="DevicesPanel" Spacing="8">
                     <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="附近的设备" />
-                    <ListView
-                        x:Name="PeerList"
-                        ItemsSource="{x:Bind Peers}"
-                        SelectionMode="None">
-                        <ListView.ItemContainerStyle>
-                            <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0,0,0,4" />
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.ItemTemplate>
+                    <!-- A plain ItemsControl: nothing is selected, and a ListView
+                         would nest its own scroller inside the page's. -->
+                    <ItemsControl x:Name="PeerList" ItemsSource="{x:Bind Peers}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="4" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="local:PeerItem">
                                 <Grid
                                     Padding="16,12"
@@ -98,20 +100,61 @@
                                             Style="{StaticResource CaptionTextBlockStyle}"
                                             Text="{x:Bind Detail}" />
                                     </StackPanel>
-                                    <Button
+                                    <StackPanel
                                         Grid.Column="2"
-                                        Click="OnPeerAction"
-                                        Content="{x:Bind ActionText}"
-                                        IsEnabled="{x:Bind CanAct}"
-                                        Tag="{x:Bind Id}" />
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                        <DropDownButton Content="位置" ToolTipService.ToolTip="把这台设备放在这台电脑的某一侧">
+                                            <DropDownButton.Flyout>
+                                                <MenuFlyout Placement="Bottom">
+                                                    <MenuFlyoutItem Click="OnPlaceLeft" Tag="{x:Bind Id}" Text="放在左边" />
+                                                    <MenuFlyoutItem Click="OnPlaceRight" Tag="{x:Bind Id}" Text="放在右边" />
+                                                    <MenuFlyoutItem Click="OnPlaceTop" Tag="{x:Bind Id}" Text="放在上边" />
+                                                    <MenuFlyoutItem Click="OnPlaceBottom" Tag="{x:Bind Id}" Text="放在下边" />
+                                                    <MenuFlyoutSeparator />
+                                                    <MenuFlyoutItem Click="OnRemovePlacement" Tag="{x:Bind Id}" Text="不放置" />
+                                                </MenuFlyout>
+                                            </DropDownButton.Flyout>
+                                        </DropDownButton>
+                                        <Button
+                                            Click="OnPeerAction"
+                                            Content="{x:Bind ActionText}"
+                                            IsEnabled="{x:Bind CanAct}"
+                                            Tag="{x:Bind Id}" />
+                                    </StackPanel>
                                 </Grid>
                             </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <TextBlock
                         x:Name="EmptyText"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="正在查找同一网络中运行 LinkCursor 的设备…"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Arrangement: where each device sits around this PC -->
+                <StackPanel x:Name="ArrangementPanel" Spacing="12" Visibility="Collapsed">
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="把设备拖到这台电脑的屏幕旁边：放在哪一侧、和哪一段边对齐，鼠标就从那一段穿过去。连接时会自动同步给对方。"
+                        TextWrapping="Wrap" />
+                    <Grid
+                        x:Name="ArrangementHost"
+                        Height="340"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource OverlayCornerRadius}">
+                        <Canvas x:Name="ArrangementCanvas" Background="Transparent" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="未放置的设备" />
+                    <StackPanel x:Name="UnplacedPanel" Orientation="Horizontal" Spacing="8" />
+                    <TextBlock
+                        x:Name="UnplacedHint"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="同一网络中发现的设备会出现在这里，把它拖到上面屏幕的旁边。把已放置的设备拖回这里可以取消放置。"
                         TextWrapping="Wrap" />
                 </StackPanel>
 
@@ -126,7 +169,7 @@
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="效果演示" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启后，把鼠标推向屏幕右边缘：边缘会鼓起，推够距离后光标从左边缘出现，就像进入了右侧的另一台设备；再往左推即可回来。关闭本窗口时自动停止。"
+                                Text="开启后，把鼠标推向“排列”里放置了设备的那段屏幕边缘（还没有放置设备时用右边缘）：边缘会鼓起，推够距离后光标从对边出现，就像进入了那台设备；再往回推即可回来。关闭本窗口时自动停止。"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="DemoSideText"
@@ -334,6 +377,6 @@
                     </Grid>
                 </StackPanel>
             </StackPanel>
-        </ScrollViewer>
+        </ScrollView>
     </Grid>
 </Window>

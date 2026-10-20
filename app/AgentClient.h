@@ -23,6 +23,11 @@ namespace LinkCursorApp
         void Connect(std::wstring_view peerId);
         void Disconnect(std::wstring_view peerId);
 
+        // Arrangement, in logical points of this PC's desktop space.
+        void SetPlacement(std::wstring_view peerId, double x, double y);
+        void RemovePlacement(std::wstring_view peerId);
+        void PlaceBeside(std::wstring_view peerId, std::wstring_view side);
+
         void SetEffect(winrt::Windows::Data::Json::JsonObject const& params);
         void ResetEffect();
         void SetEffectDemo(bool enabled);

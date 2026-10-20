@@ -9,13 +9,14 @@ use crate::effect::EffectParams;
 use crate::services::Services;
 use crate::state::Snapshot;
 use crate::win::PipeSecurity;
+use linkcursor_core::layout::{Offset, Side};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -32,6 +33,20 @@ enum Request {
     },
     Disconnect {
         peer_id: String,
+    },
+    /// Places a peer near this offset (logical points, this PC's space);
+    /// the core snaps it to a valid spot and syncs it.
+    SetPlacement {
+        peer_id: String,
+        x: f64,
+        y: f64,
+    },
+    RemovePlacement {
+        peer_id: String,
+    },
+    PlaceBeside {
+        peer_id: String,
+        side: Side,
     },
     SetEffect {
         params: EffectParams,
@@ -184,6 +199,11 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
         )),
         Request::Connect { peer_id } => core()?.connect(&peer_id),
         Request::Disconnect { peer_id } => core()?.disconnect_peer(&peer_id),
+        Request::SetPlacement { peer_id, x, y } => {
+            core()?.set_placement(&peer_id, Some(Offset { x, y }))
+        }
+        Request::RemovePlacement { peer_id } => core()?.set_placement(&peer_id, None),
+        Request::PlaceBeside { peer_id, side } => core()?.place_beside(&peer_id, side),
         Request::SetEffect { params } => {
             services.set_effect(params);
             Ok(())

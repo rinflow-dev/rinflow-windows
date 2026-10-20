@@ -114,11 +114,14 @@ impl EffectStore {
 
     pub fn set(&self, params: EffectParams) -> EffectParams {
         let params = params.sanitized();
-        if let Ok(mut current) = self.0.write() {
-            *current = params.clone();
-        }
+        // Saved while holding the lock, so concurrent saves cannot interleave
+        // and the file always ends up with the values in memory.
+        let Ok(mut current) = self.0.write() else {
+            return params;
+        };
+        *current = params.clone();
         if let Ok(text) = serde_json::to_string_pretty(&params)
-            && let Err(error) = fs::write(path(), text)
+            && let Err(error) = identity::write_file(&path(), &text)
         {
             eprintln!("linkcursor-agent: cannot save effect settings: {error}");
         }

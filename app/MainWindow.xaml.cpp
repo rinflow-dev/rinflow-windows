@@ -56,6 +56,7 @@ namespace winrt::LinkCursor::implementation
             });
 
         SetupSections();
+        SetupArrangement();
         SetupEffectControls();
 
         Closed([weak](auto&&, auto&&)
@@ -71,9 +72,14 @@ namespace winrt::LinkCursor::implementation
         {
             auto self = weak.get();
             if (!self) return;
-            bool effect = self->Sections().SelectedItem() == self->EffectItem();
-            self->DevicesPanel().Visibility(effect ? Visibility::Collapsed : Visibility::Visible);
-            self->EffectPanel().Visibility(effect ? Visibility::Visible : Visibility::Collapsed);
+            auto selected = self->Sections().SelectedItem();
+            auto show = [&](FrameworkElement const& panel, bool visible)
+            {
+                panel.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+            };
+            show(self->DevicesPanel(), selected == self->DevicesItem());
+            show(self->ArrangementPanel(), selected == self->ArrangementItem());
+            show(self->EffectPanel(), selected == self->EffectItem());
         });
     }
 
@@ -192,8 +198,8 @@ namespace winrt::LinkCursor::implementation
         }
         auto side = state.GetNamedString(L"demo_side", L"local");
         DemoSideText().Text(side == L"remote"
-            ? L"现在在“另一台设备”上 · 往左推回到本机"
-            : L"现在在本机 · 往右推进入另一台设备");
+            ? L"现在在“另一台设备”上 · 往回推回到本机"
+            : L"现在在本机 · 推向放置了设备的边缘进入另一台设备");
         DemoSideText().Visibility(demo ? Visibility::Visible : Visibility::Collapsed);
 
         m_applyingEffect = false;
@@ -283,6 +289,7 @@ namespace winrt::LinkCursor::implementation
         }
 
         ShowError(state.GetNamedString(L"last_error", L""));
+        ApplyLayout(state);
 
         m_peers.Clear();
         for (auto const& value : state.GetNamedArray(L"peers", JsonArray{}))
@@ -291,6 +298,15 @@ namespace winrt::LinkCursor::implementation
             auto id = peer.GetNamedString(L"id", L"");
             auto detail = PlatformLabel(peer.GetNamedString(L"platform", L""))
                 + L" · " + peer.GetNamedString(L"address", L"");
+            if (auto device = FindDevice(id); device && device->offset)
+            {
+                auto side = device->side == L"left" ? L"在左边"
+                    : device->side == L"right" ? L"在右边"
+                    : device->side == L"top" ? L"在上边"
+                    : device->side == L"bottom" ? L"在下边"
+                    : L"已放置";
+                detail = detail + L" · " + side;
+            }
             hstring action = L"连接";
             bool canAct = true;
             if (m_connectedPeerIds.contains(std::wstring(id)))
@@ -319,6 +335,7 @@ namespace winrt::LinkCursor::implementation
             EmptyText().Visibility(Visibility::Visible);
             // A restarted agent may have different values; reload them.
             m_effectRevision = -1;
+            m_layoutSignature.clear();
         }
     }
 

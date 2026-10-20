@@ -5,18 +5,23 @@ The Windows client for LinkCursor. It is two programs:
 | Program | Language | Role |
 | --- | --- | --- |
 | `linkcursor-agent.exe` ([agent/](agent/)) | Rust | Always running. Links `linkcursor-core` directly, owns the tray icon, plays input from a controlling peer, draws the edge push-through effect, and serves a named pipe for the settings app. Keyboard and mouse capture will live here too, because input must never wait on UI or a garbage collector. |
-| `LinkCursor.exe` ([app/](app/)) | C++/WinRT, WinUI 3 | The settings window: nearby devices and effect tuning. It starts only when opened (from the tray or directly) and exits when closed, so it costs no memory the rest of the time. |
+| `LinkCursor.exe` ([app/](app/)) | C++/WinRT, WinUI 3 | The settings window: nearby devices, their arrangement around this PC, and effect tuning. It starts only when opened (from the tray or directly) and exits when closed, so it costs no memory the rest of the time. |
 
 ```
  LinkCursor.exe (WinUI 3)  ── named pipe, JSON lines ──►  linkcursor-agent.exe (Rust)
-   devices, effect tuning                                   ├ tray icon
+   devices, arrangement,                                    ├ tray icon
+   effect tuning                                            ├ arrangement (layout.json, display watcher)
                                                             ├ edge effect overlay (Direct2D + DirectComposition)
                                                             ├ linkcursor-core ── UDP 42420 / TCP 42421 ──► other devices
                                                             ├ input injection (SendInput)
                                                             └ (next) hooks to capture local input
 ```
 
-Status: the agent discovers peers, connects to them, and plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app). The edge effect can be tuned with a single-machine demo. Local input is not captured yet, so this PC cannot control others, and the effect is not yet driven by a real peer.
+Status:
+- The agent discovers peers, connects to them, and plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app).
+- Peers can be arranged around this PC's screens, and the arrangement syncs with them.
+- The edge effect can be tuned with a single-machine demo.
+- Local input is not captured yet, so this PC cannot control others, and the effect is not yet driven by a real peer.
 
 ## Layout
 
@@ -28,11 +33,13 @@ agent/
   src/main.rs                single instance, core start-up, shutdown
   src/state.rs               folds core events into the snapshot the app renders
   src/ipc.rs                 named-pipe server
-  src/services.rs            what IPC requests act on (core, effect, demo)
+  src/services.rs            what IPC requests act on (core, arrangement, effect, demo)
+  src/displays.rs            monitors in logical points, display-change watcher, physical portals
+  src/arrangement.rs         saved placements and known devices (%LOCALAPPDATA%\LinkCursor\layout.json)
   src/effect.rs              effect parameters (%LOCALAPPDATA%\LinkCursor\effect.json)
   src/spring.rs              damped spring with SwiftUI-style response/damping
   src/overlay.rs             click-through overlay that draws the edge effect
-  src/demo.rs                single-machine demo: raw-input push tracking, wrap-around
+  src/demo.rs                single-machine demo: raw-input push tracking at the portals, wrap-around
   src/tray.rs                notification-area icon and menu
   src/identity.rs            device ID (%LOCALAPPDATA%\LinkCursor\device-id) and name
   src/inject.rs              plays a controlling peer's input with SendInput
@@ -41,7 +48,8 @@ agent/
 app/
   LinkCursor.vcxproj         unpackaged WinUI 3; also builds the agent with Cargo
   Directory.Packages.props   NuGet versions (central package management)
-  App.xaml / MainWindow.xaml settings window: devices and effect tuning (Mica, Fluent controls)
+  App.xaml / MainWindow.xaml settings window: devices, arrangement, effect tuning (Mica, Fluent controls)
+  MainWindow.Arrangement.cpp the 排列 page: to-scale canvas, dragging, tray of unplaced devices
   AgentClient.{h,cpp}        named-pipe client; starts the agent if needed
   PeerItem.{idl,h,cpp}       row model for the device list
 ```
@@ -117,6 +125,19 @@ Both programs look next to themselves for the other one. Override this with `LIN
 
 The first time the agent listens, Windows Defender Firewall asks for permission. Allow it on private networks; LinkCursor needs UDP 42420 and TCP 42421. Other LinkCursor devices on the same network appear in the list within a few seconds.
 
+## Arranging devices
+
+The **排列** page draws this PC's monitors (in the accent color) and every known peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](../README.md#arrangement).
+
+- **Placing a device.** Discovered devices that are not placed yet wait under **未放置的设备**. Drag one onto the canvas next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. Dropping a device outside the canvas removes its placement.
+- **Quick placement.** On the **设备** page, each device's **位置** menu puts it on the left, right, top or bottom, centred on that side, or removes it (**不放置**).
+- **Snapping.** The app only proposes where a device was dropped. The core snaps it to the nearest valid spot, and the canvas then draws where it actually landed.
+- **Device states.** A connected device has an accent outline. A device that is discovered but not connected has a solid outline. A placed device that is offline has a dashed outline and keeps its place.
+- **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
+- **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
+- **Persistence.** Placements and the last known name, platform and displays of each device are saved to `%LOCALAPPDATA%\LinkCursor\layout.json` ([arrangement.rs](agent/src/arrangement.rs)), so placed devices still show while offline.
+- **Portals.** The agent converts the touching segments into physical pixels per monitor ([displays.rs](agent/src/displays.rs)). The effect demo already uses them. Input capture (M2) will use them to decide where the cursor leaves this PC.
+
 ## Being controlled by another device
 
 When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts. Several peers can be connected at once (each row in the device list connects or disconnects one). Whichever peer is sending input is the one played.
@@ -151,10 +172,10 @@ Inspired by Universal Control. The effect is drawn on the device the cursor is m
 
 All motion uses a damped spring with SwiftUI-style `response` and damping ratio ([spring.rs](agent/src/spring.rs)). macOS can use the same values with `Spring(response:dampingRatio:)`, so both platforms move identically.
 
-**Tuning it on one machine.** Open the settings window, select **连接效果**, and turn on **效果演示**. The right edge of the desktop then acts as if another device sat beyond it and the screen wrapped around:
+**Tuning it on one machine.** Open the settings window, select **连接效果**, and turn on **效果演示**. The portals of the arrangement then act as if the placed devices sat beyond them and the screen wrapped around. With nothing placed, the whole right edge of the desktop stands in for a device:
 
-- Push the mouse against the right edge. The bump grows; when you have pushed far enough, the cursor comes out of the left edge, as it would on the other device.
-- Push against the left edge to come back. Returning never has resistance.
+- Push the mouse against a portal. The bump grows; when you have pushed far enough, the cursor comes out of the opposite edge, as it would on the other device.
+- Push against that opposite edge to come back. Returning never has resistance.
 - For the **连续切换免阻力** time after a crossing, crossing again needs no push either.
 - **播放预览** plays the whole sequence on the primary monitor without touching the mouse.
 
@@ -178,7 +199,7 @@ The parameters are saved to `%LOCALAPPDATA%\LinkCursor\effect.json` ([effect.rs]
 
 **How it is drawn.** [overlay.rs](agent/src/overlay.rs) owns a topmost, click-through window. It is created with `WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT` and covers the virtual desktop only while an effect is on screen; otherwise it is hidden. Each active spot on an edge is one DirectComposition visual with a small Direct2D surface: the bump outline, a Gaussian shadow, the dot and the ripple. Its own thread steps the springs once per compositor frame (`DwmFlush`) and sleeps when nothing moves, so an idle agent uses no CPU. The dot and ripple have a contrasting rim, like the system pointer, so they stay visible over both light and dark content.
 
-**How the push is measured.** [demo.rs](agent/src/demo.rs) registers for raw mouse input (`RIDEV_INPUTSINK`). Raw input keeps reporting motion while the cursor is pinned against the edge. Only outer edges of the desktop count, meaning edges with no monitor beyond them. The real implementation will move this into the input-capture code and send the push progress to the peer, which then draws the approach on its own edge.
+**How the push is measured.** [demo.rs](agent/src/demo.rs) registers for raw mouse input (`RIDEV_INPUTSINK`). Raw input keeps reporting motion while the cursor is pinned against the edge. Only outer edges of the desktop count, meaning edges with no monitor beyond them, and only within a portal. The real implementation will move this into the input-capture code and send the push progress to the peer, which then draws the approach on its own edge.
 
 ## Agent IPC protocol
 
@@ -188,9 +209,12 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":3}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":4}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
+| `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
+| `{"type":"remove_placement","peer_id":"…"}` | Remove the peer's placement. |
+| `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
 | `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
@@ -200,14 +224,17 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":3,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":4,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
 A `state` message looks like this:
 
 - `sessions` lists every peer this PC is connecting or connected to, one entry per peer and possibly several. `status` is `connecting` or `connected`, and `remote_control` is true while that peer drives this PC.
-- `last_error` is omitted when there is none.
+- `layout` is what the 排列 page draws, in logical points:
+  - `displays` are this PC's monitors.
+  - `devices` lists every known peer, online or not. Each has its `displays` in its own space (a default 1440 × 900 until it describes them), its `offset` in this PC's space (`null` while not placed), and the `side` of this PC it touches.
+- `last_error` is omitted when there is none. A session the user or the peer ended normally does not set it.
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
 - `demo_side` is `local` or `remote` while the demo runs.
@@ -220,6 +247,15 @@ A `state` message looks like this:
   "core": "running",
   "peers": [{ "id": "a1b2…", "name": "MacBook Pro", "platform": "macos", "address": "192.168.1.20", "port": 42421 }],
   "sessions": [{ "peer_id": "a1b2…", "name": "MacBook Pro", "status": "connected", "remote_control": false }],
+  "layout": {
+    "displays": [{ "x": 0.0, "y": 0.0, "width": 1440.0, "height": 960.0, "scale": 2.0 }],
+    "devices": [{
+      "peer_id": "a1b2…", "name": "MacBook Pro", "platform": "macos",
+      "displays": [{ "x": 0.0, "y": 0.0, "width": 1512.0, "height": 982.0, "scale": 2.0 }],
+      "offset": { "x": 1440.0, "y": -11.0 },
+      "side": "right"
+    }]
+  },
   "effect": { "push_distance": 260.0, "spring_response": 0.32, "spring_damping": 0.78, "bump_depth": 26.0, "…": "…" },
   "effect_revision": 1,
   "effect_demo": false,
@@ -232,9 +268,10 @@ The agent sends whole snapshots instead of individual events, so the app never h
 ## Next steps
 
 1. **Receive input (M1):** done; see [Being controlled by another device](#being-controlled-by-another-device). It still needs a pass with a real Mac for scroll speed and function keys.
-2. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, edge detection, parking and hiding the local cursor while controlling a peer, a Ctrl+Alt+Esc release key, and detecting key repeats from keys already held (low-level hooks do not report repeats). Events marked with the `LCIN` value are skipped.
-3. **Edge effect with a real peer (M3):** the renderer and tuning exist. What remains is protocol v3 in the core: screen info, `EdgeApproach` progress, `Enter` with the entry position, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
-4. **Productize (M4):** single-instance settings window, MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output.
+2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app still has to adopt it: pass its displays to the core, draw the same canvas, and drive its edges from `placement_changed`.
+3. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, crossing at the arrangement's portals, parking and hiding the local cursor while controlling a peer, a Ctrl+Alt+Esc release key, and detecting key repeats from keys already held (low-level hooks do not report repeats). Events marked with the `LCIN` value are skipped.
+4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
+5. **Productize (M4):** single-instance settings window, MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output.
 
 ## Security
 

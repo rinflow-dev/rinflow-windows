@@ -1,4 +1,5 @@
 use crate::effect::EffectParams;
+use linkcursor_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
@@ -41,6 +42,26 @@ pub struct Session {
     pub remote_control: bool,
 }
 
+/// The arrangement page: this PC's displays and every known peer, all in
+/// logical points; placed peers carry their offset in this PC's space.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct LayoutView {
+    pub displays: Vec<Display>,
+    pub devices: Vec<DeviceView>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct DeviceView {
+    pub peer_id: String,
+    pub name: String,
+    pub platform: String,
+    /// The peer's displays in its own space (a default size until known).
+    pub displays: Vec<Display>,
+    pub offset: Option<Offset>,
+    /// The side of this PC the peer is attached to, if it touches one.
+    pub side: Option<Side>,
+}
+
 /// Which side of the simulated edge the cursor is on in the effect demo.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -58,6 +79,7 @@ pub struct Snapshot {
     pub core: CoreStatus,
     pub peers: Vec<Peer>,
     pub sessions: Vec<Session>,
+    pub layout: LayoutView,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
     pub effect: EffectParams,
@@ -79,6 +101,7 @@ impl SharedState {
             core: CoreStatus::Starting,
             peers: Vec::new(),
             sessions: Vec::new(),
+            layout: LayoutView::default(),
             last_error: None,
             effect,
             effect_revision: 1,
@@ -103,6 +126,11 @@ impl SharedState {
             }
             true
         });
+    }
+
+    pub fn set_layout(&self, layout: LayoutView) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.layout, layout));
     }
 
     pub fn set_effect_demo(&self, enabled: bool) {
@@ -200,8 +228,9 @@ impl SharedState {
                 snapshot
                     .sessions
                     .retain(|session| session.peer_id != peer_id);
+                // Ending the session here or on the peer is not an error.
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
-                if reason != "local request" {
+                if reason != "local request" && reason != "peer closed the connection" {
                     snapshot.last_error = Some(format!("{name}: {reason}"));
                 }
                 true

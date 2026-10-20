@@ -143,6 +143,9 @@
     <ClCompile Include="MainWindow.xaml.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="MainWindow.Arrangement.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="PeerItem.cpp">
       <DependentUpon>PeerItem.idl</DependentUpon>
     </ClCompile>

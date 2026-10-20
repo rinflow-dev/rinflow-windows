@@ -12,7 +12,9 @@
 #include <format>
 #include <functional>
 #include <memory>
+#include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -24,7 +26,10 @@
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Graphics.h>
+#include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Composition.h>
+#include <winrt/Microsoft.UI.Input.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>

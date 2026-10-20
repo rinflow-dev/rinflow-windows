@@ -15,6 +15,7 @@
     <ClCompile Include="AgentClient.cpp" />
     <ClCompile Include="App.xaml.cpp" />
     <ClCompile Include="MainWindow.xaml.cpp" />
+    <ClCompile Include="MainWindow.Arrangement.cpp" />
     <ClCompile Include="PeerItem.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp">
       <Filter>Generated Files</Filter>

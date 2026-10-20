@@ -1,21 +1,25 @@
 //! Single-machine demo of the push-through effect, for tuning it.
 //!
-//! While enabled, the right edge of the desktop behaves as if another device
-//! sat beyond it and the screen wrapped around. Push against the edge to feel
-//! the resistance; after crossing, the cursor comes out of the left edge as it
-//! would on the other device. The left edge then leads back without
+//! While enabled, the portals of the arrangement (where placed peers touch
+//! this PC; the whole right edge if nothing is placed) behave as if the peer
+//! were there and the screen wrapped around. Push against one to feel the
+//! resistance; after crossing, the cursor comes out of the opposite edge as
+//! it would on the other device. That edge then leads back without
 //! resistance, like returning to the local machine.
 //!
 //! Push strength comes from raw input, which keeps reporting motion while the
 //! cursor is pinned against the edge.
 
+use crate::arrangement::Arrangement;
 use crate::effect::EffectStore;
 use crate::overlay::{Command, ENTRY_INSET, Edge, EdgePoint, OverlayHandle};
 use crate::state::{DemoSide, SharedState};
 use crate::win::wide;
+use linkcursor_core::layout::Side;
 use std::cell::RefCell;
 use std::io;
 use std::ptr::{null, null_mut};
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -38,8 +42,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 
-/// The edge the simulated peer sits behind.
-const PEER_EDGE: Edge = Edge::Right;
+/// Stands in for a peer when nothing is placed in the arrangement yet.
+const FALLBACK_EDGE: Edge = Edge::Right;
 /// Raw counts that return to the local side; returning has no resistance.
 const RETURN_PUSH: f32 = 3.0;
 /// Ignore pushes right after a crossing so leftover motion cannot bounce back.
@@ -56,6 +60,7 @@ impl EdgeDemo {
         overlay: OverlayHandle,
         store: EffectStore,
         state: SharedState,
+        arrangement: Arc<Arrangement>,
     ) -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
@@ -77,7 +82,8 @@ impl EdgeDemo {
                 let _ = ready_tx.send(Ok(thread_id));
                 state.set_demo_side(DemoSide::Local);
                 TRACKER.with(|tracker| {
-                    *tracker.borrow_mut() = Some(Tracker::new(overlay.clone(), store, state));
+                    *tracker.borrow_mut() =
+                        Some(Tracker::new(overlay.clone(), store, state, arrangement));
                 });
                 // SAFETY: standard message loop; the window lives on this thread.
                 unsafe {
@@ -125,7 +131,10 @@ struct Tracker {
     overlay: OverlayHandle,
     store: EffectStore,
     state: SharedState,
+    arrangement: Arc<Arrangement>,
     side: DemoSide,
+    /// The edge last crossed outward; the way back is the opposite edge.
+    crossed: Edge,
     /// Raw counts pushed against the peer edge since the push began.
     push: f32,
     pushing: bool,
@@ -141,13 +150,20 @@ struct Hit {
 }
 
 impl Tracker {
-    fn new(overlay: OverlayHandle, store: EffectStore, state: SharedState) -> Self {
+    fn new(
+        overlay: OverlayHandle,
+        store: EffectStore,
+        state: SharedState,
+        arrangement: Arc<Arrangement>,
+    ) -> Self {
         let now = Instant::now();
         Self {
             overlay,
             store,
             state,
+            arrangement,
             side: DemoSide::Local,
+            crossed: FALLBACK_EDGE,
             push: 0.0,
             pushing: false,
             last_push: now,
@@ -163,14 +179,16 @@ impl Tracker {
             return;
         }
         let params = self.store.get();
-        let edge = match self.side {
-            DemoSide::Local => PEER_EDGE,
-            DemoSide::Remote => PEER_EDGE.opposite(),
+        let cursor = cursor_position();
+        let hit = match self.side {
+            DemoSide::Local => self.portal_hit(cursor, params.corner_dead_zone),
+            DemoSide::Remote => edge_hit(self.crossed.opposite(), cursor, params.corner_dead_zone),
         };
-        let Some(hit) = edge_hit(edge, cursor_position(), params.corner_dead_zone) else {
+        let Some(hit) = hit else {
             self.cancel();
             return;
         };
+        let edge = hit.point.edge;
         let outward = outward(edge, dx, dy) as f32;
 
         match self.side {
@@ -228,9 +246,37 @@ impl Tracker {
         self.return_push = 0.0;
     }
 
+    /// Where the cursor pushes against a placed peer: inside one of the
+    /// arrangement's portals. Without any placement, the whole right edge
+    /// stands in for a peer so the effect can still be tried.
+    fn portal_hit(&self, cursor: POINT, dead_zone: f32) -> Option<Hit> {
+        let portals = self.arrangement.portals();
+        if portals.is_empty() {
+            return edge_hit(FALLBACK_EDGE, cursor, dead_zone);
+        }
+        portals.iter().find_map(|portal| {
+            let edge = match portal.side {
+                Side::Left => Edge::Left,
+                Side::Right => Edge::Right,
+                Side::Top => Edge::Top,
+                Side::Bottom => Edge::Bottom,
+            };
+            let hit = edge_hit(edge, cursor, dead_zone)?;
+            let (line, along) = if portal.side.is_vertical() {
+                (hit.point.x, hit.point.y)
+            } else {
+                (hit.point.y, hit.point.x)
+            };
+            (line == portal.line && (portal.from..portal.to).contains(&along)).then_some(hit)
+        })
+    }
+
     fn cross(&mut self, hit: &Hit) {
         if self.pushing {
             self.overlay.send(Command::Pass);
+        }
+        if self.side == DemoSide::Local {
+            self.crossed = hit.point.edge;
         }
         self.pushing = false;
         self.push = 0.0;

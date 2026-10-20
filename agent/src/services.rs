@@ -1,17 +1,19 @@
 //! What the settings app can drive through IPC.
 
+use crate::arrangement::Arrangement;
 use crate::demo::EdgeDemo;
 use crate::effect::{EffectParams, EffectStore};
 use crate::overlay::{Command, OverlayHandle};
 use crate::state::SharedState;
 use linkcursor_core::Core;
-use std::sync::{Mutex, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 pub struct Services {
     pub core: Weak<Core>,
     pub state: SharedState,
     pub effects: EffectStore,
     pub overlay: OverlayHandle,
+    pub arrangement: Arc<Arrangement>,
     demo: Mutex<Option<EdgeDemo>>,
 }
 
@@ -21,12 +23,14 @@ impl Services {
         state: SharedState,
         effects: EffectStore,
         overlay: OverlayHandle,
+        arrangement: Arc<Arrangement>,
     ) -> Self {
         Self {
             core,
             state,
             effects,
             overlay,
+            arrangement,
             demo: Mutex::new(None),
         }
     }
@@ -52,6 +56,7 @@ impl Services {
                 self.overlay.clone(),
                 self.effects.clone(),
                 self.state.clone(),
+                self.arrangement.clone(),
             )
             .map_err(|error| format!("cannot start the effect demo: {error}"))?;
             *demo = Some(started);

@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 3;
+    constexpr int ProtocolVersion = 4;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
@@ -73,6 +73,30 @@ namespace LinkCursorApp
     {
         auto message = Request(L"disconnect");
         message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
+    }
+
+    void AgentClient::SetPlacement(std::wstring_view peerId, double x, double y)
+    {
+        auto message = Request(L"set_placement");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        message.Insert(L"x", JsonValue::CreateNumberValue(x));
+        message.Insert(L"y", JsonValue::CreateNumberValue(y));
+        Send(message);
+    }
+
+    void AgentClient::RemovePlacement(std::wstring_view peerId)
+    {
+        auto message = Request(L"remove_placement");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
+    }
+
+    void AgentClient::PlaceBeside(std::wstring_view peerId, std::wstring_view side)
+    {
+        auto message = Request(L"place_beside");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        message.Insert(L"side", JsonValue::CreateStringValue(side));
         Send(message);
     }
 
