@@ -92,6 +92,26 @@ pub fn logical(monitors: &[Monitor]) -> Vec<Display> {
     monitors.iter().map(|monitor| monitor.logical).collect()
 }
 
+/// The physical pixel for a point in logical points (the arrangement's
+/// space), through the monitor that contains it. A point outside every
+/// monitor is clamped into the nearest one.
+pub fn to_physical(monitors: &[Monitor], x: f64, y: f64) -> Option<(i32, i32)> {
+    let distance = |monitor: &&Monitor| {
+        let l = &monitor.logical;
+        let dx = (l.x - x).max(0.0).max(x - l.right());
+        let dy = (l.y - y).max(0.0).max(y - l.bottom());
+        dx * dx + dy * dy
+    };
+    let monitor = monitors
+        .iter()
+        .min_by(|a, b| distance(a).total_cmp(&distance(b)))?;
+    let l = &monitor.logical;
+    let p = &monitor.physical;
+    let px = p.left + ((x - l.x) * l.scale).round() as i32;
+    let py = p.top + ((y - l.y) * l.scale).round() as i32;
+    Some((px.clamp(p.left, p.right - 1), py.clamp(p.top, p.bottom - 1)))
+}
+
 pub fn same_layout(a: &[Monitor], b: &[Monitor]) -> bool {
     a.len() == b.len()
         && a.iter()
@@ -219,4 +239,40 @@ unsafe extern "system" fn window_proc(
     }
     // SAFETY: default handling for everything else.
     unsafe { DefWindowProcW(window, message, wparam, lparam) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn monitor(left: i32, top: i32, width: i32, height: i32, scale: f64) -> Monitor {
+        Monitor {
+            logical: Display {
+                x: left as f64 / scale,
+                y: top as f64 / scale,
+                width: width as f64 / scale,
+                height: height as f64 / scale,
+                scale,
+            },
+            physical: RECT {
+                left,
+                top,
+                right: left + width,
+                bottom: top + height,
+            },
+        }
+    }
+
+    #[test]
+    fn logical_points_map_through_their_monitor() {
+        let monitors = [
+            monitor(0, 0, 2880, 1920, 2.0),
+            monitor(2880, 0, 1920, 1080, 1.0),
+        ];
+        assert_eq!(to_physical(&monitors, 720.0, 480.0), Some((1440, 960)));
+        assert_eq!(to_physical(&monitors, 2980.0, 50.0), Some((2980, 50)));
+        // Outside every monitor: clamped into the nearest one.
+        assert_eq!(to_physical(&monitors, -50.0, 100.0), Some((0, 200)));
+        assert_eq!(to_physical(&[], 0.0, 0.0), None);
+    }
 }

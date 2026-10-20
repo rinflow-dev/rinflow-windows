@@ -149,6 +149,7 @@ Core handles everything that is the same on every platform. The agent only trans
 | Shortcuts | core (`remap.rs`) | From a Mac, ⌘ arrives as Ctrl, so ⌘C copies. The Mac's own Control stays Ctrl, so it never sends a lone Windows-key tap that opens Start. |
 | Control start/end | core | `remote_control_started` / `remote_control_ended` events. When control ends or the connection drops, core first releases every key and button the peer still holds. |
 | Pointer motion | agent | Played as an absolute move on the virtual desktop: current position + delta × this monitor's scale. Windows does not accelerate it a second time, multi-monitor layouts and negative coordinates work, and sub-pixel movement is carried over. |
+| Arrival | agent | A move flagged `LC_INPUT_FLAG_ABSOLUTE_POSITION` (sent by the Mac when the pointer crosses over) is converted from logical points to pixels through the monitor that contains it, so the cursor appears at the matching point of this PC's edge. |
 | Keys | agent ([keymap.rs](agent/src/keymap.rs)) | Played by scan code. The key position counts, so this PC's layout and IME (for example Chinese Pinyin) decide the character. Pause and NumLock are played by virtual key. A key with no Windows scan code still types its character. |
 | Scroll | agent | Trackpad points × 1.2 wheel units (Windows apps scroll about 100 DIPs per 120 units), and notched-wheel lines (10 points) become one Windows line (40 units). Fractions are carried over; horizontal scroll is supported. |
 | Buttons | agent | Left, right, middle, back, forward. |
@@ -268,7 +269,7 @@ The agent sends whole snapshots instead of individual events, so the app never h
 ## Next steps
 
 1. **Receive input (M1):** done; see [Being controlled by another device](#being-controlled-by-another-device). It still needs a pass with a real Mac for scroll speed and function keys.
-2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app still has to adopt it: pass its displays to the core, draw the same canvas, and drive its edges from `placement_changed`.
+2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app uses it with a side menu; it has no drag canvas yet.
 3. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, crossing at the arrangement's portals, parking and hiding the local cursor while controlling a peer, a Ctrl+Alt+Esc release key, and detecting key repeats from keys already held (low-level hooks do not report repeats). Events marked with the `LCIN` value are skipped.
 4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
 5. **Productize (M4):** single-instance settings window, MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output.

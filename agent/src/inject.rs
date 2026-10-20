@@ -14,10 +14,12 @@
 //!   mouse the MouseKeys accessibility feature is enabled so Windows draws
 //!   the cursor at all.
 
+use crate::displays;
 use crate::keymap::{WinKey, windows_key};
 use linkcursor_core::{
-    LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN, LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN,
-    LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE, LC_INPUT_SCROLL, LcInputEvent,
+    LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN,
+    LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
+    LC_INPUT_SCROLL, LcInputEvent,
 };
 use std::collections::HashSet;
 use std::io;
@@ -157,6 +159,10 @@ struct Player {
 impl Player {
     fn play(&mut self, event: &LcInputEvent) {
         match event.kind {
+            // Where the pointer enters this PC: a point in its logical space.
+            LC_INPUT_MOUSE_MOVE if event.flags & LC_INPUT_FLAG_ABSOLUTE_POSITION != 0 => {
+                self.move_to(event.x, event.y)
+            }
             LC_INPUT_MOUSE_MOVE => self.move_by(event.delta_x, event.delta_y),
             LC_INPUT_MOUSE_BUTTON_DOWN => button(event.code, true),
             LC_INPUT_MOUSE_BUTTON_UP => button(event.code, false),
@@ -203,17 +209,17 @@ impl Player {
         if step_x == 0 && step_y == 0 {
             return;
         }
-        let desktop = VirtualDesktop::current();
-        let x = (cursor.x + step_x).clamp(desktop.x, desktop.x + desktop.width - 1);
-        let y = (cursor.y + step_y).clamp(desktop.y, desktop.y + desktop.height - 1);
-        send_mouse(MOUSEINPUT {
-            dx: normalize(x, desktop.x, desktop.width),
-            dy: normalize(y, desktop.y, desktop.height),
-            mouseData: 0,
-            dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
-            time: 0,
-            dwExtraInfo: INJECTED_MARKER,
-        });
+        place_cursor(cursor.x + step_x, cursor.y + step_y);
+    }
+
+    fn move_to(&mut self, x: f64, y: f64) {
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
+        self.motion_rest = (0.0, 0.0);
+        if let Some((x, y)) = displays::to_physical(&displays::monitors(), x, y) {
+            place_cursor(x, y);
+        }
     }
 
     fn scroll(&mut self, event: &LcInputEvent) {
@@ -364,6 +370,22 @@ fn key(event: &LcInputEvent, down: bool) {
             }
         }
     }
+}
+
+/// Puts the cursor on a physical pixel of the virtual desktop. Played as an
+/// absolute move, so Windows applies no pointer acceleration on top.
+fn place_cursor(x: i32, y: i32) {
+    let desktop = VirtualDesktop::current();
+    let x = x.clamp(desktop.x, desktop.x + desktop.width - 1);
+    let y = y.clamp(desktop.y, desktop.y + desktop.height - 1);
+    send_mouse(MOUSEINPUT {
+        dx: normalize(x, desktop.x, desktop.width),
+        dy: normalize(y, desktop.y, desktop.height),
+        mouseData: 0,
+        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+        time: 0,
+        dwExtraInfo: INJECTED_MARKER,
+    });
 }
 
 fn send_mouse(mi: MOUSEINPUT) {
