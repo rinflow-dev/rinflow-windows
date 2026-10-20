@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -30,7 +30,9 @@ enum Request {
     Connect {
         peer_id: String,
     },
-    Disconnect,
+    Disconnect {
+        peer_id: String,
+    },
     SetEffect {
         params: EffectParams,
     },
@@ -181,7 +183,7 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
             "settings app speaks protocol {protocol}, agent speaks {PROTOCOL_VERSION}"
         )),
         Request::Connect { peer_id } => core()?.connect(&peer_id),
-        Request::Disconnect => core()?.disconnect(),
+        Request::Disconnect { peer_id } => core()?.disconnect_peer(&peer_id),
         Request::SetEffect { params } => {
             services.set_effect(params);
             Ok(())

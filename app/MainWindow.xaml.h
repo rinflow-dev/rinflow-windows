@@ -54,7 +54,7 @@ namespace winrt::LinkCursor::implementation
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_peers{
             single_threaded_observable_vector<Windows::Foundation::IInspectable>()
         };
-        hstring m_connectedPeerId;
+        std::set<std::wstring> m_connectedPeerIds;
         std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
     };
 }

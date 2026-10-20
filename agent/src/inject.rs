@@ -19,6 +19,7 @@ use linkcursor_core::{
     LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN, LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN,
     LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE, LC_INPUT_SCROLL, LcInputEvent,
 };
+use std::collections::HashSet;
 use std::io;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
@@ -56,7 +57,11 @@ const WHEEL_UNITS_PER_LINE_POINT: f64 = 4.0;
 
 enum Job {
     Input(LcInputEvent),
-    Control(bool),
+    /// A peer started (`true`) or stopped driving this PC.
+    Control {
+        peer_id: String,
+        active: bool,
+    },
     Quit,
 }
 
@@ -77,15 +82,13 @@ impl InjectorHandle {
         let Ok(event) = serde_json::from_str::<serde_json::Value>(json) else {
             return;
         };
-        match event["event"].as_str() {
-            Some("remote_control_started") => {
-                let _ = self.0.send(Job::Control(true));
-            }
-            Some("remote_control_ended") => {
-                let _ = self.0.send(Job::Control(false));
-            }
-            _ => {}
-        }
+        let active = match event["event"].as_str() {
+            Some("remote_control_started") => true,
+            Some("remote_control_ended") => false,
+            _ => return,
+        };
+        let peer_id = event["peer_id"].as_str().unwrap_or_default().to_owned();
+        let _ = self.0.send(Job::Control { peer_id, active });
     }
 }
 
@@ -106,7 +109,14 @@ impl Injector {
                 while let Ok(job) = receiver.recv() {
                     match job {
                         Job::Input(event) => player.play(&event),
-                        Job::Control(active) => player.set_controlled(active),
+                        Job::Control { peer_id, active } => {
+                            if active {
+                                player.controllers.insert(peer_id);
+                            } else {
+                                player.controllers.remove(&peer_id);
+                            }
+                            player.set_controlled(!player.controllers.is_empty());
+                        }
                         Job::Quit => break,
                     }
                 }
@@ -134,6 +144,9 @@ impl Drop for Injector {
 
 #[derive(Default)]
 struct Player {
+    /// Peers currently driving this PC; usually one, but sessions with
+    /// several peers can overlap.
+    controllers: HashSet<String>,
     controlled: bool,
     /// Sub-pixel motion carried to the next event, in pixels.
     motion_rest: (f64, f64),

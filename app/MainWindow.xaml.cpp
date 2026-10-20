@@ -206,9 +206,9 @@ namespace winrt::LinkCursor::implementation
         {
             return;
         }
-        if (peerId == m_connectedPeerId)
+        if (m_connectedPeerIds.contains(std::wstring(peerId)))
         {
-            m_agent->Disconnect();
+            m_agent->Disconnect(peerId);
         }
         else
         {
@@ -233,22 +233,45 @@ namespace winrt::LinkCursor::implementation
     {
         DeviceNameText().Text(state.GetNamedString(L"device_name", L"LinkCursor"));
 
-        auto connection = state.GetNamedObject(L"connection", JsonObject{});
-        auto status = connection.GetNamedString(L"status", L"disconnected");
-        hstring connectingPeerId;
-        m_connectedPeerId = L"";
-        if (status == L"connected")
+        // One session per peer; several can be open at once.
+        m_connectedPeerIds.clear();
+        std::set<std::wstring> connectingPeerIds;
+        std::vector<hstring> connectedNames;
+        hstring controllerName;
+        for (auto const& value : state.GetNamedArray(L"sessions", JsonArray{}))
         {
-            auto peer = connection.GetNamedObject(L"peer", JsonObject{});
-            m_connectedPeerId = peer.GetNamedString(L"id", L"");
-            auto name = peer.GetNamedString(L"name", L"");
-            StatusText().Text(state.GetNamedBoolean(L"remote_control", false)
-                ? L"正在被 " + name + L" 控制键盘和鼠标"
-                : L"已连接到 " + name);
+            auto session = value.GetObject();
+            std::wstring peerId{ session.GetNamedString(L"peer_id", L"") };
+            auto name = session.GetNamedString(L"name", L"");
+            if (session.GetNamedString(L"status", L"") == L"connected")
+            {
+                m_connectedPeerIds.insert(peerId);
+                connectedNames.push_back(name);
+                if (session.GetNamedBoolean(L"remote_control", false))
+                {
+                    controllerName = name;
+                }
+            }
+            else
+            {
+                connectingPeerIds.insert(peerId);
+            }
         }
-        else if (status == L"connecting")
+
+        if (!controllerName.empty())
         {
-            connectingPeerId = connection.GetNamedString(L"peer_id", L"");
+            StatusText().Text(L"正在被 " + controllerName + L" 控制键盘和鼠标");
+        }
+        else if (connectedNames.size() == 1)
+        {
+            StatusText().Text(L"已连接到 " + connectedNames.front());
+        }
+        else if (!connectedNames.empty())
+        {
+            StatusText().Text(hstring(std::format(L"已连接 {} 台设备", connectedNames.size())));
+        }
+        else if (!connectingPeerIds.empty())
+        {
             StatusText().Text(L"正在连接…");
         }
         else
@@ -270,11 +293,11 @@ namespace winrt::LinkCursor::implementation
                 + L" · " + peer.GetNamedString(L"address", L"");
             hstring action = L"连接";
             bool canAct = true;
-            if (id == m_connectedPeerId)
+            if (m_connectedPeerIds.contains(std::wstring(id)))
             {
                 action = L"断开";
             }
-            else if (id == connectingPeerId)
+            else if (connectingPeerIds.contains(std::wstring(id)))
             {
                 action = L"连接中…";
                 canAct = false;
@@ -292,7 +315,7 @@ namespace winrt::LinkCursor::implementation
         {
             StatusText().Text(L"正在连接后台服务…");
             m_peers.Clear();
-            m_connectedPeerId = L"";
+            m_connectedPeerIds.clear();
             EmptyText().Visibility(Visibility::Visible);
             // A restarted agent may have different values; reload them.
             m_effectRevision = -1;

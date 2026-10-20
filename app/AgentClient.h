@@ -21,7 +21,7 @@ namespace LinkCursorApp
         void Stop();
 
         void Connect(std::wstring_view peerId);
-        void Disconnect();
+        void Disconnect(std::wstring_view peerId);
 
         void SetEffect(winrt::Windows::Data::Json::JsonObject const& params);
         void ResetEffect();

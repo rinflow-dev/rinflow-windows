@@ -22,12 +22,23 @@ pub enum CoreStatus {
     Stopped,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionStatus {
+    Connecting,
+    Connected,
+}
+
+/// One peer this PC is connecting or connected to. The core keeps one
+/// session per peer and several at once.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum Connection {
-    Disconnected,
-    Connecting { peer_id: String },
-    Connected { peer: Peer },
+pub struct Session {
+    pub peer_id: String,
+    /// The peer's name, or its ID until it is known.
+    pub name: String,
+    pub status: SessionStatus,
+    /// This peer is currently driving this PC's mouse and keyboard.
+    pub remote_control: bool,
 }
 
 /// Which side of the simulated edge the cursor is on in the effect demo.
@@ -46,9 +57,7 @@ pub struct Snapshot {
     pub device_name: String,
     pub core: CoreStatus,
     pub peers: Vec<Peer>,
-    pub connection: Connection,
-    /// The connected peer is currently driving this PC's mouse and keyboard.
-    pub remote_control: bool,
+    pub sessions: Vec<Session>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
     pub effect: EffectParams,
@@ -69,8 +78,7 @@ impl SharedState {
             device_name: device_name.to_owned(),
             core: CoreStatus::Starting,
             peers: Vec::new(),
-            connection: Connection::Disconnected,
-            remote_control: false,
+            sessions: Vec::new(),
             last_error: None,
             effect,
             effect_revision: 1,
@@ -153,27 +161,48 @@ impl SharedState {
                 let Some(peer_id) = event["peer_id"].as_str() else {
                     return false;
                 };
-                snapshot.connection = Connection::Connecting {
-                    peer_id: peer_id.to_owned(),
-                };
-                true
+                let known = snapshot.sessions.iter().any(|s| s.peer_id == peer_id);
+                let session = snapshot.session_mut(peer_id);
+                replace(&mut session.status, SessionStatus::Connecting) || !known
             }
             "connected" => {
                 let Some(peer) = parse_peer(&event["peer"]) else {
                     return false;
                 };
-                snapshot.connection = Connection::Connected { peer };
+                let session = snapshot.session_mut(&peer.id);
+                session.name = peer.name;
+                session.status = SessionStatus::Connected;
                 snapshot.last_error = None;
                 true
             }
-            "remote_control_started" => replace(&mut snapshot.remote_control, true),
-            "remote_control_ended" => replace(&mut snapshot.remote_control, false),
+            "remote_control_started" | "remote_control_ended" => {
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                let active = kind == "remote_control_started";
+                match snapshot.sessions.iter_mut().find(|s| s.peer_id == peer_id) {
+                    Some(session) => replace(&mut session.remote_control, active),
+                    None => false,
+                }
+            }
             "disconnected" => {
-                snapshot.connection = Connection::Disconnected;
-                snapshot.remote_control = false;
+                // Sessions are per peer; a disconnect without a peer ID does
+                // not concern any session shown here.
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                let name = snapshot
+                    .sessions
+                    .iter()
+                    .find(|session| session.peer_id == peer_id)
+                    .map(|session| session.name.clone())
+                    .unwrap_or_else(|| peer_id.to_owned());
+                snapshot
+                    .sessions
+                    .retain(|session| session.peer_id != peer_id);
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
                 if reason != "local request" {
-                    snapshot.last_error = Some(reason.to_owned());
+                    snapshot.last_error = Some(format!("{name}: {reason}"));
                 }
                 true
             }
@@ -183,6 +212,31 @@ impl SharedState {
             }
             _ => false,
         });
+    }
+}
+
+impl Snapshot {
+    /// The session with `peer_id`, added as `connecting` if there is none.
+    fn session_mut(&mut self, peer_id: &str) -> &mut Session {
+        let index = match self.sessions.iter().position(|s| s.peer_id == peer_id) {
+            Some(index) => index,
+            None => {
+                let name = self
+                    .peers
+                    .iter()
+                    .find(|peer| peer.id == peer_id)
+                    .map(|peer| peer.name.clone())
+                    .unwrap_or_else(|| peer_id.to_owned());
+                self.sessions.push(Session {
+                    peer_id: peer_id.to_owned(),
+                    name,
+                    status: SessionStatus::Connecting,
+                    remote_control: false,
+                });
+                self.sessions.len() - 1
+            }
+        };
+        &mut self.sessions[index]
     }
 }
 

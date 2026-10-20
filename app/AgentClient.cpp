@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 2;
+    constexpr int ProtocolVersion = 3;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
@@ -69,9 +69,11 @@ namespace LinkCursorApp
         Send(message);
     }
 
-    void AgentClient::Disconnect()
+    void AgentClient::Disconnect(std::wstring_view peerId)
     {
-        Send(Request(L"disconnect"));
+        auto message = Request(L"disconnect");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
     }
 
     void AgentClient::SetEffect(JsonObject const& params)

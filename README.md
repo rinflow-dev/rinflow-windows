@@ -119,7 +119,7 @@ The first time the agent listens, Windows Defender Firewall asks for permission.
 
 ## Being controlled by another device
 
-When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts.
+When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts. Several peers can be connected at once (each row in the device list connects or disconnects one). Whichever peer is sending input is the one played.
 
 Core handles everything that is the same on every platform. The agent only translates core's events to Windows:
 
@@ -188,9 +188,9 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":2}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":3}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
-| `{"type":"disconnect"}` | Drop the current connection. |
+| `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
 | `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
@@ -200,13 +200,13 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":2,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":3,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
 A `state` message looks like this:
 
-- `connection.status` is `disconnected`, `connecting` (with `peer_id`) or `connected` (with `peer`).
+- `sessions` lists every peer this PC is connecting or connected to, one entry per peer and possibly several. `status` is `connecting` or `connected`, and `remote_control` is true while that peer drives this PC.
 - `last_error` is omitted when there is none.
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
@@ -219,7 +219,7 @@ A `state` message looks like this:
   "device_name": "DESKTOP-1234",
   "core": "running",
   "peers": [{ "id": "a1b2…", "name": "MacBook Pro", "platform": "macos", "address": "192.168.1.20", "port": 42421 }],
-  "connection": { "status": "connected", "peer": { "id": "a1b2…", "name": "MacBook Pro", "platform": "macos", "address": "192.168.1.20", "port": 42421 } },
+  "sessions": [{ "peer_id": "a1b2…", "name": "MacBook Pro", "status": "connected", "remote_control": false }],
   "effect": { "push_distance": 260.0, "spring_response": 0.32, "spring_damping": 0.78, "bump_depth": 26.0, "…": "…" },
   "effect_revision": 1,
   "effect_demo": false,
