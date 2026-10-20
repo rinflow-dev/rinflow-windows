@@ -4,7 +4,7 @@ The Windows client for LinkCursor. It is two programs:
 
 | Program | Language | Role |
 | --- | --- | --- |
-| `linkcursor-agent.exe` ([agent/](agent/)) | Rust | Always running. Links `linkcursor-core` directly, owns the tray icon, draws the edge push-through effect, and serves a named pipe for the settings app. Keyboard and mouse capture and injection will live here too, because they must never wait on UI or a garbage collector. |
+| `linkcursor-agent.exe` ([agent/](agent/)) | Rust | Always running. Links `linkcursor-core` directly, owns the tray icon, plays input from a controlling peer, draws the edge push-through effect, and serves a named pipe for the settings app. Keyboard and mouse capture will live here too, because input must never wait on UI or a garbage collector. |
 | `LinkCursor.exe` ([app/](app/)) | C++/WinRT, WinUI 3 | The settings window: nearby devices and effect tuning. It starts only when opened (from the tray or directly) and exits when closed, so it costs no memory the rest of the time. |
 
 ```
@@ -12,10 +12,11 @@ The Windows client for LinkCursor. It is two programs:
    devices, effect tuning                                   ├ tray icon
                                                             ├ edge effect overlay (Direct2D + DirectComposition)
                                                             ├ linkcursor-core ── UDP 42420 / TCP 42421 ──► other devices
-                                                            └ (next) hooks, SendInput
+                                                            ├ input injection (SendInput)
+                                                            └ (next) hooks to capture local input
 ```
 
-Status: the agent starts the core, discovers peers and connects to them, and the edge effect can be tuned with a single-machine demo. Remote input is received but not yet injected, and local input is not yet captured, so the effect is not yet driven by a real peer.
+Status: the agent discovers peers, connects to them, and plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app). The edge effect can be tuned with a single-machine demo. Local input is not captured yet, so this PC cannot control others, and the effect is not yet driven by a real peer.
 
 ## Layout
 
@@ -34,6 +35,8 @@ agent/
   src/demo.rs                single-machine demo: raw-input push tracking, wrap-around
   src/tray.rs                notification-area icon and menu
   src/identity.rs            device ID (%LOCALAPPDATA%\LinkCursor\device-id) and name
+  src/inject.rs              plays a controlling peer's input with SendInput
+  src/keymap.rs              USB HID usage → Windows scan code
   src/win.rs                 Win32 helpers: mutex, user SID, pipe security
 app/
   LinkCursor.vcxproj         unpackaged WinUI 3; also builds the agent with Cargo
@@ -113,6 +116,27 @@ Start either program:
 Both programs look next to themselves for the other one. Override this with `LINKCURSOR_AGENT_PATH` (used by the app) or `LINKCURSOR_APP_PATH` (used by the agent).
 
 The first time the agent listens, Windows Defender Firewall asks for permission. Allow it on private networks; LinkCursor needs UDP 42420 and TCP 42421. Other LinkCursor devices on the same network appear in the list within a few seconds.
+
+## Being controlled by another device
+
+When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts.
+
+Core handles everything that is the same on every platform. The agent only translates core's events to Windows:
+
+| | Where | What |
+| --- | --- | --- |
+| Shortcuts | core (`remap.rs`) | From a Mac, ⌘ arrives as Ctrl, so ⌘C copies. The Mac's own Control stays Ctrl, so it never sends a lone Windows-key tap that opens Start. |
+| Control start/end | core | `remote_control_started` / `remote_control_ended` events. When control ends or the connection drops, core first releases every key and button the peer still holds. |
+| Pointer motion | agent | Played as an absolute move on the virtual desktop: current position + delta × this monitor's scale. Windows does not accelerate it a second time, multi-monitor layouts and negative coordinates work, and sub-pixel movement is carried over. |
+| Keys | agent ([keymap.rs](agent/src/keymap.rs)) | Played by scan code. The key position counts, so this PC's layout and IME (for example Chinese Pinyin) decide the character. Pause and NumLock are played by virtual key. A key with no Windows scan code still types its character. |
+| Scroll | agent | Trackpad points × 1.2 wheel units (Windows apps scroll about 100 DIPs per 120 units), and notched-wheel lines (10 points) become one Windows line (40 units). Fractions are carried over; horizontal scroll is supported. |
+| Buttons | agent | Left, right, middle, back, forward. |
+| Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. |
+| No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
+
+Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The future capture hooks will use it to skip input the agent itself played.
+
+Known limits: windows of elevated programs (such as Task Manager), UAC prompts and the lock screen ignore injected input until the LocalSystem service exists (M4). Scroll speeds and Mac function-key behavior still need checking against a real Mac.
 
 ## Edge push-through effect
 
@@ -207,8 +231,8 @@ The agent sends whole snapshots instead of individual events, so the app never h
 
 ## Next steps
 
-1. **Receive input (M1):** inject events from the core's input callback with `SendInput`: absolute moves with `MOUSEEVENTF_VIRTUALDESK` so Windows does not accelerate them a second time, scan-code keys mapped from USB HID usages, and high-resolution wheel. Map ⌘ to Ctrl when the peer is a Mac.
-2. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, edge detection, parking and hiding the local cursor while controlling a peer, and a Ctrl+Alt+Esc release key.
+1. **Receive input (M1):** done; see [Being controlled by another device](#being-controlled-by-another-device). It still needs a pass with a real Mac for scroll speed and function keys.
+2. **Send input (M2):** `WH_MOUSE_LL` / `WH_KEYBOARD_LL` hooks on a dedicated thread, edge detection, parking and hiding the local cursor while controlling a peer, a Ctrl+Alt+Esc release key, and detecting key repeats from keys already held (low-level hooks do not report repeats). Events marked with the `LCIN` value are skipped.
 3. **Edge effect with a real peer (M3):** the renderer and tuning exist. What remains is protocol v3 in the core: screen info, `EdgeApproach` progress, `Enter` with the entry position, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
 4. **Productize (M4):** single-instance settings window, MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output.
 

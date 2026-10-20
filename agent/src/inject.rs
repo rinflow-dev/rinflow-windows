@@ -1,0 +1,465 @@
+//! Plays input from a controlling peer with `SendInput`.
+//!
+//! Runs on its own thread so the core's network threads never wait on the
+//! window manager. Received events follow the wire conventions documented on
+//! `LcInputEvent` in linkcursor-core: deltas and scroll amounts in logical
+//! points, keys as USB HID usages already translated for this platform's
+//! shortcut convention.
+//!
+//! - Pointer motion is played as an absolute move on the virtual desktop
+//!   (current position + delta × display scale). Relative injection would be
+//!   accelerated a second time by "Enhance pointer precision".
+//! - Keys are played by scan code (see `keymap.rs`).
+//! - While a peer is in control the PC stays awake, and on a PC without a
+//!   mouse the MouseKeys accessibility feature is enabled so Windows draws
+//!   the cursor at all.
+
+use crate::keymap::{WinKey, windows_key};
+use linkcursor_core::{
+    LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN, LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN,
+    LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE, LC_INPUT_SCROLL, LcInputEvent,
+};
+use std::io;
+use std::sync::mpsc;
+use std::thread::JoinHandle;
+use windows_sys::Win32::Foundation::POINT;
+use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+use windows_sys::Win32::System::Power::{
+    ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState,
+};
+use windows_sys::Win32::UI::Accessibility::MOUSEKEYS;
+use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC_EX,
+    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN,
+    MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
+};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetCursorPos, GetSystemMetrics, MKF_AVAILABLE, MKF_MOUSEKEYSON, MKF_REPLACENUMBERS,
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_MOUSEPRESENT, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
+};
+
+/// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
+/// own low-level hooks can tell played input from the user's hardware.
+pub const INJECTED_MARKER: usize = 0x4C43_494E;
+
+/// Windows apps such as Chrome and Edge scroll 100 DIPs per wheel notch of
+/// 120 units, so this keeps trackpad distances the same as on the sender.
+const WHEEL_UNITS_PER_POINT: f64 = 1.2;
+/// A notched wheel reports 10 points per line; one Windows line is 40 units
+/// (a 120-unit notch scrolls three lines by default).
+const WHEEL_UNITS_PER_LINE_POINT: f64 = 4.0;
+
+enum Job {
+    Input(LcInputEvent),
+    Control(bool),
+    Quit,
+}
+
+/// Cloneable sender used by the core callbacks.
+#[derive(Clone)]
+pub struct InjectorHandle(mpsc::Sender<Job>);
+
+impl InjectorHandle {
+    pub fn play(&self, event: LcInputEvent) {
+        let _ = self.0.send(Job::Input(event));
+    }
+
+    /// Picks the remote-control start and end out of the core's event stream.
+    pub fn core_event(&self, json: &str) {
+        if !json.contains("remote_control_") {
+            return;
+        }
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(json) else {
+            return;
+        };
+        match event["event"].as_str() {
+            Some("remote_control_started") => {
+                let _ = self.0.send(Job::Control(true));
+            }
+            Some("remote_control_ended") => {
+                let _ = self.0.send(Job::Control(false));
+            }
+            _ => {}
+        }
+    }
+}
+
+pub struct Injector {
+    handle: InjectorHandle,
+    join: Option<JoinHandle<()>>,
+}
+
+impl Injector {
+    pub fn spawn() -> io::Result<Self> {
+        let (sender, receiver) = mpsc::channel();
+        let join = std::thread::Builder::new()
+            .name("linkcursor-inject".to_owned())
+            .spawn(move || {
+                let mut player = Player::default();
+                // Jobs arrive in order, so the key-ups the core sends when a
+                // session ends are always played before Quit.
+                while let Ok(job) = receiver.recv() {
+                    match job {
+                        Job::Input(event) => player.play(&event),
+                        Job::Control(active) => player.set_controlled(active),
+                        Job::Quit => break,
+                    }
+                }
+                player.set_controlled(false);
+            })?;
+        Ok(Self {
+            handle: InjectorHandle(sender),
+            join: Some(join),
+        })
+    }
+
+    pub fn handle(&self) -> InjectorHandle {
+        self.handle.clone()
+    }
+}
+
+impl Drop for Injector {
+    fn drop(&mut self) {
+        let _ = self.handle.0.send(Job::Quit);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+#[derive(Default)]
+struct Player {
+    controlled: bool,
+    /// Sub-pixel motion carried to the next event, in pixels.
+    motion_rest: (f64, f64),
+    /// Sub-unit wheel movement carried to the next event, in wheel units.
+    wheel_rest: (f64, f64),
+}
+
+impl Player {
+    fn play(&mut self, event: &LcInputEvent) {
+        match event.kind {
+            LC_INPUT_MOUSE_MOVE => self.move_by(event.delta_x, event.delta_y),
+            LC_INPUT_MOUSE_BUTTON_DOWN => button(event.code, true),
+            LC_INPUT_MOUSE_BUTTON_UP => button(event.code, false),
+            LC_INPUT_SCROLL => self.scroll(event),
+            LC_INPUT_KEY_DOWN => key(event, true),
+            LC_INPUT_KEY_UP => key(event, false),
+            _ => {}
+        }
+    }
+
+    fn set_controlled(&mut self, controlled: bool) {
+        if self.controlled == controlled {
+            return;
+        }
+        self.controlled = controlled;
+        self.motion_rest = (0.0, 0.0);
+        self.wheel_rest = (0.0, 0.0);
+        let state = if controlled {
+            // While a peer drives this PC, nobody touches its own mouse or
+            // keyboard, so Windows would otherwise sleep or blank the screen.
+            ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+        } else {
+            ES_CONTINUOUS
+        };
+        // SAFETY: changes this thread's execution state only.
+        unsafe {
+            SetThreadExecutionState(state);
+        }
+        if controlled {
+            show_cursor_without_mouse();
+        }
+    }
+
+    fn move_by(&mut self, dx: f64, dy: f64) {
+        let mut cursor = POINT { x: 0, y: 0 };
+        // SAFETY: writes the cursor position into `cursor`.
+        if unsafe { GetCursorPos(&mut cursor) } == 0 {
+            return;
+        }
+        let scale = monitor_scale(cursor);
+        let (step_x, rest_x) = scaled_step(dx, scale, self.motion_rest.0);
+        let (step_y, rest_y) = scaled_step(dy, scale, self.motion_rest.1);
+        self.motion_rest = (rest_x, rest_y);
+        if step_x == 0 && step_y == 0 {
+            return;
+        }
+        let desktop = VirtualDesktop::current();
+        let x = (cursor.x + step_x).clamp(desktop.x, desktop.x + desktop.width - 1);
+        let y = (cursor.y + step_y).clamp(desktop.y, desktop.y + desktop.height - 1);
+        send_mouse(MOUSEINPUT {
+            dx: normalize(x, desktop.x, desktop.width),
+            dy: normalize(y, desktop.y, desktop.height),
+            mouseData: 0,
+            dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+            time: 0,
+            dwExtraInfo: INJECTED_MARKER,
+        });
+    }
+
+    fn scroll(&mut self, event: &LcInputEvent) {
+        let per_point = if event.flags & LC_INPUT_FLAG_PRECISE_SCROLL != 0 {
+            WHEEL_UNITS_PER_POINT
+        } else {
+            WHEEL_UNITS_PER_LINE_POINT
+        };
+        // Wire: positive y scrolls up, positive x scrolls left. Windows:
+        // positive WHEEL scrolls up, positive HWHEEL scrolls right.
+        let (vertical, rest_y) = wheel_step(event.scroll_y, per_point, self.wheel_rest.1);
+        let (horizontal, rest_x) = wheel_step(-event.scroll_x, per_point, self.wheel_rest.0);
+        self.wheel_rest = (rest_x, rest_y);
+        for (units, flag) in [
+            (vertical, MOUSEEVENTF_WHEEL),
+            (horizontal, MOUSEEVENTF_HWHEEL),
+        ] {
+            if units != 0 {
+                send_mouse(MOUSEINPUT {
+                    dx: 0,
+                    dy: 0,
+                    mouseData: units as u32,
+                    dwFlags: flag,
+                    time: 0,
+                    dwExtraInfo: INJECTED_MARKER,
+                });
+            }
+        }
+    }
+}
+
+/// Whole pixels to move now and the fraction to carry over.
+fn scaled_step(delta: f64, scale: f64, rest: f64) -> (i32, f64) {
+    let total = delta * scale + rest;
+    let whole = total.trunc();
+    (whole as i32, total - whole)
+}
+
+/// Whole wheel units to send now and the fraction to carry over.
+fn wheel_step(points: f64, units_per_point: f64, rest: f64) -> (i32, f64) {
+    let total = points * units_per_point + rest;
+    let whole = total.trunc();
+    (whole as i32, total - whole)
+}
+
+/// Maps a virtual-desktop pixel to SendInput's 0…65535 range, aiming at the
+/// pixel's centre so Windows' conversion back lands on the same pixel.
+fn normalize(value: i32, origin: i32, extent: i32) -> i32 {
+    let extent = extent.max(1) as f64;
+    (((value - origin) as f64 + 0.5) * 65536.0 / extent).clamp(0.0, 65535.0) as i32
+}
+
+struct VirtualDesktop {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+impl VirtualDesktop {
+    fn current() -> Self {
+        // SAFETY: plain system metric queries.
+        unsafe {
+            Self {
+                x: GetSystemMetrics(SM_XVIRTUALSCREEN),
+                y: GetSystemMetrics(SM_YVIRTUALSCREEN),
+                width: GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                height: GetSystemMetrics(SM_CYVIRTUALSCREEN),
+            }
+        }
+    }
+}
+
+fn monitor_scale(point: POINT) -> f64 {
+    // SAFETY: plain monitor queries.
+    unsafe {
+        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+        let (mut x, mut y) = (96u32, 96u32);
+        if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut x, &mut y) != 0 {
+            return 1.0;
+        }
+        x as f64 / 96.0
+    }
+}
+
+fn button(code: u32, down: bool) {
+    let (flags, data) = match (code, down) {
+        (1, true) => (MOUSEEVENTF_LEFTDOWN, 0),
+        (1, false) => (MOUSEEVENTF_LEFTUP, 0),
+        (2, true) => (MOUSEEVENTF_RIGHTDOWN, 0),
+        (2, false) => (MOUSEEVENTF_RIGHTUP, 0),
+        (3, true) => (MOUSEEVENTF_MIDDLEDOWN, 0),
+        (3, false) => (MOUSEEVENTF_MIDDLEUP, 0),
+        (4, true) => (MOUSEEVENTF_XDOWN, XBUTTON1),
+        (4, false) => (MOUSEEVENTF_XUP, XBUTTON1),
+        (5, true) => (MOUSEEVENTF_XDOWN, XBUTTON2),
+        (5, false) => (MOUSEEVENTF_XUP, XBUTTON2),
+        _ => return,
+    };
+    send_mouse(MOUSEINPUT {
+        dx: 0,
+        dy: 0,
+        mouseData: data as u32,
+        dwFlags: flags,
+        time: 0,
+        dwExtraInfo: INJECTED_MARKER,
+    });
+}
+
+fn key(event: &LcInputEvent, down: bool) {
+    let up = if down { 0 } else { KEYEVENTF_KEYUP };
+    match windows_key(event.code) {
+        Some(WinKey::Scan { code, extended }) => send_key(KEYBDINPUT {
+            wVk: 0,
+            wScan: code,
+            dwFlags: KEYEVENTF_SCANCODE | up | if extended { KEYEVENTF_EXTENDEDKEY } else { 0 },
+            time: 0,
+            dwExtraInfo: INJECTED_MARKER,
+        }),
+        Some(WinKey::Virtual(vk)) => {
+            // SAFETY: plain keyboard-layout query.
+            let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC_EX) };
+            let extended = scan >> 8 == 0xE0;
+            send_key(KEYBDINPUT {
+                wVk: vk,
+                wScan: (scan & 0xFF) as u16,
+                dwFlags: up | if extended { KEYEVENTF_EXTENDEDKEY } else { 0 },
+                time: 0,
+                dwExtraInfo: INJECTED_MARKER,
+            });
+        }
+        // A key this PC has no scan code for still types its character.
+        None => {
+            let Some(character) = char::from_u32(event.key_symbol).filter(|_| down) else {
+                return;
+            };
+            let mut units = [0u16; 2];
+            for &unit in character.encode_utf16(&mut units).iter() {
+                for flags in [KEYEVENTF_UNICODE, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP] {
+                    send_key(KEYBDINPUT {
+                        wVk: 0,
+                        wScan: unit,
+                        dwFlags: flags,
+                        time: 0,
+                        dwExtraInfo: INJECTED_MARKER,
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn send_mouse(mi: MOUSEINPUT) {
+    send(INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 { mi },
+    });
+}
+
+fn send_key(ki: KEYBDINPUT) {
+    send(INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 { ki },
+    });
+}
+
+fn send(input: INPUT) {
+    // SAFETY: one fully initialised INPUT with its exact size.
+    let sent = unsafe { SendInput(1, &input, size_of::<INPUT>() as i32) };
+    // No retry: SendInput fails when another desktop (UAC, lock screen) has
+    // input, and retrying would only spin. UIPI blocks silently anyway.
+    if sent == 0 && cfg!(debug_assertions) {
+        eprintln!(
+            "linkcursor-agent: SendInput failed: {}",
+            io::Error::last_os_error()
+        );
+    }
+}
+
+/// Windows hides the cursor on a PC with no mouse attached, even while input
+/// moves it. Turning on MouseKeys makes it draw the cursor (the approach
+/// Deskflow uses). It is left on afterwards: toggling it back can leave the
+/// cursor stuck hidden. PCs with any pointing device are not touched.
+fn show_cursor_without_mouse() {
+    // SAFETY: plain system metric query and MOUSEKEYS get/set with its size.
+    unsafe {
+        if GetSystemMetrics(SM_MOUSEPRESENT) != 0 {
+            return;
+        }
+        let mut keys = MOUSEKEYS {
+            cbSize: size_of::<MOUSEKEYS>() as u32,
+            ..std::mem::zeroed()
+        };
+        if SystemParametersInfoW(
+            SPI_GETMOUSEKEYS,
+            keys.cbSize,
+            (&mut keys as *mut MOUSEKEYS).cast(),
+            0,
+        ) == 0
+            || keys.dwFlags & MKF_MOUSEKEYSON != 0
+        {
+            return;
+        }
+        keys.dwFlags |= MKF_AVAILABLE | MKF_MOUSEKEYSON | MKF_REPLACENUMBERS;
+        SystemParametersInfoW(
+            SPI_SETMOUSEKEYS,
+            keys.cbSize,
+            (&mut keys as *mut MOUSEKEYS).cast(),
+            SPIF_SENDCHANGE,
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, normalize, scaled_step, wheel_step,
+    };
+
+    #[test]
+    fn motion_scales_and_keeps_fractions() {
+        // 1.25 px per point at 125 %: four 1-point moves add up to 5 px.
+        let mut rest = 0.0;
+        let mut total = 0;
+        for _ in 0..4 {
+            let (step, carry) = scaled_step(1.0, 1.25, rest);
+            total += step;
+            rest = carry;
+        }
+        assert_eq!(total, 5);
+        assert!(rest.abs() < 1e-9);
+        assert_eq!(scaled_step(-3.0, 2.0, 0.0).0, -6);
+    }
+
+    #[test]
+    fn normalized_coordinates_map_back_to_the_same_pixel() {
+        // Windows converts back with floor(n * width / 65536).
+        for (origin, width) in [(0, 2880), (-1920, 4800), (0, 1366)] {
+            for x in [origin, origin + 1, origin + width / 2, origin + width - 1] {
+                let n = normalize(x, origin, width) as i64;
+                let back = origin as i64 + n * width as i64 / 65536;
+                assert_eq!(back, x as i64, "origin {origin} width {width}");
+            }
+        }
+    }
+
+    #[test]
+    fn wheel_units_follow_the_wire_conventions() {
+        // One notched-wheel line (10 points) is one Windows line (40 units).
+        assert_eq!(wheel_step(10.0, WHEEL_UNITS_PER_LINE_POINT, 0.0).0, 40);
+        // Small trackpad deltas accumulate instead of being dropped.
+        let mut rest = 0.0;
+        let mut total = 0;
+        for _ in 0..10 {
+            let (units, carry) = wheel_step(0.5, WHEEL_UNITS_PER_POINT, rest);
+            total += units;
+            rest = carry;
+        }
+        // Whatever was not sent yet is carried, never lost.
+        assert!((total as f64 + rest - 6.0).abs() < 1e-9, "{total} + {rest}");
+    }
+}

@@ -241,7 +241,10 @@ namespace winrt::LinkCursor::implementation
         {
             auto peer = connection.GetNamedObject(L"peer", JsonObject{});
             m_connectedPeerId = peer.GetNamedString(L"id", L"");
-            StatusText().Text(L"已连接到 " + peer.GetNamedString(L"name", L""));
+            auto name = peer.GetNamedString(L"name", L"");
+            StatusText().Text(state.GetNamedBoolean(L"remote_control", false)
+                ? L"正在被 " + name + L" 控制键盘和鼠标"
+                : L"已连接到 " + name);
         }
         else if (status == L"connecting")
         {

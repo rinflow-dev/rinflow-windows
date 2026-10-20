@@ -47,6 +47,8 @@ pub struct Snapshot {
     pub core: CoreStatus,
     pub peers: Vec<Peer>,
     pub connection: Connection,
+    /// The connected peer is currently driving this PC's mouse and keyboard.
+    pub remote_control: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
     pub effect: EffectParams,
@@ -68,6 +70,7 @@ impl SharedState {
             core: CoreStatus::Starting,
             peers: Vec::new(),
             connection: Connection::Disconnected,
+            remote_control: false,
             last_error: None,
             effect,
             effect_revision: 1,
@@ -163,8 +166,11 @@ impl SharedState {
                 snapshot.last_error = None;
                 true
             }
+            "remote_control_started" => replace(&mut snapshot.remote_control, true),
+            "remote_control_ended" => replace(&mut snapshot.remote_control, false),
             "disconnected" => {
                 snapshot.connection = Connection::Disconnected;
+                snapshot.remote_control = false;
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
                 if reason != "local request" {
                     snapshot.last_error = Some(reason.to_owned());

@@ -4,7 +4,9 @@
 mod demo;
 mod effect;
 mod identity;
+mod inject;
 mod ipc;
+mod keymap;
 mod overlay;
 mod services;
 mod spring;
@@ -41,6 +43,13 @@ fn main() {
             return;
         }
     };
+    let injector = match inject::Injector::spawn() {
+        Ok(injector) => injector,
+        Err(error) => {
+            eprintln!("linkcursor-agent: cannot start input injection: {error}");
+            return;
+        }
+    };
     let config = CoreConfig {
         device_id: identity.device_id.clone(),
         device_name: identity.device_name.clone(),
@@ -48,11 +57,15 @@ fn main() {
         ..CoreConfig::default()
     };
     let events = state.clone();
+    let control = injector.handle();
+    let input = injector.handle();
     let core = match Core::start(
         config,
-        move |json| events.apply_core_event(&json),
-        // Remote input is dropped until SendInput injection is implemented.
-        |_input| {},
+        move |json| {
+            events.apply_core_event(&json);
+            control.core_event(&json);
+        },
+        move |event| input.play(event),
     ) {
         Ok(core) => Arc::new(core),
         Err(error) => {
@@ -77,5 +90,8 @@ fn main() {
     drop(overlay);
     // The IPC thread only holds a weak reference, so this stops the core and
     // lets connected peers see a clean disconnect before the process exits.
+    // Stopping the core queues key-ups for anything the peer still held; the
+    // injector plays them before it exits.
     drop(core);
+    drop(injector);
 }
