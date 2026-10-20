@@ -32,6 +32,7 @@ namespace LinkCursorApp
         void ResetEffect();
         void SetEffectDemo(bool enabled);
         void PreviewEffect();
+        void SetClipboardSync(bool enabled);
 
     private:
         void Run();

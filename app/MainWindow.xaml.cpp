@@ -59,6 +59,15 @@ namespace winrt::LinkCursor::implementation
         SetupArrangement();
         SetupEffectControls();
 
+        ClipboardToggle().Toggled([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (self && !self->m_applyingClipboard)
+            {
+                self->m_agent->SetClipboardSync(self->ClipboardToggle().IsOn());
+            }
+        });
+
         Closed([weak](auto&&, auto&&)
         {
             if (auto self = weak.get()) self->m_agent->Stop();
@@ -321,6 +330,15 @@ namespace winrt::LinkCursor::implementation
             m_peers.Append(make<PeerItem>(id, peer.GetNamedString(L"name", id), detail, action, canAct));
         }
         EmptyText().Visibility(m_peers.Size() == 0 ? Visibility::Visible : Visibility::Collapsed);
+
+        // Copied without echoing the change back as a request.
+        bool clipboard = state.GetNamedBoolean(L"clipboard_sync", false);
+        if (ClipboardToggle().IsOn() != clipboard)
+        {
+            m_applyingClipboard = true;
+            ClipboardToggle().IsOn(clipboard);
+            m_applyingClipboard = false;
+        }
 
         ApplyEffect(state);
     }

@@ -131,6 +131,30 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="正在查找同一网络中运行 LinkCursor 的设备…"
                         TextWrapping="Wrap" />
+
+                    <Grid
+                        Margin="0,12,0,0"
+                        ColumnSpacing="16"
+                        Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="同步剪贴板" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式和图片，最大 8 MB。密码管理器标记为隐私的内容不会同步。目前传输还没有加密，请只在可信的网络中开启。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="ClipboardToggle"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent="" />
+                    </Grid>
                 </StackPanel>
 
                 <!-- Arrangement: where each device sits around this PC -->

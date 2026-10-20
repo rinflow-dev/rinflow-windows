@@ -108,6 +108,7 @@ namespace winrt::LinkCursor::implementation
         // Set while state from the agent is copied into the controls, so the
         // resulting change events are not echoed back as edits.
         bool m_applyingEffect{ false };
+        bool m_applyingClipboard{ false };
         double m_effectRevision{ -1 };
 
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_peers{

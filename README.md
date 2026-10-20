@@ -22,6 +22,7 @@ Status:
 - It plays the mouse and keyboard input of a peer that controls this PC (for example the macOS app).
 - It controls a peer when the pointer is pushed through the edge it is placed at, with the push-through effect on this PC's side.
 - Peers can be arranged around this PC's screens, and the arrangement syncs with them.
+- The clipboard can follow control to and from peers (off by default).
 - The edge effect can be tuned with a single-machine demo.
 
 ## Layout
@@ -42,6 +43,8 @@ agent/
   src/overlay.rs             click-through overlay that draws the edge effect
   src/edge.rs                edge thread: raw-input push tracking at the portals, crossing, the demo
   src/capture.rs             while driving a peer: low-level hooks, hidden parked cursor, return
+  src/clipboard.rs           the Windows clipboard ↔ the core: text, HTML (CF_HTML), PNG (and CF_DIB)
+  src/settings.rs            other preferences (%LOCALAPPDATA%\LinkCursor\settings.json)
   src/tray.rs                notification-area icon and menu
   src/identity.rs            device ID (%LOCALAPPDATA%\LinkCursor\device-id) and name
   src/inject.rs              plays a controlling peer's input with SendInput
@@ -181,6 +184,19 @@ Known limits:
 
 Known limits: windows of elevated programs (such as Task Manager), UAC prompts and the lock screen ignore injected input until the LocalSystem service exists (M4). Scroll speeds and Mac function-key behavior still need checking against a real Mac.
 
+## Clipboard
+
+Turn on **同步剪贴板** on the **设备** page. The clipboard then follows control, as in Deskflow. When this PC starts driving a peer, or a peer driving it gives control back, the peer gets this PC's clipboard. The other way round works the same. The core sends contents only if they changed since the last exchange with that peer, which also keeps them from echoing back. The whole design, including file transfer plans, is in [linkcursor-core/docs/clipboard-and-files.md](../linkcursor-core/docs/clipboard-and-files.md).
+
+[clipboard.rs](agent/src/clipboard.rs) is the Windows end:
+
+| What | How |
+| --- | --- |
+| Shared formats | Text (`CF_UNICODETEXT` ↔ UTF-8), HTML (the fragment of `"HTML Format"`, rebuilt into CF_HTML on write), images (`"PNG"`, or `CF_DIB` converted to PNG; written back as both). At most 8 MiB in all. |
+| Changes | `AddClipboardFormatListener` on a message-only window on its own thread. A peer's clipboard written here is not reported back: the sequence number after the write is skipped. |
+| Privacy | Contents marked with `ExcludeClipboardContentFromMonitorProcessing` or `Clipboard Viewer Ignore`, or `CanIncludeInClipboardHistory` = 0 (password managers), are never shared. |
+| Setting | Off by default, because traffic is not encrypted yet. Saved to `%LOCALAPPDATA%\LinkCursor\settings.json`. The core always offers the clipboard to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards and clears any it receives, so the core does not pass them on. |
+
 ## Edge push-through effect
 
 Inspired by Universal Control. The effect is drawn on the device the cursor is moving into:
@@ -231,12 +247,13 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":4}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":5}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
 | `{"type":"remove_placement","peer_id":"…"}` | Remove the peer's placement. |
 | `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
+| `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `settings.json`. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
 | `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
@@ -246,7 +263,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":4,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":5,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
@@ -260,6 +277,7 @@ A `state` message looks like this:
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
 - `demo_side` is `local` or `remote` while the demo runs.
+- `clipboard_sync` is true while the clipboard is shared.
 
 ```json
 {

@@ -1,11 +1,13 @@
 //! What the settings app can drive through IPC.
 
+use crate::clipboard::ClipboardHandle;
 use crate::edge::EdgeHandle;
 use crate::effect::{EffectParams, EffectStore};
 use crate::overlay::{Command, OverlayHandle};
+use crate::settings::SettingsStore;
 use crate::state::SharedState;
 use linkcursor_core::Core;
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 pub struct Services {
     pub core: Weak<Core>,
@@ -13,6 +15,8 @@ pub struct Services {
     pub effects: EffectStore,
     pub overlay: OverlayHandle,
     edge: EdgeHandle,
+    clipboard: ClipboardHandle,
+    settings: Arc<SettingsStore>,
 }
 
 impl Services {
@@ -22,6 +26,8 @@ impl Services {
         effects: EffectStore,
         overlay: OverlayHandle,
         edge: EdgeHandle,
+        clipboard: ClipboardHandle,
+        settings: Arc<SettingsStore>,
     ) -> Self {
         Self {
             core,
@@ -29,7 +35,17 @@ impl Services {
             effects,
             overlay,
             edge,
+            clipboard,
+            settings,
         }
+    }
+
+    /// Shares the clipboard with peers, or stops sharing it; remembered.
+    pub fn set_clipboard_sync(&self, enabled: bool) {
+        self.clipboard.set_enabled(enabled);
+        self.settings
+            .update(|settings| settings.clipboard = enabled);
+        self.state.set_clipboard_sync(enabled);
     }
 
     pub fn set_effect(&self, params: EffectParams) {

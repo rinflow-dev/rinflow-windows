@@ -88,13 +88,20 @@ pub struct Snapshot {
     pub effect_revision: u64,
     pub effect_demo: bool,
     pub demo_side: DemoSide,
+    /// The clipboard is shared with peers (see `clipboard.rs`).
+    pub clipboard_sync: bool,
 }
 
 #[derive(Clone)]
 pub struct SharedState(Arc<watch::Sender<Snapshot>>);
 
 impl SharedState {
-    pub fn new(device_id: &str, device_name: &str, effect: EffectParams) -> Self {
+    pub fn new(
+        device_id: &str,
+        device_name: &str,
+        effect: EffectParams,
+        clipboard_sync: bool,
+    ) -> Self {
         Self(Arc::new(watch::Sender::new(Snapshot {
             device_id: device_id.to_owned(),
             device_name: device_name.to_owned(),
@@ -107,7 +114,13 @@ impl SharedState {
             effect_revision: 1,
             effect_demo: false,
             demo_side: DemoSide::Local,
+            clipboard_sync,
         })))
+    }
+
+    pub fn set_clipboard_sync(&self, enabled: bool) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.clipboard_sync, enabled));
     }
 
     pub fn subscribe(&self) -> watch::Receiver<Snapshot> {

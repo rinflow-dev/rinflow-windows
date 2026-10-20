@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -60,6 +60,9 @@ enum Request {
     EffectPreview {
         #[serde(default)]
         hold: Option<f32>,
+    },
+    SetClipboardSync {
+        enabled: bool,
     },
 }
 
@@ -219,6 +222,10 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
         }
         Request::EffectPreview { hold } => {
             services.preview_effect(hold);
+            Ok(())
+        }
+        Request::SetClipboardSync { enabled } => {
+            services.set_clipboard_sync(enabled);
             Ok(())
         }
     }
