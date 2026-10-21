@@ -70,6 +70,23 @@ Import-Module (Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.
 Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation `
     -DevCmdArguments "-arch=$targetArch -host_arch=$hostArch -no_logo" | Out-Null
 
+# Windows will not overwrite a running program or the files it holds open,
+# but it lets them be renamed. Move those out of the way, so building never
+# has to stop a running agent or settings window; it keeps running from the
+# renamed files. dev.ps1 deletes the leftovers once it has stopped them.
+$output = Join-Path $PSScriptRoot "app\$Platform\$Configuration\LinkCursor"
+if (Test-Path $output) {
+    Get-ChildItem $output -Filter '*.old' -File | Remove-Item -ErrorAction SilentlyContinue
+    foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Extension -ne '.old' }) {
+        try {
+            [IO.File]::Open($file.FullName, 'Open', 'ReadWrite', 'None').Close()
+        } catch {
+            Move-Item $file.FullName ('{0}.{1:HHmmssfff}.old' -f $file.FullName, (Get-Date))
+            Write-Host "In use, moved aside: $($file.Name)"
+        }
+    }
+}
+
 $arguments = @(
     (Join-Path $PSScriptRoot 'app\LinkCursor.vcxproj'),
     '-restore',

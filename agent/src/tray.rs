@@ -5,8 +5,10 @@ use crate::win::wide;
 use std::io;
 use std::path::PathBuf;
 use std::ptr::{null, null_mut};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
+use std::time::Duration;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows_sys::Win32::System::Console::{CTRL_CLOSE_EVENT, SetConsoleCtrlHandler};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW, Shell_NotifyIconW,
@@ -14,9 +16,10 @@ use windows_sys::Win32::UI::Shell::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
     DispatchMessageW, GetCursorPos, GetMessageW, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
-    MF_STRING, MSG, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow,
-    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP,
-    WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
+    MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+    SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
+    TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
+    WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -26,6 +29,34 @@ const MENU_QUIT: usize = 2;
 
 /// Explorer broadcasts this after it restarts; the icon must be re-added.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+/// The tray window once created, so [`quit`] works from any thread.
+static WINDOW: AtomicIsize = AtomicIsize::new(0);
+
+/// Quits the agent as the tray menu's 退出 does: the icon goes away and the
+/// core stops, so peers see a clean disconnect. False before the tray exists.
+pub fn quit() -> bool {
+    let window = WINDOW.load(Ordering::Acquire);
+    if window == 0 {
+        return false;
+    }
+    // SAFETY: posts to this process's tray window; harmless if it is gone.
+    unsafe { PostMessageW(window as HWND, WM_CLOSE, 0, 0) != 0 }
+}
+
+/// Debug builds run in a console (`make run`, `cargo run`): Ctrl+C and
+/// closing the console quit cleanly instead of killing the process, which
+/// would leave a dead tray icon and drop peers mid-session.
+unsafe extern "system" fn console_control(event: u32) -> windows_sys::core::BOOL {
+    if !quit() {
+        // Not started yet: let Windows end the process as usual.
+        return 0;
+    }
+    if event == CTRL_CLOSE_EVENT {
+        // Windows ends the process once this returns; let shutdown finish.
+        std::thread::sleep(Duration::from_secs(3));
+    }
+    1
+}
 
 /// Creates the tray icon and runs the message loop until the user quits.
 pub fn run() -> io::Result<()> {
@@ -69,6 +100,8 @@ pub fn run() -> io::Result<()> {
         if !add_icon(window) {
             return Err(io::Error::last_os_error());
         }
+        WINDOW.store(window as isize, Ordering::Release);
+        SetConsoleCtrlHandler(Some(console_control), 1);
 
         let mut message: MSG = std::mem::zeroed();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {

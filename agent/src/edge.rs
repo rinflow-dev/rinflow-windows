@@ -14,7 +14,7 @@
 //! for one window only, so crossing and the demo share this thread.
 
 use crate::arrangement::Arrangement;
-use crate::capture::{self, Ended, WM_END_CAPTURE};
+use crate::capture::{self, WM_END_CAPTURE};
 use crate::displays::PhysicalPortal;
 use crate::effect::EffectStore;
 use crate::overlay::{Command, ENTRY_INSET, Edge, EdgePoint, OverlayHandle};
@@ -26,7 +26,7 @@ use std::cell::RefCell;
 use std::io;
 use std::ptr::{null, null_mut};
 use std::sync::mpsc;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
@@ -57,6 +57,13 @@ const CROSS_COOLDOWN: Duration = Duration::from_millis(250);
 const RELEASE_TIMER: usize = 1;
 /// Thread message: the demo was turned on (wparam 1) or off.
 const WM_SET_DEMO: u32 = WM_APP + 1;
+/// Thread message: entries were added to [`REVOKED`].
+const WM_CONTROL_REVOKED: u32 = WM_APP + 3;
+
+/// Control this PC lost (`control_revoked`), queued by the core's callback
+/// thread for the edge thread, which owns the capture: the peer, and whether
+/// the cursor stays where the new controller puts it.
+static REVOKED: Mutex<Vec<(String, bool)>> = Mutex::new(Vec::new());
 
 pub struct EdgeThread {
     handle: EdgeHandle,
@@ -74,6 +81,32 @@ impl EdgeHandle {
         // SAFETY: posts to the edge thread's message queue.
         unsafe {
             PostThreadMessageW(self.thread_id, WM_SET_DEMO, usize::from(enabled), 0);
+        }
+    }
+
+    /// Picks `control_revoked` out of the core's event stream: the core
+    /// took this PC's control of a peer away, so the capture has to end.
+    pub fn core_event(&self, json: &str) {
+        if !json.contains("control_revoked") {
+            return;
+        }
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(json) else {
+            return;
+        };
+        if event["event"] != "control_revoked" {
+            return;
+        }
+        let Some(peer_id) = event["peer_id"].as_str() else {
+            return;
+        };
+        // `taken_over`: a peer drives this PC now and places the cursor.
+        let stay = event["reason"] == "taken_over";
+        if let Ok(mut revoked) = REVOKED.lock() {
+            revoked.push((peer_id.to_owned(), stay));
+        }
+        // SAFETY: posts to the edge thread's message queue.
+        unsafe {
+            PostThreadMessageW(self.thread_id, WM_CONTROL_REVOKED, 0, 0);
         }
     }
 }
@@ -121,6 +154,16 @@ impl EdgeThread {
                         if message.hwnd.is_null() && message.message == WM_SET_DEMO {
                             let enabled = message.wParam != 0;
                             with_tracker(|tracker| tracker.set_demo(enabled));
+                            continue;
+                        }
+                        if message.hwnd.is_null() && message.message == WM_CONTROL_REVOKED {
+                            let revoked = REVOKED
+                                .lock()
+                                .map(|mut queue| std::mem::take(&mut *queue))
+                                .unwrap_or_default();
+                            for (peer_id, stay) in revoked {
+                                capture::revoked(&peer_id, stay);
+                            }
                             continue;
                         }
                         TranslateMessage(&message);
@@ -382,8 +425,8 @@ impl Tracker {
 
     /// The pointer came back from a peer: show it coming in, and let it go
     /// straight back for a while without pushing again.
-    fn returned(&mut self, ended: &Ended) {
-        if let Some(at) = self.entry_point(&ended.peer_id, ended.cursor) {
+    fn returned(&mut self, peer_id: &str, cursor: POINT) {
+        if let Some(at) = self.entry_point(peer_id, cursor) {
             self.overlay.send(Command::Emerge { at });
         }
         self.start_cooldown();
@@ -704,8 +747,11 @@ unsafe extern "system" fn window_proc(
         }
         WM_TIMER if wparam == RELEASE_TIMER => with_tracker(Tracker::on_timer),
         WM_END_CAPTURE => {
-            if let Some(ended) = capture::finish() {
-                with_tracker(|tracker| tracker.returned(&ended));
+            // Only a pointer that came back shows the emerge animation.
+            if let Some(ended) = capture::finish()
+                && let Some(cursor) = ended.cursor
+            {
+                with_tracker(|tracker| tracker.returned(&ended.peer_id, cursor));
             }
             return 0;
         }

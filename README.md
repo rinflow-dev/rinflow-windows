@@ -109,6 +109,8 @@ Build messages are in Chinese by default. Pass `-Language en-US` (or another cul
 
 Inside a Developer PowerShell you can also call MSBuild directly: `msbuild app\LinkCursor.vcxproj -restore -p:Configuration=Debug -p:Platform=x64`.
 
+For a debugging loop, use `make build`, `make run` and `make stop` from the workspace root (see [Make shortcuts](../README.md#make-shortcuts)). They call [dev.ps1](dev.ps1). Building never stops a running copy: [build.ps1](build.ps1) renames the files it holds open to `*.old` (Windows refuses to overwrite them but allows the rename), so `.\build.cmd` also works while LinkCursor runs. `make run` builds first, then stops the old copy, deletes the `*.old` files and starts the new build, keeping the agent in your terminal with its log. The settings window it opens does not start an agent of its own, so the terminal stays in charge of the agent. Ctrl+C, or closing a debug agent's console, quits the agent the same way as the tray's 退出: the tray icon goes away and peers see a clean disconnect.
+
 A Release x64 build is about 3.2 MB of files (1.2 MB zipped): the agent is 1.3 MB, `LinkCursor.exe` 0.6 MB and the Windows App SDK bootstrapper 0.4 MB. The other 0.8 MB is a WebView2 DLL that the WinUI package brings in and the app does not use. At run time the agent uses about 13 MB of memory and no CPU while idle; the settings window uses about 120 MB, but only while it is open.
 
 To work on the agent alone:
@@ -145,7 +147,7 @@ The **排列** page draws this PC's monitors (in the accent color) and every kno
 
 ## Being controlled by another device
 
-When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts. Several peers can be connected at once (each row in the device list connects or disconnects one). Whichever peer is sending input is the one played.
+When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The settings window shows **正在被 … 控制键盘和鼠标** while that lasts. Several peers can be connected at once (each row in the device list connects or disconnects one), but only one drives this PC at a time: when another peer starts driving it, the core tells the previous one to stop and ignores whatever that one still sends (see "One controller at a time" in the [core README](../README.md#how-it-works)).
 
 Core handles everything that is the same on every platform. The agent only translates core's events to Windows:
 
@@ -175,6 +177,7 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Coming back | agent | The cursor reappears there with the effect's emerge animation. For the **连续切换免阻力** time, going back across needs no push. |
 | Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
 | Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
+| Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc, with the emerge animation. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
 
 The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
 

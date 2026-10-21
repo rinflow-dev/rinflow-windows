@@ -21,7 +21,7 @@ mod win;
 
 use linkcursor_core::{Core, CoreConfig};
 use services::Services;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 const INSTANCE_MUTEX: &str = "Local\\LinkCursor.Agent";
 
@@ -91,6 +91,10 @@ fn main() {
     let control = injector.handle();
     let input = injector.handle();
     let clipboard_events = clipboard.clone();
+    // The edge thread starts after the core; until then nothing is captured,
+    // so nothing can be revoked either.
+    let edge_slot = Arc::new(OnceLock::<edge::EdgeHandle>::new());
+    let edge_events = edge_slot.clone();
     let core = match Core::start(
         config,
         move |json| {
@@ -98,6 +102,9 @@ fn main() {
             layout_events.core_event(&json);
             control.core_event(&json);
             clipboard_events.core_event(&json);
+            if let Some(edge) = edge_events.get() {
+                edge.core_event(&json);
+            }
         },
         move |event| input.play(event),
     ) {
@@ -135,6 +142,7 @@ fn main() {
             return;
         }
     };
+    let _ = edge_slot.set(edge.handle());
 
     // Reports clipboard changes and writes peers' clipboards.
     let clipboard_thread =

@@ -76,14 +76,24 @@ struct Capture {
     cursor_window: HWND,
     /// The edge thread's window, for `WM_END_CAPTURE`.
     notify: HWND,
-    /// Set once the capture is ending: the local point to continue at.
-    ending: Option<(f64, f64)>,
+    /// Set once the capture is ending.
+    ending: Option<Exit>,
 }
 
-/// How a capture ended: the peer it drove and where the cursor reappeared.
+/// Where the cursor goes when a capture ends.
+#[derive(Clone, Copy)]
+enum Exit {
+    /// Back on this PC, at this local point (logical points).
+    Return(f64, f64),
+    /// Nowhere: a peer now drives this PC and places the cursor itself.
+    Stay,
+}
+
+/// How a capture ended: the peer it drove, and where the cursor reappeared
+/// if it came back to this PC.
 pub struct Ended {
     pub peer_id: String,
-    pub cursor: POINT,
+    pub cursor: Option<POINT>,
 }
 
 pub fn active() -> bool {
@@ -204,23 +214,25 @@ pub fn begin(
 /// edge thread's timer.
 pub fn check(connected: impl Fn(&str) -> bool) {
     with_capture(|capture| {
-        if capture.ending.is_none() && !connected(&capture.peer_id) {
-            let back = capture
-                .pointer
-                .return_point(capture.left_at.0, capture.left_at.1);
-            capture.request_end(back);
+        if !connected(&capture.peer_id) {
+            capture.request_end(capture.home());
         }
     });
 }
 
 /// Gives control back without crossing (release, shutdown).
 pub fn release() {
+    with_capture(|capture| capture.request_end(capture.home()));
+}
+
+/// The core took this PC's control of `peer_id` away (`control_revoked`).
+/// With `stay`, a peer now drives this PC and places the cursor itself;
+/// otherwise the cursor comes back as after a release.
+pub fn revoked(peer_id: &str, stay: bool) {
     with_capture(|capture| {
-        if capture.ending.is_none() {
-            let back = capture
-                .pointer
-                .return_point(capture.left_at.0, capture.left_at.1);
-            capture.request_end(back);
+        if capture.peer_id == peer_id {
+            let exit = if stay { Exit::Stay } else { capture.home() };
+            capture.request_end(exit);
         }
     });
 }
@@ -240,23 +252,31 @@ pub fn finish() -> Option<Ended> {
         }
         DestroyWindow(capture.cursor_window);
     }
-    let (x, y) = capture.ending.unwrap_or_else(|| {
-        capture
-            .pointer
-            .return_point(capture.left_at.0, capture.left_at.1)
-    });
-    let cursor = displays::to_physical(&displays::monitors(), x, y)
-        .map_or(capture.park, |(x, y)| POINT { x, y });
-    // SAFETY: moves the cursor to a point on the desktop.
-    unsafe {
-        SetCursorPos(cursor.x, cursor.y);
-    }
-    // The peer releases whatever it still holds and ends its control.
+    let cursor = match capture.ending.unwrap_or_else(|| capture.home()) {
+        Exit::Return(x, y) => {
+            let cursor = displays::to_physical(&displays::monitors(), x, y)
+                .map_or(capture.park, |(x, y)| POINT { x, y });
+            // SAFETY: moves the cursor to a point on the desktop.
+            unsafe {
+                SetCursorPos(cursor.x, cursor.y);
+            }
+            eprintln!(
+                "linkcursor-agent: back from {} at ({x:.1}, {y:.1})",
+                capture.peer_id
+            );
+            Some(cursor)
+        }
+        Exit::Stay => {
+            eprintln!(
+                "linkcursor-agent: control of {} taken over; the new controller places the cursor",
+                capture.peer_id
+            );
+            None
+        }
+    };
+    // The peer releases whatever it still holds and ends its control. After
+    // a revoke the core has done so already and this only acknowledges it.
     let _ = capture.core.reset_input();
-    eprintln!(
-        "linkcursor-agent: back from {} at ({x:.1}, {y:.1})",
-        capture.peer_id
-    );
     Some(Ended {
         peer_id: capture.peer_id,
         cursor,
@@ -264,11 +284,17 @@ pub fn finish() -> Option<Ended> {
 }
 
 impl Capture {
-    fn request_end(&mut self, local: (f64, f64)) {
+    /// Back on this PC, just inside the edge the pointer left through.
+    fn home(&self) -> Exit {
+        let (x, y) = self.pointer.return_point(self.left_at.0, self.left_at.1);
+        Exit::Return(x, y)
+    }
+
+    fn request_end(&mut self, exit: Exit) {
         if self.ending.is_some() {
             return;
         }
-        self.ending = Some(local);
+        self.ending = Some(exit);
         // SAFETY: posts to the edge thread's own window.
         unsafe {
             PostMessageW(self.notify, WM_END_CAPTURE, 0, 0);
@@ -304,8 +330,8 @@ impl Capture {
                 if dx == 0.0 && dy == 0.0 {
                     return true;
                 }
-                if let Some(exit) = self.pointer.move_by(dx, dy) {
-                    self.request_end(exit);
+                if let Some((x, y)) = self.pointer.move_by(dx, dy) {
+                    self.request_end(Exit::Return(x, y));
                     return true;
                 }
                 self.send(LcInputEvent {
@@ -397,8 +423,7 @@ impl Capture {
             return true;
         };
         if down && usage == USAGE_ESCAPE && self.held(&USAGE_CONTROL) && self.held(&USAGE_ALT) {
-            let back = self.pointer.return_point(self.left_at.0, self.left_at.1);
-            self.request_end(back);
+            self.request_end(self.home());
             return true;
         }
         // Low-level hooks report auto-repeat as further key-downs.
