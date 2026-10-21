@@ -1,4 +1,5 @@
 use crate::effect::EffectParams;
+use crate::settings::Settings;
 use linkcursor_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -40,6 +41,8 @@ pub struct Session {
     pub status: SessionStatus,
     /// This peer is currently driving this PC's mouse and keyboard.
     pub remote_control: bool,
+    /// Round trip to the peer, in whole milliseconds, once measured.
+    pub latency_ms: Option<u32>,
 }
 
 /// The arrangement page: this PC's displays and every known peer, all in
@@ -60,6 +63,11 @@ pub struct DeviceView {
     pub offset: Option<Offset>,
     /// The side of this PC the peer is attached to, if it touches one.
     pub side: Option<Side>,
+    /// One of the user's devices: connected at least once, or placed.
+    /// Others are only nearby (the app offers them under 添加设备).
+    pub remembered: bool,
+    /// When the peer was last seen online (Unix milliseconds), if ever.
+    pub last_seen_ms: Option<u64>,
 }
 
 /// Which side of the simulated edge the cursor is on in the effect demo.
@@ -90,6 +98,16 @@ pub struct Snapshot {
     pub demo_side: DemoSide,
     /// The clipboard is shared with peers (see `clipboard.rs`).
     pub clipboard_sync: bool,
+    /// Preferences (see `settings.rs`).
+    pub settings: Settings,
+    /// The agent starts when the user signs in.
+    pub launch_at_login: bool,
+    /// The port the core listens on now; `settings.port` applies after a
+    /// restart.
+    pub control_port: u16,
+    /// Locked to the current screen with the lock shortcut: no crossing.
+    pub locked: bool,
+    pub agent_version: &'static str,
 }
 
 #[derive(Clone)]
@@ -100,7 +118,9 @@ impl SharedState {
         device_id: &str,
         device_name: &str,
         effect: EffectParams,
-        clipboard_sync: bool,
+        settings: Settings,
+        launch_at_login: bool,
+        control_port: u16,
     ) -> Self {
         Self(Arc::new(watch::Sender::new(Snapshot {
             device_id: device_id.to_owned(),
@@ -114,13 +134,35 @@ impl SharedState {
             effect_revision: 1,
             effect_demo: false,
             demo_side: DemoSide::Local,
-            clipboard_sync,
+            clipboard_sync: settings.clipboard,
+            settings,
+            launch_at_login,
+            control_port,
+            locked: false,
+            agent_version: env!("CARGO_PKG_VERSION"),
         })))
     }
 
-    pub fn set_clipboard_sync(&self, enabled: bool) {
+    pub fn set_settings(&self, settings: Settings) {
+        self.0.send_if_modified(|snapshot| {
+            let clipboard = replace(&mut snapshot.clipboard_sync, settings.clipboard);
+            replace(&mut snapshot.settings, settings) || clipboard
+        });
+    }
+
+    pub fn set_launch_at_login(&self, enabled: bool) {
         self.0
-            .send_if_modified(|snapshot| replace(&mut snapshot.clipboard_sync, enabled));
+            .send_if_modified(|snapshot| replace(&mut snapshot.launch_at_login, enabled));
+    }
+
+    pub fn set_locked(&self, locked: bool) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.locked, locked));
+    }
+
+    pub fn clear_error(&self) {
+        self.0
+            .send_if_modified(|snapshot| snapshot.last_error.take().is_some());
     }
 
     pub fn subscribe(&self) -> watch::Receiver<Snapshot> {
@@ -225,6 +267,17 @@ impl SharedState {
                 snapshot.last_error = None;
                 true
             }
+            "latency" => {
+                let (Some(peer_id), Some(ms)) = (event["peer_id"].as_str(), event["ms"].as_f64())
+                else {
+                    return false;
+                };
+                let ms = ms.round().clamp(0.0, f64::from(u32::MAX)) as u32;
+                match snapshot.sessions.iter_mut().find(|s| s.peer_id == peer_id) {
+                    Some(session) => replace(&mut session.latency_ms, Some(ms)),
+                    None => false,
+                }
+            }
             "remote_control_started" | "remote_control_ended" => {
                 let Some(peer_id) = event["peer_id"].as_str() else {
                     return false;
@@ -288,6 +341,7 @@ impl Snapshot {
                     name,
                     status: SessionStatus::Connecting,
                     remote_control: false,
+                    latency_ms: None,
                 });
                 self.sessions.len() - 1
             }

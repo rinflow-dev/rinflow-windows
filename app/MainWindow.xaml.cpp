@@ -1,3 +1,8 @@
+// The main window: the 设备 page (sharing switch, arrangement, the user's
+// devices), the 设置 page (MainWindow.Settings.cpp) and, in development
+// builds, the edge animation page (MainWindow.Effect.cpp). Everything shown
+// comes from the agent's state snapshots; edits go back as requests.
+
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #if __has_include("MainWindow.g.cpp")
@@ -8,17 +13,56 @@
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
 using namespace winrt::Microsoft::UI::Xaml;
+using namespace winrt::Microsoft::UI::Xaml::Controls;
 using namespace winrt::Windows::Data::Json;
 
 namespace
 {
-    hstring PlatformLabel(hstring const& platform)
+#if defined(_DEBUG)
+    // The edge animation is a development aid; release builds leave it out.
+    constexpr bool DevelopmentBuild = true;
+#else
+    constexpr bool DevelopmentBuild = false;
+#endif
+
+    // What a row shows, to skip rebuilding rows that did not change.
+    std::wstring RowSignature(LinkCursor::PeerItem const& row)
     {
-        if (platform == L"macos") return L"Mac";
-        if (platform == L"windows") return L"Windows";
-        if (platform == L"linux") return L"Linux";
-        if (platform == L"android") return L"Android";
-        return L"未知设备";
+        std::wstring signature;
+        for (auto const& part : { row.Id(), row.Name(), row.Detail(), row.Glyph(), row.Latency(), row.StatusText() })
+        {
+            signature += part;
+            signature += L'\x1f';
+        }
+        signature += row.IsConnected() ? L'c' : L'-';
+        signature += row.IsOffline() ? L'o' : L'-';
+        signature += row.CanConnect() ? L'k' : L'-';
+        return signature;
+    }
+
+    // Updates `target` to `rows`, replacing only the rows that changed when
+    // the devices are the same, so the list does not flicker every second.
+    void UpdateRows(Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> const& target,
+        std::vector<LinkCursor::PeerItem> const& rows)
+    {
+        bool sameIds = target.Size() == rows.size();
+        for (uint32_t i = 0; sameIds && i < rows.size(); ++i)
+        {
+            sameIds = target.GetAt(i).as<LinkCursor::PeerItem>().Id() == rows[i].Id();
+        }
+        if (sameIds)
+        {
+            for (uint32_t i = 0; i < rows.size(); ++i)
+            {
+                if (RowSignature(target.GetAt(i).as<LinkCursor::PeerItem>()) != RowSignature(rows[i]))
+                {
+                    target.SetAt(i, rows[i]);
+                }
+            }
+            return;
+        }
+        std::vector<Windows::Foundation::IInspectable> items(rows.begin(), rows.end());
+        target.ReplaceAll(items);
     }
 }
 
@@ -34,7 +78,7 @@ namespace winrt::LinkCursor::implementation
         HWND hwnd{};
         check_hresult(m_inner.as<::IWindowNative>()->get_WindowHandle(&hwnd));
         double scale = GetDpiForWindow(hwnd) / 96.0;
-        AppWindow().Resize({ static_cast<int32_t>(720 * scale), static_cast<int32_t>(760 * scale) });
+        AppWindow().Resize({ static_cast<int32_t>(960 * scale), static_cast<int32_t>(840 * scale) });
 
         auto dispatcher = DispatcherQueue();
         auto weak = get_weak();
@@ -55,180 +99,171 @@ namespace winrt::LinkCursor::implementation
                 });
             });
 
-        SetupSections();
+        SetupDevicesPage();
         SetupArrangement();
-        SetupEffectControls();
+        SetupSettingsPage();
+        SetupEffectPage();
 
-        ClipboardToggle().Toggled([weak](auto&&, auto&&)
+        BackButton().Click([weak](auto&&, auto&&)
         {
-            auto self = weak.get();
-            if (self && !self->m_applyingClipboard)
-            {
-                self->m_agent->SetClipboardSync(self->ClipboardToggle().IsOn());
-            }
+            if (auto self = weak.get()) self->ShowPage(Page::Devices);
+        });
+        SettingsButton().Click([weak](auto&&, auto&&)
+        {
+            if (auto self = weak.get()) self->ShowPage(Page::Settings);
+        });
+        EffectButton().Visibility(DevelopmentBuild ? Visibility::Visible : Visibility::Collapsed);
+        EffectButton().Click([weak](auto&&, auto&&)
+        {
+            if (auto self = weak.get()) self->ShowPage(Page::Effect);
         });
 
         Closed([weak](auto&&, auto&&)
         {
-            if (auto self = weak.get()) self->m_agent->Stop();
+            auto self = weak.get();
+            if (!self) return;
+            // 关闭窗口时保留在托盘 off: closing the window quits LinkCursor.
+            if (!self->m_keepInTray)
+            {
+                self->m_agent->Quit();
+            }
+            self->m_agent->Stop();
         });
     }
 
-    void MainWindow::SetupSections()
+    void MainWindow::ShowPage(Page page)
+    {
+        m_page = page;
+        auto show = [](FrameworkElement const& element, bool visible)
+        {
+            element.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+        };
+        show(DevicesPage(), page == Page::Devices);
+        show(SettingsPage(), page == Page::Settings);
+        show(EffectPage(), page == Page::Effect && DevelopmentBuild);
+        show(BackButton(), page != Page::Devices);
+        if (page == Page::Devices && m_layoutDirty && !m_drag)
+        {
+            RenderArrangement();
+        }
+    }
+
+    void MainWindow::SetupDevicesPage()
     {
         auto weak = get_weak();
-        Sections().SelectionChanged([weak](auto&&, auto&&)
+        SharingToggle().Toggled([weak](auto&&, auto&&)
         {
             auto self = weak.get();
             if (!self) return;
-            auto selected = self->Sections().SelectedItem();
-            auto show = [&](FrameworkElement const& panel, bool visible)
+            bool on = self->SharingToggle().IsOn();
+            self->SharingState().Text(on ? L"开" : L"关");
+            if (!self->m_applying)
             {
-                panel.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
-            };
-            show(self->DevicesPanel(), selected == self->DevicesItem());
-            show(self->ArrangementPanel(), selected == self->ArrangementItem());
-            show(self->EffectPanel(), selected == self->EffectItem());
-        });
-    }
-
-    void MainWindow::SetupEffectControls()
-    {
-        auto number = [](std::wstring_view unit, double multiplier = 1.0, int decimals = 0)
-        {
-            return [unit, multiplier, decimals](double value)
-            {
-                auto text = decimals == 0
-                    ? std::format(L"{:.0f}", value * multiplier)
-                    : std::format(L"{:.2f}", value * multiplier);
-                return unit.empty() ? text : text + L" " + std::wstring(unit);
-            };
-        };
-        // Keys and units match EffectParams in agent/src/effect.rs.
-        m_effectSliders = {
-            { L"push_distance", PushDistanceSlider(), PushDistanceValue(), number(L"") },
-            { L"release_delay", ReleaseDelaySlider(), ReleaseDelayValue(), number(L"毫秒", 1000) },
-            { L"warm_seconds", WarmSecondsSlider(), WarmSecondsValue(), number(L"秒") },
-            { L"corner_dead_zone", CornerDeadZoneSlider(), CornerDeadZoneValue(), number(L"pt") },
-            { L"spring_response", SpringResponseSlider(), SpringResponseValue(), number(L"秒", 1, 2) },
-            { L"spring_damping", SpringDampingSlider(), SpringDampingValue(), number(L"", 1, 2) },
-            { L"bump_depth", BumpDepthSlider(), BumpDepthValue(), number(L"pt") },
-            { L"bump_width", BumpWidthSlider(), BumpWidthValue(), number(L"pt") },
-            { L"dot_size", DotSizeSlider(), DotSizeValue(), number(L"pt") },
-            { L"opacity", OpacitySlider(), OpacityValue(), number(L"%", 100) },
-        };
-
-        auto weak = get_weak();
-        auto edited = [weak](auto&&, auto&&)
-        {
-            if (auto self = weak.get()) self->OnEffectEdited();
-        };
-        for (auto const& entry : m_effectSliders)
-        {
-            entry.slider.ValueChanged(edited);
-        }
-        RippleToggle().Toggled(edited);
-        ThemeCombo().SelectionChanged(edited);
-
-        DemoToggle().Toggled([weak](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (self && !self->m_applyingEffect)
-            {
-                self->m_agent->SetEffectDemo(self->DemoToggle().IsOn());
+                self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(on));
             }
         });
-        PreviewButton().Click([weak](auto&&, auto&&)
+        AddDeviceButton().Click([weak](auto&&, auto&&)
         {
-            if (auto self = weak.get()) self->m_agent->PreviewEffect();
+            if (auto self = weak.get()) self->ShowAddDevice();
         });
-        ResetEffectButton().Click([weak](auto&&, auto&&)
+        AddDeviceDialog().Closed([weak](auto&&, auto&&)
         {
-            if (auto self = weak.get()) self->m_agent->ResetEffect();
+            if (auto self = weak.get()) self->m_addDeviceOpen = false;
         });
-        UpdateEffectLabels();
     }
 
-    void MainWindow::OnEffectEdited()
+    void MainWindow::ShowAddDevice()
     {
-        UpdateEffectLabels();
-        if (m_applyingEffect)
+        if (m_addDeviceOpen)
         {
             return;
         }
-        JsonObject params;
-        for (auto const& entry : m_effectSliders)
-        {
-            params.Insert(entry.key, JsonValue::CreateNumberValue(entry.slider.Value()));
-        }
-        params.Insert(L"ripple", JsonValue::CreateBooleanValue(RippleToggle().IsOn()));
-        hstring theme = L"auto";
-        if (auto item = ThemeCombo().SelectedItem().try_as<Controls::ComboBoxItem>())
-        {
-            theme = unbox_value_or<hstring>(item.Tag(), L"auto");
-        }
-        params.Insert(L"theme", JsonValue::CreateStringValue(theme));
-        m_agent->SetEffect(params);
+        m_addDeviceOpen = true;
+        AddDeviceDialog().XamlRoot(Root().XamlRoot());
+        AddDeviceDialog().ShowAsync();
     }
 
-    void MainWindow::UpdateEffectLabels()
+    void MainWindow::OnConnectDevice(Windows::Foundation::IInspectable const& sender, RoutedEventArgs const&)
     {
-        for (auto const& entry : m_effectSliders)
-        {
-            entry.label.Text(entry.format(entry.slider.Value()));
-        }
-    }
-
-    void MainWindow::ApplyEffect(JsonObject const& state)
-    {
-        m_applyingEffect = true;
-
-        // Values are copied only when the agent reloads them (start-up,
-        // reset). Copying every snapshot would fight the slider being dragged.
-        auto revision = state.GetNamedNumber(L"effect_revision", 0);
-        if (revision != m_effectRevision)
-        {
-            m_effectRevision = revision;
-            auto params = state.GetNamedObject(L"effect", JsonObject{});
-            for (auto const& entry : m_effectSliders)
-            {
-                entry.slider.Value(params.GetNamedNumber(entry.key, entry.slider.Value()));
-            }
-            RippleToggle().IsOn(params.GetNamedBoolean(L"ripple", true));
-            auto theme = params.GetNamedString(L"theme", L"auto");
-            ThemeCombo().SelectedIndex(theme == L"light" ? 1 : theme == L"dark" ? 2 : 0);
-            UpdateEffectLabels();
-        }
-
-        bool demo = state.GetNamedBoolean(L"effect_demo", false);
-        if (DemoToggle().IsOn() != demo)
-        {
-            DemoToggle().IsOn(demo);
-        }
-        auto side = state.GetNamedString(L"demo_side", L"local");
-        DemoSideText().Text(side == L"remote"
-            ? L"现在在“另一台设备”上 · 往回推回到本机"
-            : L"现在在本机 · 推向放置了设备的边缘进入另一台设备");
-        DemoSideText().Visibility(demo ? Visibility::Visible : Visibility::Collapsed);
-
-        m_applyingEffect = false;
-    }
-
-    void MainWindow::OnPeerAction(Windows::Foundation::IInspectable const& sender, RoutedEventArgs const&)
-    {
-        auto peerId = unbox_value_or<hstring>(sender.as<Controls::Button>().Tag(), L"");
-        if (peerId.empty())
-        {
-            return;
-        }
-        if (m_connectedPeerIds.contains(std::wstring(peerId)))
-        {
-            m_agent->Disconnect(peerId);
-        }
-        else
+        auto peerId = unbox_value_or<hstring>(sender.as<FrameworkElement>().Tag(), L"");
+        if (!peerId.empty())
         {
             m_agent->Connect(peerId);
         }
+    }
+
+    void MainWindow::OnDeviceMore(Windows::Foundation::IInspectable const& sender, RoutedEventArgs const&)
+    {
+        auto button = sender.as<FrameworkElement>();
+        auto peerId = unbox_value_or<hstring>(button.Tag(), L"");
+        if (auto device = m_model.Find(peerId))
+        {
+            DeviceMenu(*device).ShowAt(button);
+        }
+    }
+
+    MenuFlyout MainWindow::DeviceMenu(LinkCursorApp::DeviceInfo const& device)
+    {
+        MenuFlyout menu;
+        auto weak = get_weak();
+        auto peerId = device.id;
+        auto add = [&](hstring const& text, wchar_t const* glyph, std::function<void(MainWindow&)> action)
+        {
+            MenuFlyoutItem item;
+            item.Text(text);
+            if (glyph)
+            {
+                FontIcon icon;
+                icon.Glyph(glyph);
+                item.Icon(icon);
+            }
+            item.Click([weak, action](auto&&, auto&&)
+            {
+                if (auto self = weak.get()) action(*self);
+            });
+            menu.Items().Append(item);
+        };
+
+        if (device.connected)
+        {
+            add(L"断开连接", L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });
+        }
+        else if (device.online && !device.connecting)
+        {
+            add(L"连接", L"\xE8CE", [peerId](MainWindow& self) { self.m_agent->Connect(peerId); });
+        }
+        if (menu.Items().Size() > 0)
+        {
+            menu.Items().Append(MenuFlyoutSeparator());
+        }
+        add(L"放在左边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"left"); });
+        add(L"放在右边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"right"); });
+        add(L"放在上边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"top"); });
+        add(L"放在下边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"bottom"); });
+        if (device.placed)
+        {
+            add(L"取消放置", nullptr, [peerId](MainWindow& self) { self.m_agent->RemovePlacement(peerId); });
+        }
+        menu.Items().Append(MenuFlyoutSeparator());
+        auto name = device.name;
+        add(L"移除此设备…", L"\xE74D", [peerId, name](MainWindow& self)
+        {
+            ContentDialog confirm;
+            confirm.XamlRoot(self.Root().XamlRoot());
+            confirm.Title(box_value(L"移除 " + name + L"？"));
+            confirm.Content(box_value(hstring(L"会断开连接，并删除它在排列中的位置。它在线时仍会出现在“添加设备”里。")));
+            confirm.PrimaryButtonText(L"移除");
+            confirm.CloseButtonText(L"取消");
+            confirm.DefaultButton(ContentDialogButton::Close);
+            auto weak = self.get_weak();
+            auto operation = confirm.ShowAsync();
+            operation.Completed([weak, peerId](auto const& result, auto&&)
+            {
+                if (result.GetResults() != ContentDialogResult::Primary) return;
+                if (auto self = weak.get()) self->m_agent->ForgetDevice(peerId);
+            });
+        });
+        return menu;
     }
 
     void MainWindow::ApplyMessage(JsonObject const& message)
@@ -246,111 +281,89 @@ namespace winrt::LinkCursor::implementation
 
     void MainWindow::ApplyState(JsonObject const& state)
     {
-        DeviceNameText().Text(state.GetNamedString(L"device_name", L"LinkCursor"));
+        m_localName = state.GetNamedString(L"device_name", L"LinkCursor");
+        m_deviceId = state.GetNamedString(L"device_id", L"");
+        ShowError(state.GetNamedString(L"last_error", L""));
+        ApplySettings(state);
+        ApplyDevices(state);
+        ApplyLayout(state);
+        ApplyEffect(state);
+    }
 
-        // One session per peer; several can be open at once.
+    void MainWindow::ApplyDevices(JsonObject const& state)
+    {
+        m_model = LinkCursorApp::DeviceModel::FromState(state);
         m_connectedPeerIds.clear();
-        std::set<std::wstring> connectingPeerIds;
-        std::vector<hstring> connectedNames;
-        hstring controllerName;
-        for (auto const& value : state.GetNamedArray(L"sessions", JsonArray{}))
+        hstring controller;
+        size_t connected = 0;
+        bool connecting = false;
+        for (auto const& device : m_model.mine)
         {
-            auto session = value.GetObject();
-            std::wstring peerId{ session.GetNamedString(L"peer_id", L"") };
-            auto name = session.GetNamedString(L"name", L"");
-            if (session.GetNamedString(L"status", L"") == L"connected")
+            if (device.connected)
             {
-                m_connectedPeerIds.insert(peerId);
-                connectedNames.push_back(name);
-                if (session.GetNamedBoolean(L"remote_control", false))
-                {
-                    controllerName = name;
-                }
+                m_connectedPeerIds.insert(std::wstring(device.id));
+                ++connected;
+                if (device.controlling) controller = device.name;
             }
-            else
-            {
-                connectingPeerIds.insert(peerId);
-            }
+            connecting = connecting || device.connecting;
         }
 
-        if (!controllerName.empty())
-        {
-            StatusText().Text(L"正在被 " + controllerName + L" 控制键盘和鼠标");
-        }
-        else if (connectedNames.size() == 1)
-        {
-            StatusText().Text(L"已连接到 " + connectedNames.front());
-        }
-        else if (!connectedNames.empty())
-        {
-            StatusText().Text(hstring(std::format(L"已连接 {} 台设备", connectedNames.size())));
-        }
-        else if (!connectingPeerIds.empty())
-        {
-            StatusText().Text(L"正在连接…");
-        }
+        std::vector<LinkCursor::PeerItem> rows;
+        for (auto const& device : m_model.mine) rows.push_back(LinkCursorApp::DeviceRow(device));
+        UpdateRows(m_devices, rows);
+        DevicesEmptyText().Visibility(rows.empty() ? Visibility::Visible : Visibility::Collapsed);
+
+        std::vector<LinkCursor::PeerItem> nearby;
+        for (auto const& device : m_model.nearby) nearby.push_back(LinkCursorApp::NearbyRow(device));
+        UpdateRows(m_nearby, nearby);
+        NearbyEmptyPanel().Visibility(nearby.empty() ? Visibility::Visible : Visibility::Collapsed);
+
+        // The dot by 添加设备: green while connected; the tooltip says more.
+        StatusDotConnected().Visibility(connected > 0 ? Visibility::Visible : Visibility::Collapsed);
+        hstring status;
+        if (!controller.empty()) status = L"正在被 " + controller + L" 控制键盘和鼠标";
+        else if (connected == 1) status = L"已连接 1 台设备";
+        else if (connected > 1) status = hstring(std::format(L"已连接 {} 台设备", connected));
+        else if (connecting) status = L"正在连接…";
         else
         {
             auto core = state.GetNamedString(L"core", L"starting");
-            StatusText().Text(core == L"running" ? L"未连接 · 正在局域网中查找设备"
+            status = core == L"running" ? L"未连接 · 正在局域网中查找设备"
                 : core == L"stopped" ? L"核心服务已停止"
-                : L"正在启动…");
+                : L"正在启动…";
         }
+        ToolTipService::SetToolTip(StatusIndicator(), box_value(status));
+    }
 
-        ShowError(state.GetNamedString(L"last_error", L""));
-        ApplyLayout(state);
-
-        m_peers.Clear();
-        for (auto const& value : state.GetNamedArray(L"peers", JsonArray{}))
+    void MainWindow::ApplyTheme(hstring const& theme)
+    {
+        if (theme == m_theme)
         {
-            auto peer = value.GetObject();
-            auto id = peer.GetNamedString(L"id", L"");
-            auto detail = PlatformLabel(peer.GetNamedString(L"platform", L""))
-                + L" · " + peer.GetNamedString(L"address", L"");
-            if (auto device = FindDevice(id); device && device->offset)
-            {
-                auto side = device->side == L"left" ? L"在左边"
-                    : device->side == L"right" ? L"在右边"
-                    : device->side == L"top" ? L"在上边"
-                    : device->side == L"bottom" ? L"在下边"
-                    : L"已放置";
-                detail = detail + L" · " + side;
-            }
-            hstring action = L"连接";
-            bool canAct = true;
-            if (m_connectedPeerIds.contains(std::wstring(id)))
-            {
-                action = L"断开";
-            }
-            else if (connectingPeerIds.contains(std::wstring(id)))
-            {
-                action = L"连接中…";
-                canAct = false;
-            }
-            m_peers.Append(make<PeerItem>(id, peer.GetNamedString(L"name", id), detail, action, canAct));
+            return;
         }
-        EmptyText().Visibility(m_peers.Size() == 0 ? Visibility::Visible : Visibility::Collapsed);
-
-        // Copied without echoing the change back as a request.
-        bool clipboard = state.GetNamedBoolean(L"clipboard_sync", false);
-        if (ClipboardToggle().IsOn() != clipboard)
-        {
-            m_applyingClipboard = true;
-            ClipboardToggle().IsOn(clipboard);
-            m_applyingClipboard = false;
-        }
-
-        ApplyEffect(state);
+        m_theme = theme;
+        auto requested = theme == L"light" ? ElementTheme::Light
+            : theme == L"dark" ? ElementTheme::Dark
+            : ElementTheme::Default;
+        Root().RequestedTheme(requested);
+        AppWindow().TitleBar().PreferredTheme(theme == L"light" ? Microsoft::UI::Windowing::TitleBarTheme::Light
+            : theme == L"dark" ? Microsoft::UI::Windowing::TitleBarTheme::Dark
+            : Microsoft::UI::Windowing::TitleBarTheme::UseDefaultAppMode);
+        // Code-drawn parts pick their colours up again.
+        m_layoutSignature.clear();
+        RenderDots();
     }
 
     void MainWindow::SetAgentLinked(bool linked)
     {
         if (!linked)
         {
-            StatusText().Text(L"正在连接后台服务…");
-            m_peers.Clear();
+            ToolTipService::SetToolTip(StatusIndicator(), box_value(L"正在连接后台服务…"));
+            StatusDotConnected().Visibility(Visibility::Collapsed);
+            m_devices.Clear();
+            m_nearby.Clear();
             m_connectedPeerIds.clear();
-            EmptyText().Visibility(Visibility::Visible);
+            DevicesEmptyText().Visibility(Visibility::Visible);
             // A restarted agent may have different values; reload them.
             m_effectRevision = -1;
             m_layoutSignature.clear();

@@ -9,6 +9,80 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Switches end at their track: the template reserves this much
+                 width for the on / off text, which these switches show on
+                 their left instead (SwitchStateStyle). -->
+            <x:Double x:Key="ToggleSwitchThemeMinWidth">0</x:Double>
+
+            <!-- A card: one settings row, a device row, the sharing switch. -->
+            <Style x:Key="CardStyle" TargetType="Grid">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+                <Setter Property="Padding" Value="20,12" />
+                <Setter Property="MinHeight" Value="64" />
+                <Setter Property="ColumnSpacing" Value="16" />
+            </Style>
+
+            <Style x:Key="PageTitleStyle" BasedOn="{StaticResource TitleTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="30" />
+            </Style>
+
+            <Style x:Key="SectionHeaderStyle" BasedOn="{StaticResource BodyStrongTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,28,0,8" />
+            </Style>
+
+            <Style x:Key="RowTitleStyle" BasedOn="{StaticResource BodyTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="RowDescriptionStyle" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <!-- The 开 / 关 next to a switch. The switch's own content would
+                 sit on its right; Windows Settings shows it on the left. -->
+            <Style x:Key="SwitchStateStyle" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,12,0" />
+            </Style>
+
+            <Style x:Key="BareSwitchStyle" TargetType="ToggleSwitch">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="OnContent" Value="" />
+                <Setter Property="OffContent" Value="" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,-12,0" />
+            </Style>
+
+            <Style x:Key="IconButtonStyle" BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Padding" Value="0" />
+            </Style>
+
+            <Style x:Key="SubtleIconButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+            </Style>
+
+            <!-- A key of a shortcut, drawn as a keycap. -->
+            <Style x:Key="KeycapStyle" TargetType="Border">
+                <Setter Property="MinWidth" Value="32" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1,1,1,2" />
+                <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

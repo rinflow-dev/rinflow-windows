@@ -41,12 +41,18 @@ fn main() {
 
     let effects = effect::EffectStore::load();
     let settings = Arc::new(settings::SettingsStore::load());
-    let clipboard_sync = settings.get().clipboard;
+    let preferences = settings.get();
+    let clipboard_sync = preferences.clipboard;
+    let control_port = preferences
+        .port
+        .unwrap_or_else(|| CoreConfig::default().control_port);
     let state = state::SharedState::new(
         &identity.device_id,
         &identity.device_name,
         effects.get(),
-        clipboard_sync,
+        preferences.clone(),
+        settings::autostart::enabled(),
+        control_port,
     );
     let clipboard = clipboard::ClipboardHandle::new(clipboard_sync);
     let overlay = match overlay::Overlay::spawn(effects.clone()) {
@@ -69,6 +75,7 @@ fn main() {
         device_id: identity.device_id.clone(),
         device_name: identity.device_name.clone(),
         platform: "windows".to_owned(),
+        control_port,
         displays: displays::logical(&monitors),
         placements: arrangement.placements(),
         // Always offered to peers; whether this PC's clipboard is actually
@@ -114,6 +121,10 @@ fn main() {
             return;
         }
     };
+    // Sharing paused in the settings: peers may not drive this PC either.
+    if !preferences.sharing {
+        let _ = core.set_remote_control_allowed(false);
+    }
 
     // Resolution, scaling or monitor changes reach the core (which re-fits
     // placements and tells peers) and the arrangement view.
@@ -132,6 +143,7 @@ fn main() {
     let edge = match edge::EdgeThread::start(
         overlay.handle(),
         effects.clone(),
+        settings.clone(),
         state.clone(),
         arrangement.clone(),
         Arc::downgrade(&core),
@@ -162,6 +174,7 @@ fn main() {
         edge.handle(),
         clipboard,
         settings,
+        arrangement,
     ));
     ipc::spawn(&identity.user_sid, services.clone());
 

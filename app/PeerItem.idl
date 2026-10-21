@@ -1,14 +1,35 @@
 namespace LinkCursor
 {
-    // One row in the nearby-device list. Rows are rebuilt from every agent
-    // state snapshot, so the properties are read-only.
+    // One device row: in the device list, the add-device dialog and the tray
+    // panel. Rows are rebuilt from every agent state snapshot. Colours stay
+    // in XAML (ThemeResource), so rows only say which parts show.
+    // (MIDL reads this file in the system code page: keep it ASCII.)
     runtimeclass PeerItem
     {
-        PeerItem(String id, String name, String detail, String actionText, Boolean canAct);
+        PeerItem(String id, String name, String detail, String glyph);
+
         String Id{ get; };
         String Name{ get; };
         String Detail{ get; };
-        String ActionText{ get; };
-        Boolean CanAct{ get; };
+        // Segoe Fluent Icons glyph for the kind of device.
+        String Glyph{ get; };
+
+        // "2 ms", an em dash, or empty.
+        String Latency{ get; set; };
+        // Connected, not connected, offline...
+        String StatusText{ get; set; };
+        // Connected: the status shows green with a filled dot. Otherwise it
+        // shows in the secondary text colour with a hollow dot.
+        Boolean IsConnected{ get; set; };
+        // Not reachable now: the row is dimmed.
+        Boolean IsOffline{ get; set; };
+        // Online but not connected: offer to connect instead of a latency.
+        Boolean CanConnect{ get; set; };
+
+        Microsoft.UI.Xaml.Visibility ConnectedVisibility{ get; };
+        Microsoft.UI.Xaml.Visibility OtherVisibility{ get; };
+        Microsoft.UI.Xaml.Visibility LatencyVisibility{ get; };
+        Microsoft.UI.Xaml.Visibility ConnectVisibility{ get; };
+        Double ContentOpacity{ get; };
     }
 }

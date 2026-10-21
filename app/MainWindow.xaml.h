@@ -2,6 +2,7 @@
 
 #include "MainWindow.g.h"
 #include "AgentClient.h"
+#include "DeviceModel.h"
 
 namespace winrt::LinkCursor::implementation
 {
@@ -16,29 +17,34 @@ namespace winrt::LinkCursor::implementation
         // Named elements only exist after the base InitializeComponent runs.
         void InitializeComponent();
 
-        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> Peers() const
+        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> Devices() const
         {
-            return m_peers;
+            return m_devices;
+        }
+        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> Nearby() const
+        {
+            return m_nearby;
         }
 
-        void OnPeerAction(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPlaceLeft(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPlaceRight(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPlaceTop(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPlaceBottom(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnRemovePlacement(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+        enum class Page { Devices, Settings, Effect };
+        // Shows a page and brings the window to the front.
+        void ShowPage(Page page);
 
-        // ---- Arrangement page (MainWindow.Arrangement.cpp) ----------------
+        void OnConnectDevice(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+        void OnDeviceMore(Windows::Foundation::IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+
+        // ---- Arrangement (MainWindow.Arrangement.cpp) ----------------------
 
         // A rectangle in logical points.
         struct LayoutRect
         {
             double x{}, y{}, width{}, height{};
+            double scale{ 1.0 };
             double Right() const { return x + width; }
             double Bottom() const { return y + height; }
         };
 
-        // A peer as the arrangement page draws it.
+        // A peer as the arrangement draws it.
         struct LayoutDevice
         {
             hstring peerId;
@@ -48,41 +54,52 @@ namespace winrt::LinkCursor::implementation
             LayoutRect bounds;                // of `displays`
             std::optional<std::pair<double, double>> offset;
             hstring side;
+            bool remembered{ false };
         };
 
-        // A device being dragged: from the canvas (placed) or from the tray.
+        // A device being dragged: from the canvas (placed) or a chip.
         struct LayoutDrag
         {
             hstring peerId;
             Microsoft::UI::Xaml::FrameworkElement element{ nullptr };
-            Windows::Foundation::Point grab{};   // pointer offset inside the element
-            bool fromTray{ false };
+            Windows::Foundation::Point grab{};  // pointer offset inside the element
+            Windows::Foundation::Point start{}; // where the pointer went down
+            bool fromChip{ false };
         };
 
     private:
+        // ---- Window, state, devices (MainWindow.xaml.cpp) -----------------
+        void ApplyMessage(Windows::Data::Json::JsonObject const& message);
+        void ApplyState(Windows::Data::Json::JsonObject const& state);
+        void ApplyDevices(Windows::Data::Json::JsonObject const& state);
+        void ApplyTheme(hstring const& theme);
+        void SetAgentLinked(bool linked);
+        void ShowError(hstring const& message);
+        void SetupDevicesPage();
+        void ShowAddDevice();
+        Microsoft::UI::Xaml::Controls::MenuFlyout DeviceMenu(LinkCursorApp::DeviceInfo const& device);
+
+        // ---- Arrangement (MainWindow.Arrangement.cpp) ----------------------
         void SetupArrangement();
         void ApplyLayout(Windows::Data::Json::JsonObject const& state);
         void RenderArrangement();
+        void RenderDots();
+        Microsoft::UI::Xaml::FrameworkElement Screen(hstring const& templateKey, double width, double height,
+            hstring const& glyph, hstring const& title, hstring const& subtitle, bool dashed, bool strong);
         Microsoft::UI::Xaml::FrameworkElement DeviceElement(LayoutDevice const& device, bool ghost);
         void BeginDrag(LayoutDevice const& device, Microsoft::UI::Xaml::FrameworkElement const& element,
-            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args, bool fromTray);
+            Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void MoveDrag(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void EndDrag(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
-        LayoutDevice const* FindDevice(hstring const& peerId) const;
-        void PlaceFromMenu(Windows::Foundation::IInspectable const& sender, wchar_t const* side);
+        LayoutDevice const* FindLayoutDevice(hstring const& peerId) const;
 
-        std::vector<LayoutRect> m_localDisplays;
-        std::vector<LayoutDevice> m_layoutDevices;
-        std::set<std::wstring> m_onlinePeerIds;
-        std::wstring m_layoutSignature;
-        // Canvas pixels per logical point, and the logical point at the
-        // canvas origin.
-        double m_layoutScale{ 1.0 };
-        double m_layoutOriginX{ 0.0 };
-        double m_layoutOriginY{ 0.0 };
-        std::optional<LayoutDrag> m_drag;
-        bool m_layoutDirty{ false };
+        // ---- Settings (MainWindow.Settings.cpp) ----------------------------
+        void SetupSettingsPage();
+        void ApplySettings(Windows::Data::Json::JsonObject const& state);
+        void ShowHotkeyKeys(Microsoft::UI::Xaml::Controls::StackPanel const& panel, uint32_t modifiers, uint32_t key);
+        fire_and_forget EditHotkey();
 
+        // ---- Edge animation, development builds (MainWindow.Effect.cpp) ---
         // One tunable effect parameter: its key in the agent's JSON, the
         // slider that edits it and the label that shows the value.
         struct EffectSlider
@@ -92,30 +109,53 @@ namespace winrt::LinkCursor::implementation
             Microsoft::UI::Xaml::Controls::TextBlock label{ nullptr };
             std::function<std::wstring(double)> format;
         };
-
-        void ApplyMessage(Windows::Data::Json::JsonObject const& message);
-        void ApplyState(Windows::Data::Json::JsonObject const& state);
-        void SetAgentLinked(bool linked);
-        void ShowError(hstring const& message);
-
-        void SetupSections();
-        void SetupEffectControls();
+        void SetupEffectPage();
         void ApplyEffect(Windows::Data::Json::JsonObject const& state);
         void OnEffectEdited();
         void UpdateEffectLabels();
 
-        std::vector<EffectSlider> m_effectSliders;
-        // Set while state from the agent is copied into the controls, so the
-        // resulting change events are not echoed back as edits.
-        bool m_applyingEffect{ false };
-        bool m_applyingClipboard{ false };
-        double m_effectRevision{ -1 };
-
-        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_peers{
+        std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
+        Page m_page{ Page::Devices };
+        LinkCursorApp::DeviceModel m_model;
+        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{
             single_threaded_observable_vector<Windows::Foundation::IInspectable>()
         };
+        Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_nearby{
+            single_threaded_observable_vector<Windows::Foundation::IInspectable>()
+        };
+        std::wstring m_devicesSignature;
+        std::wstring m_nearbySignature;
+        bool m_addDeviceOpen{ false };
+
+        // Set while state from the agent is copied into the controls, so the
+        // resulting change events are not echoed back as edits.
+        bool m_applying{ false };
+        Windows::Data::Json::JsonObject m_settings{ nullptr };
+        hstring m_theme;
+        bool m_keepInTray{ true };
+        hstring m_deviceId;
+
+        std::vector<LayoutRect> m_localDisplays;
+        std::vector<LayoutDevice> m_layoutDevices;
+        std::set<std::wstring> m_onlinePeerIds;
         std::set<std::wstring> m_connectedPeerIds;
-        std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
+        std::wstring m_layoutSignature;
+        // Canvas pixels per logical point, and the logical point at the
+        // canvas origin.
+        double m_layoutScale{ 1.0 };
+        double m_layoutOriginX{ 0.0 };
+        double m_layoutOriginY{ 0.0 };
+        std::optional<LayoutDrag> m_drag;
+        bool m_layoutDirty{ false };
+        hstring m_localName;
+
+        std::vector<EffectSlider> m_effectSliders;
+        bool m_applyingEffect{ false };
+        double m_effectRevision{ -1 };
+
+        // The shortcut being recorded in the hotkey dialog.
+        uint32_t m_newHotkeyModifiers{ 0 };
+        uint32_t m_newHotkeyKey{ 0 };
     };
 }
 

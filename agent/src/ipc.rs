@@ -11,12 +11,17 @@ use crate::state::Snapshot;
 use crate::win::PipeSecurity;
 use linkcursor_core::layout::{Offset, Side};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
-pub const PROTOCOL_VERSION: u32 = 5;
+/// 6: `update_settings`, `forget_device`, `quit`; the snapshot gains
+/// `settings`, `launch_at_login`, `control_port`, `locked`,
+/// `agent_version`, session `latency_ms` and device `remembered` /
+/// `last_seen_ms`.
+pub const PROTOCOL_VERSION: u32 = 6;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -64,6 +69,15 @@ enum Request {
     SetClipboardSync {
         enabled: bool,
     },
+    /// Some keys of `settings` (see `settings.rs`), and `launch_at_login`.
+    UpdateSettings {
+        values: Map<String, Value>,
+    },
+    ForgetDevice {
+        peer_id: String,
+    },
+    /// Quits the agent as the tray's 退出 does.
+    Quit,
 }
 
 #[derive(Serialize)]
@@ -226,6 +240,12 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
         }
         Request::SetClipboardSync { enabled } => {
             services.set_clipboard_sync(enabled);
+            Ok(())
+        }
+        Request::UpdateSettings { values } => services.update_settings(values),
+        Request::ForgetDevice { peer_id } => services.forget_device(&peer_id),
+        Request::Quit => {
+            crate::tray::quit();
             Ok(())
         }
     }

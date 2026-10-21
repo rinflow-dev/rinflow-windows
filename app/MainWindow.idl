@@ -1,9 +1,13 @@
 namespace LinkCursor
 {
+    // (MIDL reads this file in the system code page: keep it ASCII.)
     [default_interface]
     runtimeclass MainWindow : Microsoft.UI.Xaml.Window
     {
         MainWindow();
-        Windows.Foundation.Collections.IObservableVector<IInspectable> Peers{ get; };
+        // The user's devices, and nearby ones for the add-device dialog
+        // (PeerItem rows).
+        Windows.Foundation.Collections.IObservableVector<IInspectable> Devices{ get; };
+        Windows.Foundation.Collections.IObservableVector<IInspectable> Nearby{ get; };
     }
 }

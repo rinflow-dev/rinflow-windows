@@ -1,10 +1,13 @@
-// The 排列 page: this PC's displays and the peers around them, drawn to scale
-// in logical points. Peers are placed by dragging; the agent's core snaps
-// every drop to a valid spot (touching an edge, enough overlap) and syncs it
-// to the peer, so this page only proposes positions and draws what comes back.
+// The arrangement on the 设备 page: this PC's screens and the placed peers
+// around them, drawn to scale in logical points on a dotted canvas. Peers are
+// placed by dragging (from the canvas, or from the 未放置 chips); the agent's
+// core snaps every drop to a valid spot (touching an edge, enough overlap)
+// and syncs it to the peer, so this page only proposes positions and draws
+// what comes back. Dragging a placed peer out of the canvas unplaces it.
 
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "DeviceModel.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -19,15 +22,19 @@ namespace
 {
     using LayoutRect = winrt::LinkCursor::implementation::MainWindow::LayoutRect;
 
-    Brush ThemeBrush(wchar_t const* key)
-    {
-        return Application::Current().Resources().Lookup(box_value(key)).as<Brush>();
-    }
+    // Room around the drawing for the chips (top) and the hint (bottom).
+    constexpr double PadSide = 24;
+    constexpr double PadTop = 52;
+    constexpr double PadBottom = 48;
+    constexpr double DotSpacing = 22;
+    // A press that moves less than this is a click, not a drag.
+    constexpr double DragThreshold = 6;
 
     LayoutRect ParseRect(JsonObject const& value)
     {
         return { value.GetNamedNumber(L"x", 0), value.GetNamedNumber(L"y", 0),
-            value.GetNamedNumber(L"width", 0), value.GetNamedNumber(L"height", 0) };
+            value.GetNamedNumber(L"width", 0), value.GetNamedNumber(L"height", 0),
+            value.GetNamedNumber(L"scale", 1) };
     }
 
     LayoutRect BoundsOf(std::vector<LayoutRect> const& rects)
@@ -52,50 +59,25 @@ namespace
         return BoundsOf({ a, b });
     }
 
-    hstring SideLabel(hstring const& side)
+    // The main display: the one at the origin of its device, else the first.
+    size_t PrimaryIndex(std::vector<LayoutRect> const& displays)
     {
-        if (side == L"left") return L"在左边";
-        if (side == L"right") return L"在右边";
-        if (side == L"top") return L"在上边";
-        if (side == L"bottom") return L"在下边";
-        return L"";
+        for (size_t i = 0; i < displays.size(); ++i)
+        {
+            if (displays[i].x == 0 && displays[i].y == 0) return i;
+        }
+        return 0;
     }
 
-    Shapes::Rectangle Screen(double width, double height, Brush const& fill, Brush const& stroke,
-        double thickness, bool dashed)
+    hstring Pixels(LayoutRect const& display)
     {
-        Shapes::Rectangle rectangle;
-        rectangle.Width((std::max)(width, 2.0));
-        rectangle.Height((std::max)(height, 2.0));
-        rectangle.RadiusX(6);
-        rectangle.RadiusY(6);
-        rectangle.Fill(fill);
-        rectangle.Stroke(stroke);
-        rectangle.StrokeThickness(thickness);
-        if (dashed)
-        {
-            DoubleCollection dashes;
-            dashes.Append(4);
-            dashes.Append(3);
-            rectangle.StrokeDashArray(dashes);
-        }
-        return rectangle;
+        return hstring(std::format(L"{}×{}", std::lround(display.width * display.scale),
+            std::lround(display.height * display.scale)));
     }
 
-    TextBlock Label(hstring const& text, Brush const& foreground, bool strong)
+    double Distance(Point a, Point b)
     {
-        TextBlock label;
-        label.Text(text);
-        label.Foreground(foreground);
-        label.FontSize(strong ? 13 : 11);
-        if (strong)
-        {
-            label.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
-        }
-        label.TextTrimming(TextTrimming::CharacterEllipsis);
-        label.HorizontalAlignment(HorizontalAlignment::Center);
-        label.TextAlignment(TextAlignment::Center);
-        return label;
+        return std::hypot(a.X - b.X, a.Y - b.Y);
     }
 }
 
@@ -106,11 +88,14 @@ namespace winrt::LinkCursor::implementation
         auto weak = get_weak();
         ArrangementHost().SizeChanged([weak](auto&&, auto&&)
         {
-            if (auto self = weak.get(); self && !self->m_drag) self->RenderArrangement();
+            auto self = weak.get();
+            if (!self) return;
+            self->RenderDots();
+            if (!self->m_drag) self->RenderArrangement();
         });
     }
 
-    MainWindow::LayoutDevice const* MainWindow::FindDevice(hstring const& peerId) const
+    MainWindow::LayoutDevice const* MainWindow::FindLayoutDevice(hstring const& peerId) const
     {
         for (auto const& device : m_layoutDevices)
         {
@@ -132,7 +117,7 @@ namespace winrt::LinkCursor::implementation
         std::wstring signature{ layout.Stringify() };
         for (auto const& id : online) signature += L"|o:" + id;
         for (auto const& id : m_connectedPeerIds) signature += L"|c:" + id;
-        signature += L"|n:" + std::wstring(DeviceNameText().Text());
+        signature += L"|n:" + std::wstring(m_localName);
         if (signature == m_layoutSignature)
         {
             return;
@@ -153,6 +138,7 @@ namespace winrt::LinkCursor::implementation
             device.peerId = entry.GetNamedString(L"peer_id", L"");
             device.name = entry.GetNamedString(L"name", device.peerId);
             device.platform = entry.GetNamedString(L"platform", L"");
+            device.remembered = entry.GetNamedBoolean(L"remembered", false);
             for (auto const& display : entry.GetNamedArray(L"displays", JsonArray{}))
             {
                 device.displays.push_back(ParseRect(display.GetObject()));
@@ -172,12 +158,68 @@ namespace winrt::LinkCursor::implementation
             m_layoutDevices.push_back(std::move(device));
         }
 
-        if (m_drag)
+        if (m_drag || m_page != Page::Devices)
         {
             m_layoutDirty = true;
             return;
         }
         RenderArrangement();
+    }
+
+    void MainWindow::RenderDots()
+    {
+        auto canvas = DotsCanvas();
+        canvas.Children().Clear();
+        double width = ArrangementHost().ActualWidth();
+        double height = ArrangementHost().ActualHeight();
+        if (width <= 1 || height <= 1)
+        {
+            return;
+        }
+        GeometryGroup dots;
+        for (double y = DotSpacing / 2; y < height; y += DotSpacing)
+        {
+            for (double x = DotSpacing / 2; x < width; x += DotSpacing)
+            {
+                EllipseGeometry dot;
+                dot.Center({ static_cast<float>(x), static_cast<float>(y) });
+                dot.RadiusX(1.1);
+                dot.RadiusY(1.1);
+                dots.Children().Append(dot);
+            }
+        }
+        auto path = Root().Resources().Lookup(box_value(L"DotsTemplate")).as<DataTemplate>().LoadContent().as<Shapes::Path>();
+        path.Data(dots);
+        canvas.Children().Append(path);
+    }
+
+    FrameworkElement MainWindow::Screen(hstring const& templateKey, double width, double height,
+        hstring const& glyph, hstring const& title, hstring const& subtitle, bool dashed, bool)
+    {
+        auto screen = Root().Resources().Lookup(box_value(templateKey)).as<DataTemplate>().LoadContent().as<Grid>();
+        screen.Width((std::max)(width, 4.0));
+        screen.Height((std::max)(height, 4.0));
+        auto shape = screen.FindName(L"Shape").as<Shapes::Rectangle>();
+        if (dashed)
+        {
+            DoubleCollection dashes;
+            dashes.Append(4);
+            dashes.Append(3);
+            shape.StrokeDashArray(dashes);
+        }
+        auto icon = screen.FindName(L"Icon").as<FontIcon>();
+        auto titleText = screen.FindName(L"Title").as<TextBlock>();
+        auto subtitleText = screen.FindName(L"Subtitle").as<TextBlock>();
+        auto labels = screen.FindName(L"Labels").as<StackPanel>();
+        labels.MaxWidth((std::max)(width - 8, 0.0));
+        icon.Glyph(glyph);
+        titleText.Text(title);
+        subtitleText.Text(subtitle);
+        // Small screens show less.
+        icon.Visibility(glyph.empty() || height < 84 ? Visibility::Collapsed : Visibility::Visible);
+        titleText.Visibility(title.empty() || height < 24 ? Visibility::Collapsed : Visibility::Visible);
+        subtitleText.Visibility(subtitle.empty() || height < 52 ? Visibility::Collapsed : Visibility::Visible);
+        return screen;
     }
 
     void MainWindow::RenderArrangement()
@@ -193,10 +235,11 @@ namespace winrt::LinkCursor::implementation
         m_layoutDirty = false;
         canvas.Children().Clear();
 
-        // Fit this PC plus generous room around it, and every placed peer.
+        // Fit this PC with room on every side for placing, and every placed peer.
         auto local = BoundsOf(m_localDisplays);
-        double room = (std::max)(local.width, local.height) * 0.75;
-        LayoutRect view{ local.x - room, local.y - room, local.width + 2 * room, local.height + 2 * room };
+        double roomX = local.width * 0.8;
+        double roomY = local.height * 0.45;
+        LayoutRect view{ local.x - roomX, local.y - roomY, local.width + 2 * roomX, local.height + 2 * roomY };
         for (auto const& device : m_layoutDevices)
         {
             if (device.offset)
@@ -206,85 +249,75 @@ namespace winrt::LinkCursor::implementation
                 view = Union(view, placed);
             }
         }
-        double padding = 12;
-        m_layoutScale = (std::min)((width - 2 * padding) / view.width, (height - 2 * padding) / view.height);
+        double areaHeight = (std::max)(height - PadTop - PadBottom, 40.0);
+        m_layoutScale = (std::min)((width - 2 * PadSide) / view.width, areaHeight / view.height);
         m_layoutOriginX = view.x - (width / m_layoutScale - view.width) / 2;
-        m_layoutOriginY = view.y - (height / m_layoutScale - view.height) / 2;
+        m_layoutOriginY = view.y - (areaHeight / m_layoutScale - view.height) / 2 - PadTop / m_layoutScale;
         auto toCanvasX = [this](double x) { return (x - m_layoutOriginX) * m_layoutScale; };
         auto toCanvasY = [this](double y) { return (y - m_layoutOriginY) * m_layoutScale; };
 
-        // This PC: each monitor on its own, the primary one (at the origin)
-        // labelled with the PC's name.
-        int number = 1;
-        for (auto const& display : m_localDisplays)
+        // This PC: each monitor on its own; the main one carries the name.
+        int number = 2;
+        auto primary = PrimaryIndex(m_localDisplays);
+        for (size_t i = 0; i < m_localDisplays.size(); ++i)
         {
-            Grid screen;
-            screen.Width(display.width * m_layoutScale);
-            screen.Height(display.height * m_layoutScale);
-            screen.Children().Append(Screen(display.width * m_layoutScale, display.height * m_layoutScale,
-                ThemeBrush(L"AccentFillColorDefaultBrush"), ThemeBrush(L"AccentFillColorSecondaryBrush"), 1, false));
-            bool primary = display.x == 0 && display.y == 0;
-            StackPanel labels;
-            labels.VerticalAlignment(VerticalAlignment::Center);
-            labels.Children().Append(Label(primary ? DeviceNameText().Text() : hstring(std::format(L"显示器 {}", number)),
-                ThemeBrush(L"TextOnAccentFillColorPrimaryBrush"), true));
-            if (primary)
-            {
-                labels.Children().Append(Label(L"这台电脑", ThemeBrush(L"TextOnAccentFillColorSecondaryBrush"), false));
-            }
-            screen.Children().Append(labels);
+            auto const& display = m_localDisplays[i];
+            bool main = i == primary;
+            auto screen = Screen(L"LocalScreenTemplate", display.width * m_layoutScale, display.height * m_layoutScale,
+                main ? L"\xE7F4" : L"",
+                main ? m_localName : hstring(std::format(L"显示器 {}", number)),
+                main ? L"本机 · " + Pixels(display) : Pixels(display),
+                false, true);
+            if (!main) ++number;
             Canvas::SetLeft(screen, toCanvasX(display.x));
             Canvas::SetTop(screen, toCanvasY(display.y));
             canvas.Children().Append(screen);
-            ++number;
         }
 
         // Placed peers.
+        bool anyPlaced = false;
         for (auto const& device : m_layoutDevices)
         {
             if (!device.offset) continue;
+            anyPlaced = true;
             auto element = DeviceElement(device, false);
             Canvas::SetLeft(element, toCanvasX(device.bounds.x + device.offset->first));
             Canvas::SetTop(element, toCanvasY(device.bounds.y + device.offset->second));
             canvas.Children().Append(element);
         }
 
-        // Discovered peers that are not placed yet wait in the tray.
-        auto tray = UnplacedPanel();
-        tray.Children().Clear();
+        // The user's online devices that are not placed yet wait as chips.
+        auto chips = UnplacedChips();
+        chips.Children().Clear();
         auto weak = get_weak();
         for (auto const& device : m_layoutDevices)
         {
-            if (device.offset || !m_onlinePeerIds.contains(std::wstring(device.peerId))) continue;
-            Border chip;
-            chip.Padding(ThicknessHelper::FromLengths(14, 6, 14, 6));
-            chip.CornerRadius(CornerRadiusHelper::FromUniformRadius(14));
-            chip.Background(ThemeBrush(L"ControlFillColorDefaultBrush"));
-            chip.BorderBrush(ThemeBrush(L"ControlStrokeColorDefaultBrush"));
-            chip.BorderThickness(ThicknessHelper::FromUniformLength(1));
-            TextBlock name;
-            name.Text(device.name);
-            chip.Child(name);
-            // No tooltip: it would pop up over the device being dragged, and
-            // the hint under the tray already says what to do.
+            auto id = std::wstring(device.peerId);
+            bool mine = device.remembered || m_connectedPeerIds.contains(id);
+            if (device.offset || !mine || !m_onlinePeerIds.contains(id)) continue;
+            auto chip = Root().Resources().Lookup(box_value(L"ChipTemplate")).as<DataTemplate>().LoadContent().as<Border>();
+            chip.FindName(L"Icon").as<FontIcon>().Glyph(LinkCursorApp::DeviceGlyph(device.platform));
+            chip.FindName(L"Title").as<TextBlock>().Text(device.name);
+            // No tooltip: it would pop up over the device being dragged.
             auto peerId = device.peerId;
             chip.PointerPressed([weak, peerId](IInspectable const& sender, PointerRoutedEventArgs const& args)
             {
                 auto self = weak.get();
                 if (!self || self->m_drag) return;
-                auto device = self->FindDevice(peerId);
+                auto device = self->FindLayoutDevice(peerId);
                 if (!device) return;
-                // The chip turns into a to-scale ghost of the device under
-                // the pointer, which the chip keeps steering while captured.
+                // A to-scale ghost of the device follows the pointer, steered
+                // by the chip while it holds the capture.
                 auto ghost = self->DeviceElement(*device, true);
                 auto position = args.GetCurrentPoint(self->ArrangementCanvas()).Position();
                 double ghostWidth = device->bounds.width * self->m_layoutScale;
                 double ghostHeight = device->bounds.height * self->m_layoutScale;
                 Canvas::SetLeft(ghost, position.X - ghostWidth / 2);
                 Canvas::SetTop(ghost, position.Y - ghostHeight / 2);
+                ghost.Visibility(Visibility::Collapsed); // until it moves
                 self->ArrangementCanvas().Children().Append(ghost);
                 self->m_drag = LayoutDrag{ peerId, ghost,
-                    Point{ static_cast<float>(ghostWidth / 2), static_cast<float>(ghostHeight / 2) }, true };
+                    Point{ static_cast<float>(ghostWidth / 2), static_cast<float>(ghostHeight / 2) }, position, true };
                 sender.as<UIElement>().CapturePointer(args.Pointer());
                 args.Handled(true);
             });
@@ -296,11 +329,21 @@ namespace winrt::LinkCursor::implementation
             {
                 if (auto self = weak.get()) self->EndDrag(args);
             });
-            tray.Children().Append(chip);
+            chip.PointerCaptureLost([weak](auto&&, auto&&)
+            {
+                auto self = weak.get();
+                if (self && self->m_drag && self->m_drag->fromChip)
+                {
+                    self->m_drag.reset();
+                    self->RenderArrangement();
+                }
+            });
+            chips.Children().Append(chip);
         }
-        UnplacedHint().Text(tray.Children().Size() == 0
-            ? L"没有等待放置的设备。同一网络中发现的设备会出现在这里；把已放置的设备拖到框外可以取消放置。"
-            : L"把设备拖到上面屏幕的旁边。把已放置的设备拖到框外可以取消放置。");
+        UnplacedPanel().Visibility(chips.Children().Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
+        ArrangementHint().Text(anyPlaced || chips.Children().Size() > 0
+            ? L"拖动以调整屏幕位置"
+            : L"连接设备后，可以在这里把它拖到屏幕旁边");
     }
 
     FrameworkElement MainWindow::DeviceElement(LayoutDevice const& device, bool ghost)
@@ -314,25 +357,28 @@ namespace winrt::LinkCursor::implementation
         group.Height(device.bounds.height * scale);
         group.Background(SolidColorBrush(Windows::UI::Colors::Transparent()));
         if (ghost) group.Opacity(0.85);
-        for (auto const& display : device.displays)
+        else if (!online) group.Opacity(0.6);
+
+        auto primary = PrimaryIndex(device.displays);
+        for (size_t i = 0; i < device.displays.size(); ++i)
         {
-            auto screen = Screen(display.width * scale, display.height * scale,
-                online ? ThemeBrush(L"ControlFillColorDefaultBrush") : ThemeBrush(L"ControlFillColorTransparentBrush"),
-                connected ? ThemeBrush(L"AccentFillColorDefaultBrush") : ThemeBrush(L"ControlStrokeColorSecondaryBrush"),
-                connected ? 2 : 1, !online);
+            auto const& display = device.displays[i];
+            bool main = i == primary;
+            hstring subtitle;
+            if (main)
+            {
+                subtitle = LinkCursorApp::PlatformLabel(device.platform) + L" · " + Pixels(display);
+                if (!connected) subtitle = subtitle + (online ? L" · 未连接" : L" · 离线");
+            }
+            auto screen = Screen(L"PeerScreenTemplate", display.width * scale, display.height * scale,
+                main ? LinkCursorApp::DeviceGlyph(device.platform) : hstring(),
+                main ? device.name : hstring(), subtitle, !online, connected);
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);
             screen.Margin(ThicknessHelper::FromLengths((display.x - device.bounds.x) * scale,
                 (display.y - device.bounds.y) * scale, 0, 0));
             group.Children().Append(screen);
         }
-        StackPanel labels;
-        labels.VerticalAlignment(VerticalAlignment::Center);
-        labels.Padding(ThicknessHelper::FromLengths(4, 0, 4, 0));
-        labels.Children().Append(Label(device.name, ThemeBrush(L"TextFillColorPrimaryBrush"), true));
-        labels.Children().Append(Label(connected ? L"已连接" : online ? L"未连接" : L"离线",
-            ThemeBrush(L"TextFillColorSecondaryBrush"), false));
-        group.Children().Append(labels);
 
         if (!ghost)
         {
@@ -342,9 +388,9 @@ namespace winrt::LinkCursor::implementation
             {
                 auto self = weak.get();
                 if (!self || self->m_drag) return;
-                if (auto device = self->FindDevice(peerId))
+                if (auto device = self->FindLayoutDevice(peerId))
                 {
-                    self->BeginDrag(*device, sender.as<FrameworkElement>(), args, false);
+                    self->BeginDrag(*device, sender.as<FrameworkElement>(), args);
                 }
             });
             group.PointerMoved([weak](auto&&, PointerRoutedEventArgs const& args)
@@ -360,7 +406,7 @@ namespace winrt::LinkCursor::implementation
                 // Capture lost without a release (e.g. the window lost
                 // focus): drop the drag and show the stored arrangement.
                 auto self = weak.get();
-                if (self && self->m_drag && !self->m_drag->fromTray)
+                if (self && self->m_drag && !self->m_drag->fromChip)
                 {
                     self->m_drag.reset();
                     self->RenderArrangement();
@@ -371,13 +417,13 @@ namespace winrt::LinkCursor::implementation
     }
 
     void MainWindow::BeginDrag(LayoutDevice const& device, FrameworkElement const& element,
-        PointerRoutedEventArgs const& args, bool fromTray)
+        PointerRoutedEventArgs const& args)
     {
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
         auto left = Canvas::GetLeft(element);
         auto top = Canvas::GetTop(element);
         m_drag = LayoutDrag{ device.peerId, element,
-            Point{ static_cast<float>(position.X - left), static_cast<float>(position.Y - top) }, fromTray };
+            Point{ static_cast<float>(position.X - left), static_cast<float>(position.Y - top) }, position, false };
         element.CapturePointer(args.Pointer());
         // Drawn above the other devices while it moves.
         Canvas::SetZIndex(element, 10);
@@ -388,6 +434,10 @@ namespace winrt::LinkCursor::implementation
     {
         if (!m_drag) return;
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
+        if (Distance(position, m_drag->start) >= DragThreshold)
+        {
+            m_drag->element.Visibility(Visibility::Visible);
+        }
         Canvas::SetLeft(m_drag->element, position.X - m_drag->grab.X);
         Canvas::SetTop(m_drag->element, position.Y - m_drag->grab.Y);
         args.Handled(true);
@@ -401,10 +451,11 @@ namespace winrt::LinkCursor::implementation
         args.Handled(true);
 
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
+        bool moved = Distance(position, drag.start) >= DragThreshold;
         bool inside = position.X >= 0 && position.Y >= 0
             && position.X <= ArrangementHost().ActualWidth() && position.Y <= ArrangementHost().ActualHeight();
-        auto device = FindDevice(drag.peerId);
-        if (inside && device)
+        auto device = FindLayoutDevice(drag.peerId);
+        if (moved && inside && device)
         {
             // Propose the drop position; the core snaps it and the next
             // snapshot draws where it actually landed.
@@ -412,16 +463,16 @@ namespace winrt::LinkCursor::implementation
             double worldY = Canvas::GetTop(drag.element) / m_layoutScale + m_layoutOriginY;
             m_agent->SetPlacement(drag.peerId, worldX - device->bounds.x, worldY - device->bounds.y);
         }
-        else if (!drag.fromTray)
+        else if (moved && !drag.fromChip)
         {
             m_agent->RemovePlacement(drag.peerId);
         }
 
         // Redraw from the stored arrangement shortly, in case the drop changed
-        // nothing (dropped back on its spot) and no new snapshot arrives.
+        // nothing (a click, or dropped back on its spot) and no snapshot comes.
         m_layoutSignature.clear();
         auto timer = DispatcherQueue().CreateTimer();
-        timer.Interval(std::chrono::milliseconds(250));
+        timer.Interval(std::chrono::milliseconds(moved ? 250 : 0));
         timer.IsRepeating(false);
         auto weak = get_weak();
         timer.Tick([weak](auto&& sender, auto&&)
@@ -430,22 +481,5 @@ namespace winrt::LinkCursor::implementation
             if (auto self = weak.get(); self && !self->m_drag) self->RenderArrangement();
         });
         timer.Start();
-    }
-
-    void MainWindow::PlaceFromMenu(IInspectable const& sender, wchar_t const* side)
-    {
-        auto peerId = unbox_value_or<hstring>(sender.as<FrameworkElement>().Tag(), L"");
-        if (!peerId.empty()) m_agent->PlaceBeside(peerId, side);
-    }
-
-    void MainWindow::OnPlaceLeft(IInspectable const& sender, RoutedEventArgs const&) { PlaceFromMenu(sender, L"left"); }
-    void MainWindow::OnPlaceRight(IInspectable const& sender, RoutedEventArgs const&) { PlaceFromMenu(sender, L"right"); }
-    void MainWindow::OnPlaceTop(IInspectable const& sender, RoutedEventArgs const&) { PlaceFromMenu(sender, L"top"); }
-    void MainWindow::OnPlaceBottom(IInspectable const& sender, RoutedEventArgs const&) { PlaceFromMenu(sender, L"bottom"); }
-
-    void MainWindow::OnRemovePlacement(IInspectable const& sender, RoutedEventArgs const&)
-    {
-        auto peerId = unbox_value_or<hstring>(sender.as<FrameworkElement>().Tag(), L"");
-        if (!peerId.empty()) m_agent->RemovePlacement(peerId);
     }
 }

@@ -4,11 +4,17 @@
 #include <restrictederrorinfo.h>
 #include <hstring.h>
 #include <sddl.h>
+#include <shellapi.h>
+#include <dwmapi.h>
+#include <ShellScalingApi.h>
 
 // Undefine GetCurrentTime macro to prevent
 // conflict with Storyboard::GetCurrentTime
 #undef GetCurrentTime
 
+#include <algorithm>
+#include <cmath>
+#include <ctime>
 #include <format>
 #include <functional>
 #include <memory>
@@ -24,6 +30,8 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
+#include <winrt/Windows.System.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Graphics.h>
 #include <winrt/Windows.UI.Text.h>

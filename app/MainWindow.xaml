@@ -13,63 +13,307 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="Root">
         <Grid.Resources>
-            <Style x:Key="CardStyle" TargetType="Grid">
-                <Setter Property="Padding" Value="16" />
-                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
-            </Style>
             <Style x:Key="SliderValueStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="HorizontalAlignment" Value="Right" />
             </Style>
+
+            <!-- Screens on the arrangement canvas. Built from templates so
+                 their ThemeResource colours follow the window's theme. -->
+            <DataTemplate x:Key="LocalScreenTemplate">
+                <Grid>
+                    <Rectangle
+                        x:Name="Shape"
+                        Fill="{ThemeResource SolidBackgroundFillColorQuarternaryBrush}"
+                        RadiusX="8"
+                        RadiusY="8"
+                        Stroke="{ThemeResource AccentFillColorDefaultBrush}"
+                        StrokeThickness="2" />
+                    <StackPanel
+                        x:Name="Labels"
+                        Padding="6,0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="2">
+                        <FontIcon
+                            x:Name="Icon"
+                            Margin="0,0,0,8"
+                            FontSize="22"
+                            Glyph="&#xE7F4;" />
+                        <TextBlock
+                            x:Name="Title"
+                            HorizontalAlignment="Center"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            x:Name="Subtitle"
+                            HorizontalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </DataTemplate>
+            <DataTemplate x:Key="PeerScreenTemplate">
+                <Grid>
+                    <Rectangle
+                        x:Name="Shape"
+                        Fill="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
+                        RadiusX="8"
+                        RadiusY="8"
+                        Stroke="{ThemeResource ControlStrongStrokeColorDisabledBrush}"
+                        StrokeThickness="1" />
+                    <StackPanel
+                        x:Name="Labels"
+                        Padding="6,0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="2">
+                        <FontIcon
+                            x:Name="Icon"
+                            Margin="0,0,0,8"
+                            FontSize="22"
+                            Glyph="&#xE7F4;" />
+                        <TextBlock
+                            x:Name="Title"
+                            HorizontalAlignment="Center"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            x:Name="Subtitle"
+                            HorizontalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </DataTemplate>
+            <DataTemplate x:Key="ChipTemplate">
+                <Border
+                    Padding="12,5"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon x:Name="Icon" FontSize="14" />
+                        <TextBlock x:Name="Title" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+            <DataTemplate x:Key="DotsTemplate">
+                <Path Fill="{ThemeResource ControlStrongStrokeColorDisabledBrush}" />
+            </DataTemplate>
         </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="AppTitleBar" Padding="16,0,0,0">
-            <TextBlock
+        <!-- Title bar. The back button sits outside the drag region so it
+             can be clicked. -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                Margin="8,0,0,0"
                 VerticalAlignment="Center"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Text="LinkCursor" />
+                AutomationProperties.Name="返回"
+                Style="{StaticResource SubtleIconButtonStyle}"
+                ToolTipService.ToolTip="返回"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <Grid
+                x:Name="AppTitleBar"
+                Grid.Column="1"
+                Padding="16,0,0,0"
+                Background="Transparent"
+                ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <!-- The LinkCursor mark: two overlapping rounded squares. -->
+                <Grid Width="18" Height="18" VerticalAlignment="Center">
+                    <Border
+                        Width="12"
+                        Height="12"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#6CB4F0"
+                        CornerRadius="3" />
+                    <Border
+                        Width="13.5"
+                        Height="13.5"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Background="#0F6CBD"
+                        BorderBrush="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        BorderThickness="1.5"
+                        CornerRadius="4" />
+                </Grid>
+                <TextBlock
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="LinkCursor" />
+            </Grid>
         </Grid>
 
-        <!-- ScrollView with vertical content: the page is laid out at the
-             viewport's width. A ScrollViewer would centre a page narrower
-             than the viewport by its desired width (the Devices tab's
-             content can be short) and push the 680-wide column off-centre. -->
-        <ScrollView Grid.Row="1" ContentOrientation="Vertical">
-            <StackPanel MaxWidth="680" Padding="32,8,32,32" Spacing="20">
-                <StackPanel Spacing="4">
-                    <TextBlock
-                        x:Name="DeviceNameText"
-                        Style="{StaticResource TitleTextBlockStyle}"
-                        Text="LinkCursor" />
-                    <TextBlock
-                        x:Name="StatusText"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="正在连接后台服务…" />
-                </StackPanel>
+        <Grid Grid.Row="1">
+            <!-- ================= Devices ================= -->
+            <!-- ScrollView with vertical content: the page is laid out at the
+                 viewport's width (a ScrollViewer would centre a narrower page
+                 by its desired width). -->
+            <ScrollView x:Name="DevicesPage" ContentOrientation="Vertical">
+                <StackPanel MaxWidth="1040" Padding="40,12,40,40">
+                    <Grid Margin="0,0,0,24" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PageTitleStyle}"
+                            Text="设备" />
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="12">
+                            <!-- Connection status: grey, or green while a
+                                 device is connected; the tooltip says more. -->
+                            <Grid
+                                x:Name="StatusIndicator"
+                                Margin="0,0,4,0"
+                                Padding="4"
+                                VerticalAlignment="Center"
+                                Background="Transparent">
+                                <Ellipse
+                                    Width="8"
+                                    Height="8"
+                                    Fill="{ThemeResource ControlStrongStrokeColorDisabledBrush}" />
+                                <Ellipse
+                                    x:Name="StatusDotConnected"
+                                    Width="8"
+                                    Height="8"
+                                    Fill="{ThemeResource SystemFillColorSuccessBrush}"
+                                    Visibility="Collapsed" />
+                            </Grid>
+                            <Button
+                                x:Name="AddDeviceButton"
+                                Height="36"
+                                Padding="16,0"
+                                AutomationProperties.Name="添加设备"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                    <TextBlock Text="添加设备" />
+                                </StackPanel>
+                            </Button>
+                            <!-- The edge animation's tuning page exists in
+                                 development builds only. -->
+                            <Button
+                                x:Name="EffectButton"
+                                AutomationProperties.Name="动画效果（开发版）"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="动画效果（仅开发版）"
+                                Visibility="Collapsed">
+                                <FontIcon FontSize="16" Glyph="&#xE9E9;" />
+                            </Button>
+                            <Button
+                                x:Name="SettingsButton"
+                                AutomationProperties.Name="设置"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="设置">
+                                <FontIcon FontSize="16" Glyph="&#xE713;" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
 
-                <SelectorBar x:Name="Sections" Margin="-12,0,0,0">
-                    <SelectorBarItem x:Name="DevicesItem" IsSelected="True" Text="设备" />
-                    <SelectorBarItem x:Name="ArrangementItem" Text="排列" />
-                    <SelectorBarItem x:Name="EffectItem" Text="连接效果" />
-                </SelectorBar>
+                    <InfoBar
+                        x:Name="ErrorBar"
+                        Margin="0,0,0,12"
+                        IsOpen="False"
+                        Severity="Warning" />
+                    <InfoBar
+                        x:Name="LockBar"
+                        Margin="0,0,0,12"
+                        IsClosable="False"
+                        IsOpen="False"
+                        Severity="Informational"
+                        Title="已锁定到当前屏幕" />
 
-                <InfoBar x:Name="ErrorBar" IsOpen="False" Severity="Warning" />
+                    <!-- Sharing on / off -->
+                    <Grid Height="68" Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon VerticalAlignment="Center" FontSize="20" Glyph="&#xE962;" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Style="{StaticResource RowTitleStyle}"
+                            Text="共享键盘和鼠标" />
+                        <TextBlock x:Name="SharingState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch
+                            x:Name="SharingToggle"
+                            Grid.Column="3"
+                            AutomationProperties.Name="共享键盘和鼠标"
+                            Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
 
-                <!-- Devices -->
-                <StackPanel x:Name="DevicesPanel" Spacing="8">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="附近的设备" />
+                    <!-- Arrangement -->
+                    <Grid
+                        x:Name="ArrangementHost"
+                        Height="340"
+                        Margin="0,16,0,0"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource OverlayCornerRadius}">
+                        <Canvas x:Name="DotsCanvas" IsHitTestVisible="False" />
+                        <Canvas x:Name="ArrangementCanvas" Background="Transparent" />
+                        <StackPanel
+                            x:Name="UnplacedPanel"
+                            Margin="14"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            Visibility="Collapsed">
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="未放置：" />
+                            <StackPanel x:Name="UnplacedChips" Orientation="Horizontal" Spacing="8" />
+                        </StackPanel>
+                        <TextBlock
+                            x:Name="ArrangementHint"
+                            Margin="0,0,0,18"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsHitTestVisible="False"
+                            Text="拖动以调整屏幕位置" />
+                    </Grid>
+
+                    <!-- The user's devices -->
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="我的设备" />
                     <!-- A plain ItemsControl: nothing is selected, and a ListView
                          would nest its own scroller inside the page's. -->
-                    <ItemsControl x:Name="PeerList" ItemsSource="{x:Bind Peers}">
+                    <ItemsControl ItemsSource="{x:Bind Devices}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Spacing="4" />
@@ -77,152 +321,376 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="local:PeerItem">
-                                <Grid
-                                    Padding="16,12"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="1"
-                                    ColumnSpacing="16"
-                                    CornerRadius="{StaticResource OverlayCornerRadius}">
+                                <Grid Style="{StaticResource CardStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <FontIcon
                                         VerticalAlignment="Center"
-                                        FontSize="20"
-                                        Glyph="&#xE7F4;" />
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
+                                        FontSize="22"
+                                        Glyph="{x:Bind Glyph}"
+                                        Opacity="{x:Bind ContentOpacity}" />
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Opacity="{x:Bind ContentOpacity}"
+                                        Spacing="2">
+                                        <TextBlock
+                                            FontSize="15"
+                                            Text="{x:Bind Name}"
+                                            TextTrimming="CharacterEllipsis" />
                                         <TextBlock
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Style="{StaticResource CaptionTextBlockStyle}"
-                                            Text="{x:Bind Detail}" />
+                                            Text="{x:Bind Detail}"
+                                            TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <StackPanel
+                                    <TextBlock
                                         Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind Latency}"
+                                        Visibility="{x:Bind LatencyVisibility}" />
+                                    <HyperlinkButton
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Click="OnConnectDevice"
+                                        Content="连接"
+                                        Tag="{x:Bind Id}"
+                                        Visibility="{x:Bind ConnectVisibility}" />
+                                    <StackPanel
+                                        Grid.Column="3"
+                                        Margin="12,0,0,0"
+                                        VerticalAlignment="Center"
                                         Orientation="Horizontal"
                                         Spacing="8">
-                                        <DropDownButton Content="位置" ToolTipService.ToolTip="把这台设备放在这台电脑的某一侧">
-                                            <DropDownButton.Flyout>
-                                                <MenuFlyout Placement="Bottom">
-                                                    <MenuFlyoutItem Click="OnPlaceLeft" Tag="{x:Bind Id}" Text="放在左边" />
-                                                    <MenuFlyoutItem Click="OnPlaceRight" Tag="{x:Bind Id}" Text="放在右边" />
-                                                    <MenuFlyoutItem Click="OnPlaceTop" Tag="{x:Bind Id}" Text="放在上边" />
-                                                    <MenuFlyoutItem Click="OnPlaceBottom" Tag="{x:Bind Id}" Text="放在下边" />
-                                                    <MenuFlyoutSeparator />
-                                                    <MenuFlyoutItem Click="OnRemovePlacement" Tag="{x:Bind Id}" Text="不放置" />
-                                                </MenuFlyout>
-                                            </DropDownButton.Flyout>
-                                        </DropDownButton>
-                                        <Button
-                                            Click="OnPeerAction"
-                                            Content="{x:Bind ActionText}"
-                                            IsEnabled="{x:Bind CanAct}"
-                                            Tag="{x:Bind Id}" />
+                                        <Grid VerticalAlignment="Center">
+                                            <Ellipse
+                                                Width="8"
+                                                Height="8"
+                                                Fill="{ThemeResource SystemFillColorSuccessBrush}"
+                                                Visibility="{x:Bind ConnectedVisibility}" />
+                                            <Ellipse
+                                                Width="8"
+                                                Height="8"
+                                                Stroke="{ThemeResource TextFillColorSecondaryBrush}"
+                                                StrokeThickness="1.5"
+                                                Visibility="{x:Bind OtherVisibility}" />
+                                        </Grid>
+                                        <Grid>
+                                            <TextBlock
+                                                Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                                Text="{x:Bind StatusText}"
+                                                Visibility="{x:Bind ConnectedVisibility}" />
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="{x:Bind StatusText}"
+                                                Visibility="{x:Bind OtherVisibility}" />
+                                        </Grid>
                                     </StackPanel>
+                                    <Button
+                                        Grid.Column="4"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.Name="更多操作"
+                                        Click="OnDeviceMore"
+                                        Style="{StaticResource SubtleIconButtonStyle}"
+                                        Tag="{x:Bind Id}"
+                                        ToolTipService.ToolTip="更多操作">
+                                        <FontIcon FontSize="16" Glyph="&#xE712;" />
+                                    </Button>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBlock
-                        x:Name="EmptyText"
+                        x:Name="DevicesEmptyText"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="正在查找同一网络中运行 LinkCursor 的设备…"
+                        Text="还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。"
                         TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollView>
 
-                    <Grid
-                        Margin="0,12,0,0"
-                        ColumnSpacing="16"
-                        Style="{StaticResource CardStyle}">
+            <!-- ================= Settings ================= -->
+            <ScrollView
+                x:Name="SettingsPage"
+                ContentOrientation="Vertical"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="1040" Padding="40,12,40,40" Spacing="4">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="设置" />
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="常规" />
+                    <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="同步剪贴板" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。目前传输还没有加密，请只在可信的网络中开启。"
-                                TextWrapping="Wrap" />
+                        <TextBlock Style="{StaticResource RowTitleStyle}" Text="开机时启动" />
+                        <TextBlock x:Name="LaunchState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="LaunchToggle" Grid.Column="2" AutomationProperties.Name="开机时启动" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="关闭窗口时保留在托盘" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。" />
                         </StackPanel>
-                        <ToggleSwitch
-                            x:Name="ClipboardToggle"
-                            Grid.Column="1"
-                            MinWidth="0"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent="" />
+                        <TextBlock x:Name="TrayState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
-                </StackPanel>
-
-                <!-- Arrangement: where each device sits around this PC -->
-                <StackPanel x:Name="ArrangementPanel" Spacing="12" Visibility="Collapsed">
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="把设备拖到这台电脑的屏幕旁边：放在哪一侧、和哪一段边对齐，鼠标就从那一段穿过去。连接时会自动同步给对方。"
-                        TextWrapping="Wrap" />
-                    <Grid
-                        x:Name="ArrangementHost"
-                        Height="340"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource OverlayCornerRadius}">
-                        <Canvas x:Name="ArrangementCanvas" Background="Transparent" />
-                    </Grid>
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="未放置的设备" />
-                    <StackPanel x:Name="UnplacedPanel" Orientation="Horizontal" Spacing="8" />
-                    <TextBlock
-                        x:Name="UnplacedHint"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Text="同一网络中发现的设备会出现在这里，把它拖到上面屏幕的旁边。把已放置的设备拖回这里可以取消放置。"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-
-                <!-- Edge push-through effect -->
-                <StackPanel x:Name="EffectPanel" Spacing="12" Visibility="Collapsed">
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardStyle}">
+                    <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource RowTitleStyle}" Text="主题" />
+                        <ComboBox
+                            x:Name="ThemeCombo"
+                            Grid.Column="1"
+                            MinWidth="200"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="主题">
+                            <ComboBoxItem Content="跟随系统" Tag="system" />
+                            <ComboBoxItem Content="浅色" Tag="light" />
+                            <ComboBoxItem Content="深色" Tag="dark" />
+                        </ComboBox>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="屏幕切换" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="72" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="切换延迟" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="光标要在屏幕边缘推住这么久才会切换到另一台设备。" />
+                        </StackPanel>
+                        <Slider
+                            x:Name="SwitchDelaySlider"
+                            Grid.Column="1"
+                            Width="240"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="切换延迟"
+                            Maximum="500"
+                            Minimum="0"
+                            StepFrequency="10" />
+                        <TextBlock
+                            x:Name="SwitchDelayValue"
+                            Grid.Column="2"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="屏幕角落不触发切换" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="让开始按钮、菜单和触发角保持好用。" />
+                        </StackPanel>
+                        <TextBlock x:Name="CornerState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="CornerToggle" Grid.Column="2" AutomationProperties.Name="屏幕角落不触发切换" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="全屏游戏时暂停" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="全屏运行游戏、视频或演示时，光标不会切换到其他设备。" />
+                        </StackPanel>
+                        <TextBlock x:Name="FullscreenState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" AutomationProperties.Name="全屏游戏时暂停" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="锁定到当前屏幕" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="按一次快捷键，光标留在当前屏幕上不再切换；再按一次解除。" />
+                        </StackPanel>
+                        <StackPanel
+                            x:Name="HotkeyKeys"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="6" />
+                        <Button
+                            x:Name="EditHotkeyButton"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="修改快捷键"
+                            Style="{StaticResource SubtleIconButtonStyle}"
+                            ToolTipService.ToolTip="修改快捷键">
+                            <FontIcon FontSize="16" Glyph="&#xE70F;" />
+                        </Button>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="剪贴板" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="同步剪贴板和文件" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
+                        </StackPanel>
+                        <TextBlock x:Name="ClipboardState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="网络与安全" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="端口" />
+                            <TextBlock x:Name="PortHint" Style="{StaticResource RowDescriptionStyle}" />
+                        </StackPanel>
+                        <NumberBox
+                            x:Name="PortBox"
+                            Grid.Column="1"
+                            Width="200"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="端口"
+                            Maximum="65535"
+                            Minimum="1024"
+                            SpinButtonPlacementMode="Hidden"
+                            ValidationMode="InvalidInputOverwritten" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="加密传输 (TLS)" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="尚未支持：目前设备之间的传输没有加密，请只在可信的网络中使用。" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" Text="关" />
+                        <ToggleSwitch Grid.Column="2" AutomationProperties.Name="加密传输（尚未支持）" IsEnabled="False" IsOn="False" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="仅允许已配对设备" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="尚未支持：需要配对功能。目前同一网络中运行 LinkCursor 的设备都可以连接。" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" Text="关" />
+                        <ToggleSwitch Grid.Column="2" AutomationProperties.Name="仅允许已配对设备（尚未支持）" IsEnabled="False" IsOn="False" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="设备 ID" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="其他设备用它认出这台电脑。加密传输上线后，这里会显示本机证书指纹。" />
+                        </StackPanel>
+                        <TextBlock
+                            x:Name="DeviceIdText"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontFamily="Consolas"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsTextSelectionEnabled="True" />
+                        <Button
+                            x:Name="CopyIdButton"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="复制设备 ID"
+                            Style="{StaticResource SubtleIconButtonStyle}"
+                            ToolTipService.ToolTip="复制">
+                            <FontIcon FontSize="16" Glyph="&#xE8C8;" />
+                        </Button>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="关于" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="LinkCursor" />
+                            <TextBlock x:Name="VersionText" Style="{StaticResource RowDescriptionStyle}" />
+                        </StackPanel>
+                        <Button
+                            x:Name="CheckUpdateButton"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Content="检查更新" />
+                    </Grid>
+                </StackPanel>
+            </ScrollView>
+
+            <!-- ================= Edge animation (development builds) ================= -->
+            <ScrollView
+                x:Name="EffectPage"
+                ContentOrientation="Vertical"
+                Visibility="Collapsed">
+                <StackPanel MaxWidth="1040" Padding="40,12,40,40" Spacing="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource PageTitleStyle}" Text="动画效果" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="仅开发版提供，用来调校屏幕边缘的推动动画；正式版会移除。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="4">
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="效果演示" />
                             <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启后，把鼠标推向“排列”里放置了设备的那段屏幕边缘（还没有放置设备时用右边缘）：边缘会鼓起，推够距离后光标从对边出现，就像进入了那台设备；再往回推即可回来。关闭本窗口时自动停止。"
-                                TextWrapping="Wrap" />
+                                Style="{StaticResource RowDescriptionStyle}"
+                                Text="开启后，把鼠标推向放置了设备的那段屏幕边缘（还没有放置设备时用右边缘）：边缘会鼓起，推够距离后光标从对边出现，就像进入了那台设备；再往回推即可回来。关闭本窗口时自动停止。" />
                             <TextBlock
                                 x:Name="DemoSideText"
                                 Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Visibility="Collapsed" />
                         </StackPanel>
-                        <ToggleSwitch
-                            x:Name="DemoToggle"
-                            Grid.Column="1"
-                            MinWidth="0"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent="" />
+                        <ToggleSwitch x:Name="DemoToggle" Grid.Column="1" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button
-                            x:Name="PreviewButton"
-                            Content="播放预览"
-                            Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Name="PreviewButton" Content="播放预览" Style="{StaticResource AccentButtonStyle}" />
                         <Button x:Name="ResetEffectButton" Content="恢复默认" />
                     </StackPanel>
 
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="手感" />
-                    <Grid Style="{StaticResource CardStyle}">
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="手感" />
+                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -272,18 +740,15 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <TextBlock Text="角落死区" ToolTipService.ToolTip="屏幕角落附近不触发，避免影响开始按钮和菜单" />
+                                <TextBlock Text="角落死区" ToolTipService.ToolTip="“屏幕角落不触发切换”打开时，角落附近这么大的范围不触发" />
                                 <TextBlock x:Name="CornerDeadZoneValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
                                 <Slider x:Name="CornerDeadZoneSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="200" Minimum="0" StepFrequency="4" />
                             </Grid>
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="动画" />
-                    <Grid Style="{StaticResource CardStyle}">
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="动画" />
+                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -314,11 +779,8 @@
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="外观" />
-                    <Grid Style="{StaticResource CardStyle}">
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="外观" />
+                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -378,12 +840,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock VerticalAlignment="Center" Text="穿过时的涟漪" />
-                                <ToggleSwitch
-                                    x:Name="RippleToggle"
-                                    Grid.Column="1"
-                                    MinWidth="0"
-                                    OffContent=""
-                                    OnContent="" />
+                                <ToggleSwitch x:Name="RippleToggle" Grid.Column="1" Style="{StaticResource BareSwitchStyle}" />
                             </Grid>
                             <Grid ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
@@ -391,7 +848,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock VerticalAlignment="Center" Text="颜色" />
-                                <ComboBox x:Name="ThemeCombo" Grid.Column="1" MinWidth="140">
+                                <ComboBox x:Name="EffectThemeCombo" Grid.Column="1" MinWidth="140">
                                     <ComboBoxItem Content="跟随系统" Tag="auto" />
                                     <ComboBoxItem Content="浅色" Tag="light" />
                                     <ComboBoxItem Content="深色" Tag="dark" />
@@ -400,7 +857,101 @@
                         </StackPanel>
                     </Grid>
                 </StackPanel>
+            </ScrollView>
+        </Grid>
+
+        <!-- ================= Dialogs ================= -->
+        <ContentDialog
+            x:Name="AddDeviceDialog"
+            Grid.RowSpan="2"
+            CloseButtonText="关闭"
+            DefaultButton="Close"
+            Title="添加设备">
+            <StackPanel MinWidth="420" Spacing="12">
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
+                    TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{x:Bind Nearby}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:PeerItem">
+                            <Grid MinHeight="56" Padding="16,8" Style="{StaticResource CardStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon VerticalAlignment="Center" FontSize="20" Glyph="{x:Bind Glyph}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Text="{x:Bind Detail}" />
+                                </StackPanel>
+                                <Button
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Click="OnConnectDevice"
+                                    Content="连接"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Tag="{x:Bind Id}"
+                                    Visibility="{x:Bind ConnectVisibility}" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind StatusText}"
+                                    Visibility="{x:Bind OtherVisibility}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel
+                    x:Name="NearbyEmptyPanel"
+                    Padding="0,8"
+                    Orientation="Horizontal"
+                    Spacing="12">
+                    <ProgressRing Width="20" Height="20" IsActive="True" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="正在查找附近的设备…"
+                        TextWrapping="Wrap" />
+                </StackPanel>
             </StackPanel>
-        </ScrollView>
+        </ContentDialog>
+
+        <ContentDialog
+            x:Name="HotkeyDialog"
+            Grid.RowSpan="2"
+            CloseButtonText="取消"
+            DefaultButton="Primary"
+            PrimaryButtonText="保存"
+            SecondaryButtonText="恢复默认"
+            Title="锁定快捷键">
+            <StackPanel MinWidth="360" Spacing="16">
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。"
+                    TextWrapping="Wrap" />
+                <StackPanel
+                    x:Name="HotkeyPreview"
+                    MinHeight="36"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="6" />
+                <TextBlock
+                    x:Name="HotkeyHint"
+                    HorizontalAlignment="Center"
+                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}" />
+            </StackPanel>
+        </ContentDialog>
     </Grid>
 </Window>

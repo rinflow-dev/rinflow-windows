@@ -34,6 +34,15 @@ namespace LinkCursorApp
         void PreviewEffect();
         void SetClipboardSync(bool enabled);
 
+        // Keys of the agent's settings (agent/src/settings.rs), plus
+        // launch_at_login.
+        void UpdateSettings(winrt::Windows::Data::Json::JsonObject const& values);
+        void UpdateSetting(std::wstring_view key, winrt::Windows::Data::Json::IJsonValue const& value);
+        // Disconnects, unplaces and stops listing a device.
+        void ForgetDevice(std::wstring_view peerId);
+        // Quits the agent, as the tray's 退出 does.
+        void Quit();
+
     private:
         void Run();
         bool Open();

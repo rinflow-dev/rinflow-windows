@@ -1,0 +1,11 @@
+namespace LinkCursor
+{
+    // The panel the tray icon opens: the sharing switch, the devices and the
+    // way to the main window. It closes when it loses focus.
+    [default_interface]
+    runtimeclass TrayWindow : Microsoft.UI.Xaml.Window
+    {
+        TrayWindow();
+        Windows.Foundation.Collections.IObservableVector<IInspectable> Devices{ get; };
+    }
+}

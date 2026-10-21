@@ -7,12 +7,15 @@
 //! of the monitor it left from, so mouse motion is measured from there with
 //! Windows' own pointer speed and acceleration, and a [`RemotePointer`]
 //! follows the pointer on the peer. Moving it back out through a portal, the
-//! release key (Ctrl+Alt+Esc) or losing the session ends the capture.
+//! release key (Ctrl+Alt+Esc) or losing the session ends the capture. While
+//! the lock shortcut holds the pointer on the peer, portals lead nowhere.
 
 use crate::arrangement::Target;
 use crate::displays::{self, PhysicalPortal};
+use crate::edge;
 use crate::inject::INJECTED_MARKER;
 use crate::keymap;
+use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN};
 use crate::win::wide;
 use linkcursor_core::layout::RemotePointer;
 use linkcursor_core::{
@@ -48,7 +51,9 @@ pub const WM_END_CAPTURE: u32 = WM_APP + 2;
 const POINTS_PER_WHEEL_UNIT: f64 = 10.0 / 120.0;
 const USAGE_ESCAPE: u32 = 0x29;
 const USAGE_CONTROL: [u32; 2] = [0xE0, 0xE4];
+const USAGE_SHIFT: [u32; 2] = [0xE1, 0xE5];
 const USAGE_ALT: [u32; 2] = [0xE2, 0xE6];
+const USAGE_GUI: [u32; 2] = [0xE3, 0xE7];
 
 thread_local! {
     static CAPTURE: RefCell<Option<Capture>> = const { RefCell::new(None) };
@@ -330,9 +335,21 @@ impl Capture {
                 if dx == 0.0 && dy == 0.0 {
                     return true;
                 }
+                let before = self.pointer.position();
+                let (mut dx, mut dy) = (dx, dy);
                 if let Some((x, y)) = self.pointer.move_by(dx, dy) {
-                    self.request_end(Exit::Return(x, y));
-                    return true;
+                    if !edge::locked() {
+                        self.request_end(Exit::Return(x, y));
+                        return true;
+                    }
+                    // Locked to the peer: slide along the edge instead.
+                    let _ = self.pointer.move_by(dx, 0.0);
+                    let _ = self.pointer.move_by(0.0, dy);
+                    let after = self.pointer.position();
+                    (dx, dy) = (after.0 - before.0, after.1 - before.1);
+                    if dx == 0.0 && dy == 0.0 {
+                        return true;
+                    }
                 }
                 self.send(LcInputEvent {
                     kind: LC_INPUT_MOUSE_MOVE,
@@ -426,11 +443,24 @@ impl Capture {
             self.request_end(self.home());
             return true;
         }
+        // The lock shortcut toggles the lock here too; the peer never sees
+        // the key (it did see the modifiers).
+        let hotkey = edge::lock_hotkey();
+        if down && info.vkCode == hotkey.key && self.modifier_bits() == hotkey.modifiers {
+            // SAFETY: posts to the edge thread's own window.
+            unsafe {
+                PostMessageW(self.notify, edge::WM_TOGGLE_LOCK, 0, 0);
+            }
+            return true;
+        }
         // Low-level hooks report auto-repeat as further key-downs.
         let repeat = if down {
             !self.keys.insert(usage)
         } else {
-            self.keys.remove(&usage);
+            // The peer never got this key down (the lock shortcut's key).
+            if !self.keys.remove(&usage) {
+                return true;
+            }
             false
         };
         self.send(LcInputEvent {
@@ -451,6 +481,22 @@ impl Capture {
 
     fn held(&self, usages: &[u32]) -> bool {
         usages.iter().any(|usage| self.keys.contains(usage))
+    }
+
+    /// The `RegisterHotKey` modifier bits for the keys held down.
+    fn modifier_bits(&self) -> u32 {
+        let mut bits = 0;
+        for (usages, bit) in [
+            (USAGE_CONTROL, MOD_CONTROL),
+            (USAGE_SHIFT, MOD_SHIFT),
+            (USAGE_ALT, MOD_ALT),
+            (USAGE_GUI, MOD_WIN),
+        ] {
+            if self.held(&usages) {
+                bits |= bit;
+            }
+        }
+        bits
     }
 
     /// The `LC_MODIFIER_*` bits for the keys the peer has been told are down.

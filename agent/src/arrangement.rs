@@ -33,6 +33,18 @@ struct KnownDevice {
     platform: String,
     #[serde(default)]
     displays: Vec<Display>,
+    /// Connected at least once: one of the user's devices.
+    #[serde(default)]
+    remembered: bool,
+    /// Last seen online, Unix milliseconds (0: not recorded).
+    #[serde(default)]
+    last_seen_ms: u64,
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
 }
 
 pub struct Arrangement {
@@ -121,11 +133,30 @@ impl Arrangement {
         })
     }
 
-    /// Picks peer descriptions and placement changes out of the core's events.
+    /// Forgets a device: its name, displays and placement. It shows up again
+    /// as a nearby device while it is online.
+    pub fn forget(&self, peer_id: &str) {
+        let Ok(mut inner) = self.inner.lock() else {
+            return;
+        };
+        inner.saved.devices.remove(peer_id);
+        inner
+            .saved
+            .placements
+            .retain(|record| record.peer_id != peer_id);
+        save(&inner.saved);
+        self.publish(&mut inner);
+    }
+
+    /// Picks peer descriptions, connections and placement changes out of the
+    /// core's events.
     pub fn core_event(&self, json: &str) {
         if !(json.contains("peer_up")
+            || json.contains("peer_down")
             || json.contains("peer_displays")
-            || json.contains("placement_changed"))
+            || json.contains("placement_changed")
+            || json.contains("\"connected\"")
+            || json.contains("disconnected"))
         {
             return;
         }
@@ -142,14 +173,27 @@ impl Arrangement {
                     return;
                 };
                 let device = inner.saved.devices.entry(id.to_owned()).or_default();
-                device.name = peer["name"].as_str().unwrap_or(id).to_owned();
-                device.platform = peer["platform"].as_str().unwrap_or_default().to_owned();
-                if let Ok(displays) =
-                    serde_json::from_value::<Vec<Display>>(peer["displays"].clone())
-                    && !displays.is_empty()
-                {
-                    device.displays = displays;
-                }
+                describe(device, id, peer);
+                device.last_seen_ms = now_ms();
+            }
+            Some("connected") => {
+                let peer = &event["peer"];
+                let Some(id) = peer["id"].as_str() else {
+                    return;
+                };
+                let device = inner.saved.devices.entry(id.to_owned()).or_default();
+                describe(device, id, peer);
+                device.remembered = true;
+                device.last_seen_ms = now_ms();
+            }
+            Some("peer_down" | "disconnected") => {
+                let Some(device) = event["peer_id"]
+                    .as_str()
+                    .and_then(|id| inner.saved.devices.get_mut(id))
+                else {
+                    return;
+                };
+                device.last_seen_ms = now_ms();
             }
             Some("peer_displays") => {
                 let Some(id) = event["peer_id"].as_str() else {
@@ -172,6 +216,13 @@ impl Arrangement {
                 };
                 let offset = serde_json::from_value::<Option<Offset>>(event["offset"].clone())
                     .unwrap_or(None);
+                if offset.is_none() && !inner.saved.devices.contains_key(id) {
+                    // Removed with a forgotten device: nothing to keep.
+                    inner.saved.placements.retain(|record| record.peer_id != id);
+                    save(&inner.saved);
+                    self.publish(&mut inner);
+                    return;
+                }
                 let updated_ms = event["updated_ms"].as_u64().unwrap_or_default();
                 let record = PlacementRecord {
                     peer_id: id.to_owned(),
@@ -216,6 +267,8 @@ impl Arrangement {
             let touching = offset
                 .map(|offset| layout::portals(&local, &peer, offset))
                 .unwrap_or_default();
+            let remembered = known.remembered || offset.is_some();
+            let last_seen_ms = (known.last_seen_ms > 0).then_some(known.last_seen_ms);
             portals.extend(
                 touching
                     .iter()
@@ -232,6 +285,8 @@ impl Arrangement {
                 displays: peer,
                 offset,
                 side: touching.first().map(|portal| portal.side),
+                remembered,
+                last_seen_ms,
             });
         }
         devices.sort_by_key(|device| device.name.to_lowercase());
@@ -240,6 +295,22 @@ impl Arrangement {
             displays: local,
             devices,
         });
+    }
+}
+
+/// Takes a peer's name, platform and displays from a `peer` object of the
+/// core's events.
+fn describe(device: &mut KnownDevice, id: &str, peer: &Value) {
+    device.name = peer["name"].as_str().unwrap_or(id).to_owned();
+    if let Some(platform) = peer["platform"].as_str()
+        && !platform.is_empty()
+    {
+        device.platform = platform.to_owned();
+    }
+    if let Ok(displays) = serde_json::from_value::<Vec<Display>>(peer["displays"].clone())
+        && !displays.is_empty()
+    {
+        device.displays = displays;
     }
 }
 

@@ -1,25 +1,30 @@
 //! Notification-area icon. Keeping the tray in the agent means the settings
-//! app only runs while its window is open.
+//! app only runs while one of its windows is open: clicking the icon starts
+//! it with `--tray`, which shows its tray panel (devices, the sharing switch,
+//! the way to the main window).
 
 use crate::win::wide;
 use std::io;
 use std::path::PathBuf;
 use std::ptr::{null, null_mut};
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use std::time::Duration;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows_sys::Win32::Graphics::Gdi::{CreateBitmap, DeleteObject};
 use windows_sys::Win32::System::Console::{CTRL_CLOSE_EVENT, SetConsoleCtrlHandler};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
-    DispatchMessageW, GetCursorPos, GetMessageW, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
+    ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreateIconIndirect, CreatePopupMenu,
+    CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
+    GetMessageW, GetSystemMetrics, HICON, ICONINFO, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
     MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
-    SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
-    WS_OVERLAPPED,
+    SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP,
+    WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -121,7 +126,7 @@ unsafe extern "system" fn window_proc(
     match message {
         WM_TRAY => {
             match lparam as u32 {
-                WM_LBUTTONUP => open_settings(),
+                WM_LBUTTONUP => open_app(&["--tray"]),
                 WM_RBUTTONUP => show_menu(window),
                 _ => {}
             }
@@ -157,8 +162,7 @@ fn add_icon(window: HWND) -> bool {
     let mut data = icon_data(window);
     data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     data.uCallbackMessage = WM_TRAY;
-    // SAFETY: loads a shared system icon that must not be destroyed.
-    data.hIcon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
+    data.hIcon = tray_icon();
     for (slot, unit) in data.szTip.iter_mut().zip("LinkCursor".encode_utf16()) {
         *slot = unit;
     }
@@ -167,7 +171,7 @@ fn add_icon(window: HWND) -> bool {
 }
 
 fn show_menu(window: HWND) {
-    let open = wide("打开 LinkCursor");
+    let open = wide("打开主窗口");
     let quit = wide("退出");
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
@@ -195,7 +199,7 @@ fn show_menu(window: HWND) {
         DestroyMenu(menu);
 
         match command as usize {
-            MENU_OPEN => open_settings(),
+            MENU_OPEN => open_app(&[]),
             MENU_QUIT => {
                 DestroyWindow(window);
             }
@@ -205,8 +209,10 @@ fn show_menu(window: HWND) {
 }
 
 /// Launches the settings app: `LINKCURSOR_APP_PATH`, or `LinkCursor.exe`
-/// next to the agent (the layout produced by the app's build).
-fn open_settings() {
+/// next to the agent (the layout produced by the app's build). A running app
+/// takes the request over (it is single-instance) and shows the main window,
+/// or the tray panel with `--tray`.
+fn open_app(arguments: &[&str]) {
     let path = std::env::var_os("LINKCURSOR_APP_PATH")
         .map(PathBuf::from)
         .or_else(|| {
@@ -215,7 +221,96 @@ fn open_settings() {
                 .and_then(|exe| exe.parent().map(|dir| dir.join("LinkCursor.exe")))
         });
     let Some(path) = path else { return };
-    if let Err(error) = std::process::Command::new(&path).spawn() {
+    // The click gave this process the right to bring a window to the front;
+    // pass it on, or the app's window would open behind the others.
+    // SAFETY: plain Win32 call.
+    unsafe {
+        AllowSetForegroundWindow(ASFW_ANY);
+    }
+    if let Err(error) = std::process::Command::new(&path).args(arguments).spawn() {
         eprintln!("linkcursor-agent: cannot open {}: {error}", path.display());
+    }
+}
+
+/// The LinkCursor mark at the small-icon size: two overlapping rounded
+/// squares, drawn once.
+fn tray_icon() -> HICON {
+    static ICON: OnceLock<isize> = OnceLock::new();
+    let icon = *ICON.get_or_init(|| draw_icon().map_or(0, |icon| icon as isize));
+    if icon != 0 {
+        return icon as HICON;
+    }
+    // SAFETY: loads a shared system icon that must not be destroyed.
+    unsafe { LoadIconW(null_mut(), IDI_APPLICATION) }
+}
+
+fn draw_icon() -> Option<HICON> {
+    // SAFETY: plain system metric query.
+    let size = unsafe { GetSystemMetrics(SM_CXSMICON) }.clamp(16, 64) as usize;
+    let s = size as f32;
+    // Back square (light), front square (deep blue) with a clear gap.
+    let back = (0.06 * s, 0.06 * s, 0.66 * s, 0.66 * s, 0.16 * s);
+    let front = (0.34 * s, 0.34 * s, 0.94 * s, 0.94 * s, 0.16 * s);
+    let gap = 0.07 * s;
+    let inside = |(left, top, right, bottom, radius): (f32, f32, f32, f32, f32), x: f32, y: f32, grow: f32| {
+        let (left, top, right, bottom) = (left - grow, top - grow, right + grow, bottom + grow);
+        let radius = radius + grow;
+        let cx = x.clamp(left + radius, right - radius);
+        let cy = y.clamp(top + radius, bottom - radius);
+        x >= left && x <= right && y >= top && y <= bottom && (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius
+    };
+    let mut pixels = vec![0u32; size * size];
+    const SAMPLES: usize = 4;
+    for py in 0..size {
+        for px in 0..size {
+            let (mut a, mut r, mut g, mut b) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+            for sy in 0..SAMPLES {
+                for sx in 0..SAMPLES {
+                    let x = px as f32 + (sx as f32 + 0.5) / SAMPLES as f32;
+                    let y = py as f32 + (sy as f32 + 0.5) / SAMPLES as f32;
+                    let color = if inside(front, x, y, 0.0) {
+                        Some((0x0F, 0x6C, 0xBD))
+                    } else if inside(back, x, y, 0.0) && !inside(front, x, y, gap) {
+                        Some((0x6C, 0xB4, 0xF0))
+                    } else {
+                        None
+                    };
+                    if let Some((cr, cg, cb)) = color {
+                        a += 1.0;
+                        r += f32::from(cr as u8);
+                        g += f32::from(cg as u8);
+                        b += f32::from(cb as u8);
+                    }
+                }
+            }
+            if a > 0.0 {
+                let coverage = a / (SAMPLES * SAMPLES) as f32;
+                // Premultiplied BGRA.
+                let alpha = (coverage * 255.0).round() as u32;
+                let channel = |sum: f32| ((sum / a) * coverage).round() as u32;
+                pixels[py * size + px] = alpha << 24 | channel(r) << 16 | channel(g) << 8 | channel(b);
+            }
+        }
+    }
+    // SAFETY: creates a 32-bit color bitmap and an all-zero mask from
+    // buffers of the right size, builds the icon and frees the bitmaps.
+    unsafe {
+        let color = CreateBitmap(size as i32, size as i32, 1, 32, pixels.as_ptr().cast());
+        let mask_bits = vec![0u8; size.div_ceil(16) * 2 * size];
+        let mask = CreateBitmap(size as i32, size as i32, 1, 1, mask_bits.as_ptr().cast());
+        if color.is_null() || mask.is_null() {
+            return None;
+        }
+        let info = ICONINFO {
+            fIcon: 1,
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: mask,
+            hbmColor: color,
+        };
+        let icon = CreateIconIndirect(&info);
+        DeleteObject(color);
+        DeleteObject(mask);
+        (!icon.is_null()).then_some(icon)
     }
 }
