@@ -21,7 +21,11 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// `settings`, `launch_at_login`, `control_port`, `locked`,
 /// `agent_version`, session `latency_ms` and device `remembered` /
 /// `last_seen_ms`.
-pub const PROTOCOL_VERSION: u32 = 6;
+/// 7: `preview_placement`, answered with `placement_preview`.
+/// 8: `accept_pairing`, `reject_pairing`; the snapshot gains `fingerprint`,
+/// `pairing`, `paired_peers`, session `encrypted` / `paired`, and the
+/// `paired_only` setting.
+pub const PROTOCOL_VERSION: u32 = 8;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -48,6 +52,13 @@ enum Request {
     },
     RemovePlacement {
         peer_id: String,
+    },
+    /// Where `set_placement` with this offset would put the peer, without
+    /// placing it: answered with `placement_preview`.
+    PreviewPlacement {
+        peer_id: String,
+        x: f64,
+        y: f64,
     },
     PlaceBeside {
         peer_id: String,
@@ -76,6 +87,13 @@ enum Request {
     ForgetDevice {
         peer_id: String,
     },
+    /// The user compared the pairing code (snapshot `pairing`) and accepts.
+    AcceptPairing {
+        peer_id: String,
+    },
+    RejectPairing {
+        peer_id: String,
+    },
     /// Quits the agent as the tray's 退出 does.
     Quit,
 }
@@ -90,6 +108,11 @@ enum Message<'a> {
     State(&'a Snapshot),
     Error {
         message: String,
+    },
+    /// Where a dragged peer would land (`null` when nowhere).
+    PlacementPreview {
+        peer_id: String,
+        offset: Option<Offset>,
     },
 }
 
@@ -181,8 +204,12 @@ async fn serve_client(pipe: NamedPipeServer, services: &Services, owns_demo: &mu
         tokio::select! {
             line = lines.next_line() => {
                 let Ok(Some(line)) = line else { break };
-                if let Err(message) = handle_request(&line, services, owns_demo)
-                    && write(&mut writer, &Message::Error { message }).await.is_err()
+                let reply = match handle_request(&line, services, owns_demo) {
+                    Ok(reply) => reply,
+                    Err(message) => Some(Message::Error { message }),
+                };
+                if let Some(reply) = reply
+                    && write(&mut writer, &reply).await.is_err()
                 {
                     break;
                 }
@@ -200,7 +227,12 @@ async fn serve_client(pipe: NamedPipeServer, services: &Services, owns_demo: &mu
     }
 }
 
-fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Result<(), String> {
+/// Acts on one request; some are answered with a message of their own.
+fn handle_request(
+    line: &str,
+    services: &Services,
+    owns_demo: &mut bool,
+) -> Result<Option<Message<'static>>, String> {
     let request = serde_json::from_str::<Request>(line)
         .map_err(|error| format!("invalid request: {error}"))?;
     let core = || {
@@ -209,7 +241,11 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
             .upgrade()
             .ok_or("LinkCursor core is shutting down")
     };
-    match request {
+    let done = match request {
+        Request::PreviewPlacement { peer_id, x, y } => {
+            let offset = services.preview_placement(&peer_id, Offset { x, y });
+            return Ok(Some(Message::PlacementPreview { peer_id, offset }));
+        }
         Request::Hello { protocol } if protocol == PROTOCOL_VERSION => Ok(()),
         Request::Hello { protocol } => Err(format!(
             "settings app speaks protocol {protocol}, agent speaks {PROTOCOL_VERSION}"
@@ -244,11 +280,14 @@ fn handle_request(line: &str, services: &Services, owns_demo: &mut bool) -> Resu
         }
         Request::UpdateSettings { values } => services.update_settings(values),
         Request::ForgetDevice { peer_id } => services.forget_device(&peer_id),
+        Request::AcceptPairing { peer_id } => services.accept_pairing(&peer_id),
+        Request::RejectPairing { peer_id } => services.reject_pairing(&peer_id),
         Request::Quit => {
             crate::tray::quit();
             Ok(())
         }
-    }
+    };
+    done.map(|()| None)
 }
 
 async fn write(writer: &mut (impl AsyncWrite + Unpin), message: &Message<'_>) -> io::Result<()> {

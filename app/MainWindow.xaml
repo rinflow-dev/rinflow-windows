@@ -24,13 +24,12 @@
                  their ThemeResource colours follow the window's theme. -->
             <DataTemplate x:Key="LocalScreenTemplate">
                 <Grid>
-                    <Rectangle
+                    <Border
                         x:Name="Shape"
-                        Fill="{ThemeResource SolidBackgroundFillColorQuarternaryBrush}"
-                        RadiusX="8"
-                        RadiusY="8"
-                        Stroke="{ThemeResource AccentFillColorDefaultBrush}"
-                        StrokeThickness="2" />
+                        Background="{ThemeResource SolidBackgroundFillColorQuarternaryBrush}"
+                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                        BorderThickness="2"
+                        CornerRadius="8" />
                     <StackPanel
                         x:Name="Labels"
                         Padding="6,0"
@@ -59,13 +58,12 @@
             </DataTemplate>
             <DataTemplate x:Key="PeerScreenTemplate">
                 <Grid>
-                    <Rectangle
+                    <Border
                         x:Name="Shape"
-                        Fill="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
-                        RadiusX="8"
-                        RadiusY="8"
-                        Stroke="{ThemeResource ControlStrongStrokeColorDisabledBrush}"
-                        StrokeThickness="1" />
+                        Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
+                        BorderBrush="{ThemeResource ControlStrongStrokeColorDisabledBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8" />
                     <StackPanel
                         x:Name="Labels"
                         Padding="6,0"
@@ -104,6 +102,22 @@
                         <TextBlock x:Name="Title" />
                     </StackPanel>
                 </Border>
+            </DataTemplate>
+            <!-- Where a dragged device will land. -->
+            <DataTemplate x:Key="PreviewScreenTemplate">
+                <Grid IsHitTestVisible="False">
+                    <Rectangle
+                        Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                        Opacity="0.14"
+                        RadiusX="8"
+                        RadiusY="8" />
+                    <Rectangle
+                        RadiusX="8"
+                        RadiusY="8"
+                        Stroke="{ThemeResource AccentFillColorDefaultBrush}"
+                        StrokeDashArray="4,3"
+                        StrokeThickness="2" />
+                </Grid>
             </DataTemplate>
             <DataTemplate x:Key="DotsTemplate">
                 <Path Fill="{ThemeResource ControlStrongStrokeColorDisabledBrush}" />
@@ -326,7 +340,8 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="120" />
+                                        <!-- Statuses line up; a longer one (已连接 · 未加密) widens its row's column. -->
+                                        <ColumnDefinition Width="Auto" MinWidth="120" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <FontIcon
@@ -586,10 +601,11 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" Text="加密传输 (TLS)" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="尚未支持：目前设备之间的传输没有加密，请只在可信的网络中使用。" />
+                            <TextBlock x:Name="TlsDescription" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" Text="关" />
-                        <ToggleSwitch Grid.Column="2" AutomationProperties.Name="加密传输（尚未支持）" IsEnabled="False" IsOn="False" Style="{StaticResource BareSwitchStyle}" />
+                        <!-- Always on when available: not something to turn off. -->
+                        <TextBlock x:Name="TlsState" Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -599,10 +615,10 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" Text="仅允许已配对设备" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="尚未支持：需要配对功能。目前同一网络中运行 LinkCursor 的设备都可以连接。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。不加密的旧版设备会被拒绝。" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" Text="关" />
-                        <ToggleSwitch Grid.Column="2" AutomationProperties.Name="仅允许已配对设备（尚未支持）" IsEnabled="False" IsOn="False" Style="{StaticResource BareSwitchStyle}" />
+                        <TextBlock x:Name="PairedOnlyState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -611,8 +627,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="设备 ID" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="其他设备用它认出这台电脑。加密传输上线后，这里会显示本机证书指纹。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="本机指纹" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。" />
                         </StackPanel>
                         <TextBlock
                             x:Name="DeviceIdText"
@@ -625,7 +641,7 @@
                             x:Name="CopyIdButton"
                             Grid.Column="2"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="复制设备 ID"
+                            AutomationProperties.Name="复制本机指纹"
                             Style="{StaticResource SubtleIconButtonStyle}"
                             ToolTipService.ToolTip="复制">
                             <FontIcon FontSize="16" Glyph="&#xE8C8;" />
@@ -924,6 +940,34 @@
                         Text="正在查找附近的设备…"
                         TextWrapping="Wrap" />
                 </StackPanel>
+            </StackPanel>
+        </ContentDialog>
+
+        <!-- Pairing: both devices show the same code (from both certificates). -->
+        <ContentDialog
+            x:Name="PairingDialog"
+            Grid.RowSpan="2"
+            CloseButtonText="取消"
+            DefaultButton="Primary"
+            PrimaryButtonText="配对">
+            <StackPanel MinWidth="380" Spacing="20">
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="确认对方屏幕显示相同的代码"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    x:Name="PairingCode"
+                    Margin="0,8,0,8"
+                    HorizontalAlignment="Center"
+                    CharacterSpacing="200"
+                    FontSize="52"
+                    FontWeight="SemiBold" />
+                <TextBlock
+                    x:Name="PairingStatus"
+                    HorizontalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap" />
             </StackPanel>
         </ContentDialog>
 

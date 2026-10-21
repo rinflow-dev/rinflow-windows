@@ -17,6 +17,7 @@ mod settings;
 mod spring;
 mod state;
 mod tray;
+mod trust;
 mod win;
 
 use linkcursor_core::{Core, CoreConfig};
@@ -71,6 +72,15 @@ fn main() {
     };
     let monitors = displays::monitors();
     let arrangement = arrangement::Arrangement::load(state.clone(), monitors.clone());
+    let trust = Arc::new(trust::TrustStore::load());
+    let paired_ids = |trust: &trust::TrustStore| {
+        trust
+            .peers()
+            .into_iter()
+            .map(|peer| peer.peer_id)
+            .collect::<Vec<_>>()
+    };
+    state.set_paired_peers(paired_ids(&trust));
     let config = CoreConfig {
         device_id: identity.device_id.clone(),
         device_name: identity.device_name.clone(),
@@ -91,9 +101,15 @@ fn main() {
                 .into_owned(),
         ),
         max_auto_receive_bytes: 0,
+        // Encryption and pairing (QUIC with TLS): this PC's certificate,
+        // the devices the user paired, and whether only those may connect.
+        identity_path: Some(trust::identity_path().to_string_lossy().into_owned()),
+        trusted_peers: trust.peers(),
+        require_pairing: preferences.paired_only,
         ..CoreConfig::default()
     };
     let events = state.clone();
+    let trust_events = trust.clone();
     let layout_events = arrangement.clone();
     let control = injector.handle();
     let input = injector.handle();
@@ -106,6 +122,14 @@ fn main() {
         config,
         move |json| {
             events.apply_core_event(&json);
+            if trust_events.core_event(&json) {
+                events.set_paired_peers(paired_ids(&trust_events));
+            }
+            // A device asks to pair: bring the main window up, where the
+            // code shows.
+            if json.contains("\"pairing_requested\"") {
+                tray::open_app(&[]);
+            }
             layout_events.core_event(&json);
             control.core_event(&json);
             clipboard_events.core_event(&json);

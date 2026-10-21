@@ -3,7 +3,9 @@
 // placed by dragging (from the canvas, or from the 未放置 chips); the agent's
 // core snaps every drop to a valid spot (touching an edge, enough overlap)
 // and syncs it to the peer, so this page only proposes positions and draws
-// what comes back. Dragging a placed peer out of the canvas unplaces it.
+// what comes back. While dragging, the agent reports where the device would
+// land (the same snapping), drawn as a dashed outline. The ⋯ menu of a
+// device removes its placement.
 
 #include "pch.h"
 #include "MainWindow.xaml.h"
@@ -78,6 +80,70 @@ namespace
     double Distance(Point a, Point b)
     {
         return std::hypot(a.X - b.X, a.Y - b.Y);
+    }
+
+    // Screens are drawn to scale but inset by this much (pixels) on sides
+    // facing another device, so devices that touch show a small gap. Sides
+    // where a display meets another display of the same device stay flush:
+    // those are one computer's monitors side by side.
+    constexpr double ScreenGap = 3;
+
+    Thickness ScreenInsets(std::vector<LayoutRect> const& displays, size_t index)
+    {
+        constexpr double tolerance = 0.5;
+        auto const& d = displays[index];
+        double left = ScreenGap, top = ScreenGap, right = ScreenGap, bottom = ScreenGap;
+        for (size_t other = 0; other < displays.size(); ++other)
+        {
+            if (other == index) continue;
+            auto const& o = displays[other];
+            bool sharesRows = (std::min)(d.Bottom(), o.Bottom()) - (std::max)(d.y, o.y) > tolerance;
+            bool sharesColumns = (std::min)(d.Right(), o.Right()) - (std::max)(d.x, o.x) > tolerance;
+            if (sharesRows && std::abs(o.Right() - d.x) < tolerance) left = 0;
+            if (sharesRows && std::abs(o.x - d.Right()) < tolerance) right = 0;
+            if (sharesColumns && std::abs(o.Bottom() - d.y) < tolerance) top = 0;
+            if (sharesColumns && std::abs(o.y - d.Bottom()) < tolerance) bottom = 0;
+        }
+        return ThicknessHelper::FromLengths(left, top, right, bottom);
+    }
+
+    // Rounded corners, except where another display of the same device
+    // continues past the corner: one computer's monitors read as one shape.
+    CornerRadius ScreenCorners(std::vector<LayoutRect> const& displays, size_t index)
+    {
+        constexpr double radius = 8;
+        constexpr double tolerance = 0.5;
+        auto const& d = displays[index];
+        double topLeft = radius, topRight = radius, bottomRight = radius, bottomLeft = radius;
+        auto within = [](double value, double low, double high) { return value >= low - tolerance && value <= high + tolerance; };
+        for (size_t other = 0; other < displays.size(); ++other)
+        {
+            if (other == index) continue;
+            auto const& o = displays[other];
+            bool sharesRows = (std::min)(d.Bottom(), o.Bottom()) - (std::max)(d.y, o.y) > tolerance;
+            bool sharesColumns = (std::min)(d.Right(), o.Right()) - (std::max)(d.x, o.x) > tolerance;
+            if (sharesRows && std::abs(o.Right() - d.x) < tolerance)
+            {
+                if (within(d.y, o.y, o.Bottom())) topLeft = 0;
+                if (within(d.Bottom(), o.y, o.Bottom())) bottomLeft = 0;
+            }
+            if (sharesRows && std::abs(o.x - d.Right()) < tolerance)
+            {
+                if (within(d.y, o.y, o.Bottom())) topRight = 0;
+                if (within(d.Bottom(), o.y, o.Bottom())) bottomRight = 0;
+            }
+            if (sharesColumns && std::abs(o.Bottom() - d.y) < tolerance)
+            {
+                if (within(d.x, o.x, o.Right())) topLeft = 0;
+                if (within(d.Right(), o.x, o.Right())) topRight = 0;
+            }
+            if (sharesColumns && std::abs(o.y - d.Bottom()) < tolerance)
+            {
+                if (within(d.x, o.x, o.Right())) bottomLeft = 0;
+                if (within(d.Right(), o.x, o.Right())) bottomRight = 0;
+            }
+        }
+        return CornerRadius{ topLeft, topRight, bottomRight, bottomLeft };
     }
 }
 
@@ -193,20 +259,14 @@ namespace winrt::LinkCursor::implementation
         canvas.Children().Append(path);
     }
 
-    FrameworkElement MainWindow::Screen(hstring const& templateKey, double width, double height,
-        hstring const& glyph, hstring const& title, hstring const& subtitle, bool dashed, bool)
+    FrameworkElement MainWindow::Screen(hstring const& templateKey, double width, double height, Thickness const& insets,
+        CornerRadius const& corners, hstring const& glyph, hstring const& title, hstring const& subtitle)
     {
         auto screen = Root().Resources().Lookup(box_value(templateKey)).as<DataTemplate>().LoadContent().as<Grid>();
         screen.Width((std::max)(width, 4.0));
         screen.Height((std::max)(height, 4.0));
-        auto shape = screen.FindName(L"Shape").as<Shapes::Rectangle>();
-        if (dashed)
-        {
-            DoubleCollection dashes;
-            dashes.Append(4);
-            dashes.Append(3);
-            shape.StrokeDashArray(dashes);
-        }
+        screen.Padding(insets);
+        screen.FindName(L"Shape").as<Border>().CornerRadius(corners);
         auto icon = screen.FindName(L"Icon").as<FontIcon>();
         auto titleText = screen.FindName(L"Title").as<TextBlock>();
         auto subtitleText = screen.FindName(L"Subtitle").as<TextBlock>();
@@ -234,6 +294,7 @@ namespace winrt::LinkCursor::implementation
         }
         m_layoutDirty = false;
         canvas.Children().Clear();
+        m_preview = nullptr;
 
         // Fit this PC with room on every side for placing, and every placed peer.
         auto local = BoundsOf(m_localDisplays);
@@ -256,7 +317,17 @@ namespace winrt::LinkCursor::implementation
         auto toCanvasX = [this](double x) { return (x - m_layoutOriginX) * m_layoutScale; };
         auto toCanvasY = [this](double y) { return (y - m_layoutOriginY) * m_layoutScale; };
 
+        bool anyPlaced = std::any_of(m_layoutDevices.begin(), m_layoutDevices.end(),
+            [](LayoutDevice const& device) { return device.offset.has_value(); });
+        auto weak = get_weak();
+
         // This PC: each monitor on its own; the main one carries the name.
+        // Draggable like the peers once one is placed: moving this PC is
+        // moving every placed peer the other way.
+        Grid localGroup;
+        localGroup.Width(local.width * m_layoutScale);
+        localGroup.Height(local.height * m_layoutScale);
+        localGroup.Background(SolidColorBrush(Windows::UI::Colors::Transparent()));
         int number = 2;
         auto primary = PrimaryIndex(m_localDisplays);
         for (size_t i = 0; i < m_localDisplays.size(); ++i)
@@ -264,22 +335,29 @@ namespace winrt::LinkCursor::implementation
             auto const& display = m_localDisplays[i];
             bool main = i == primary;
             auto screen = Screen(L"LocalScreenTemplate", display.width * m_layoutScale, display.height * m_layoutScale,
+                ScreenInsets(m_localDisplays, i), ScreenCorners(m_localDisplays, i),
                 main ? L"\xE7F4" : L"",
                 main ? m_localName : hstring(std::format(L"显示器 {}", number)),
-                main ? L"本机 · " + Pixels(display) : Pixels(display),
-                false, true);
+                main ? L"本机 · " + Pixels(display) : Pixels(display));
             if (!main) ++number;
-            Canvas::SetLeft(screen, toCanvasX(display.x));
-            Canvas::SetTop(screen, toCanvasY(display.y));
-            canvas.Children().Append(screen);
+            screen.HorizontalAlignment(HorizontalAlignment::Left);
+            screen.VerticalAlignment(VerticalAlignment::Top);
+            screen.Margin(ThicknessHelper::FromLengths((display.x - local.x) * m_layoutScale,
+                (display.y - local.y) * m_layoutScale, 0, 0));
+            localGroup.Children().Append(screen);
         }
+        Canvas::SetLeft(localGroup, toCanvasX(local.x));
+        Canvas::SetTop(localGroup, toCanvasY(local.y));
+        if (anyPlaced)
+        {
+            AttachDrag(localGroup, L"", true);
+        }
+        canvas.Children().Append(localGroup);
 
         // Placed peers.
-        bool anyPlaced = false;
         for (auto const& device : m_layoutDevices)
         {
             if (!device.offset) continue;
-            anyPlaced = true;
             auto element = DeviceElement(device, false);
             Canvas::SetLeft(element, toCanvasX(device.bounds.x + device.offset->first));
             Canvas::SetTop(element, toCanvasY(device.bounds.y + device.offset->second));
@@ -289,7 +367,6 @@ namespace winrt::LinkCursor::implementation
         // The user's online devices that are not placed yet wait as chips.
         auto chips = UnplacedChips();
         chips.Children().Clear();
-        auto weak = get_weak();
         for (auto const& device : m_layoutDevices)
         {
             auto id = std::wstring(device.peerId);
@@ -371,8 +448,9 @@ namespace winrt::LinkCursor::implementation
                 if (!connected) subtitle = subtitle + (online ? L" · 未连接" : L" · 离线");
             }
             auto screen = Screen(L"PeerScreenTemplate", display.width * scale, display.height * scale,
+                ScreenInsets(device.displays, i), ScreenCorners(device.displays, i),
                 main ? LinkCursorApp::DeviceGlyph(device.platform) : hstring(),
-                main ? device.name : hstring(), subtitle, !online, connected);
+                main ? device.name : hstring(), subtitle);
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);
             screen.Margin(ThicknessHelper::FromLengths((display.x - device.bounds.x) * scale,
@@ -382,48 +460,49 @@ namespace winrt::LinkCursor::implementation
 
         if (!ghost)
         {
-            auto weak = get_weak();
-            auto peerId = device.peerId;
-            group.PointerPressed([weak, peerId](IInspectable const& sender, PointerRoutedEventArgs const& args)
-            {
-                auto self = weak.get();
-                if (!self || self->m_drag) return;
-                if (auto device = self->FindLayoutDevice(peerId))
-                {
-                    self->BeginDrag(*device, sender.as<FrameworkElement>(), args);
-                }
-            });
-            group.PointerMoved([weak](auto&&, PointerRoutedEventArgs const& args)
-            {
-                if (auto self = weak.get()) self->MoveDrag(args);
-            });
-            group.PointerReleased([weak](auto&&, PointerRoutedEventArgs const& args)
-            {
-                if (auto self = weak.get()) self->EndDrag(args);
-            });
-            group.PointerCaptureLost([weak](auto&&, auto&&)
-            {
-                // Capture lost without a release (e.g. the window lost
-                // focus): drop the drag and show the stored arrangement.
-                auto self = weak.get();
-                if (self && self->m_drag && !self->m_drag->fromChip)
-                {
-                    self->m_drag.reset();
-                    self->RenderArrangement();
-                }
-            });
+            AttachDrag(group, device.peerId, false);
         }
         return group;
     }
 
-    void MainWindow::BeginDrag(LayoutDevice const& device, FrameworkElement const& element,
+    void MainWindow::AttachDrag(FrameworkElement const& element, hstring const& peerId, bool local)
+    {
+        auto weak = get_weak();
+        element.PointerPressed([weak, peerId, local](IInspectable const& sender, PointerRoutedEventArgs const& args)
+        {
+            auto self = weak.get();
+            if (!self || self->m_drag) return;
+            self->BeginDrag(peerId, local, sender.as<FrameworkElement>(), args);
+        });
+        element.PointerMoved([weak](auto&&, PointerRoutedEventArgs const& args)
+        {
+            if (auto self = weak.get()) self->MoveDrag(args);
+        });
+        element.PointerReleased([weak](auto&&, PointerRoutedEventArgs const& args)
+        {
+            if (auto self = weak.get()) self->EndDrag(args);
+        });
+        element.PointerCaptureLost([weak](auto&&, auto&&)
+        {
+            // Capture lost without a release (e.g. the window lost focus):
+            // drop the drag and show the stored arrangement.
+            auto self = weak.get();
+            if (self && self->m_drag && !self->m_drag->fromChip)
+            {
+                self->m_drag.reset();
+                self->RenderArrangement();
+            }
+        });
+    }
+
+    void MainWindow::BeginDrag(hstring const& peerId, bool local, FrameworkElement const& element,
         PointerRoutedEventArgs const& args)
     {
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
         auto left = Canvas::GetLeft(element);
         auto top = Canvas::GetTop(element);
-        m_drag = LayoutDrag{ device.peerId, element,
-            Point{ static_cast<float>(position.X - left), static_cast<float>(position.Y - top) }, position, false };
+        m_drag = LayoutDrag{ peerId, element,
+            Point{ static_cast<float>(position.X - left), static_cast<float>(position.Y - top) }, position, false, local };
         element.CapturePointer(args.Pointer());
         // Drawn above the other devices while it moves.
         Canvas::SetZIndex(element, 10);
@@ -434,39 +513,196 @@ namespace winrt::LinkCursor::implementation
     {
         if (!m_drag) return;
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
-        if (Distance(position, m_drag->start) >= DragThreshold)
+        bool moved = Distance(position, m_drag->start) >= DragThreshold;
+        if (moved)
         {
             m_drag->element.Visibility(Visibility::Visible);
         }
         Canvas::SetLeft(m_drag->element, position.X - m_drag->grab.X);
         Canvas::SetTop(m_drag->element, position.Y - m_drag->grab.Y);
         args.Handled(true);
+        if (moved)
+        {
+            RequestPreview();
+        }
+    }
+
+    std::pair<double, double> MainWindow::DraggedOffset() const
+    {
+        double worldX = Canvas::GetLeft(m_drag->element) / m_layoutScale + m_layoutOriginX;
+        double worldY = Canvas::GetTop(m_drag->element) / m_layoutScale + m_layoutOriginY;
+        if (m_drag->local)
+        {
+            // How far this PC moved.
+            auto local = BoundsOf(m_localDisplays);
+            return { worldX - local.x, worldY - local.y };
+        }
+        auto device = FindLayoutDevice(m_drag->peerId);
+        return device ? std::pair{ worldX - device->bounds.x, worldY - device->bounds.y } : std::pair{ worldX, worldY };
+    }
+
+    MainWindow::LayoutDevice const* MainWindow::NearestPlaced(double dx, double dy) const
+    {
+        // This PC moved by (dx, dy): the placed peer closest to it now.
+        auto local = BoundsOf(m_localDisplays);
+        double cx = local.x + dx + local.width / 2, cy = local.y + dy + local.height / 2;
+        LayoutDevice const* nearest = nullptr;
+        double best = 0;
+        for (auto const& device : m_layoutDevices)
+        {
+            if (!device.offset) continue;
+            // Distance between the two rectangles (0 when they touch).
+            double left = device.bounds.x + device.offset->first, top = device.bounds.y + device.offset->second;
+            double gapX = (std::max)({ left - (cx + local.width / 2), (cx - local.width / 2) - (left + device.bounds.width), 0.0 });
+            double gapY = (std::max)({ top - (cy + local.height / 2), (cy - local.height / 2) - (top + device.bounds.height), 0.0 });
+            double distance = std::hypot(gapX, gapY);
+            if (!nearest || distance < best)
+            {
+                nearest = &device;
+                best = distance;
+            }
+        }
+        return nearest;
+    }
+
+    void MainWindow::RequestPreview()
+    {
+        if (!m_drag) return;
+        if (m_previewPending)
+        {
+            m_previewQueued = true;
+            return;
+        }
+        auto [x, y] = DraggedOffset();
+        if (m_drag->local)
+        {
+            // Moving this PC moves the peers the other way: ask where the
+            // nearest one would land, which is where this PC lands next to it.
+            auto nearest = NearestPlaced(x, y);
+            if (!nearest) return;
+            m_previewPeer = nearest->peerId;
+            x = nearest->offset->first - x;
+            y = nearest->offset->second - y;
+        }
+        else
+        {
+            m_previewPeer = m_drag->peerId;
+        }
+        m_previewPending = true;
+        m_previewQueued = false;
+        m_agent->PreviewPlacement(m_previewPeer, x, y);
+    }
+
+    void MainWindow::ApplyPlacementPreview(JsonObject const& message)
+    {
+        m_previewPending = false;
+        if (!m_drag || message.GetNamedString(L"peer_id", L"") != m_previewPeer)
+        {
+            return;
+        }
+        if (std::exchange(m_previewQueued, false))
+        {
+            RequestPreview();
+        }
+        auto device = FindLayoutDevice(m_previewPeer);
+        auto offset = message.GetNamedValue(L"offset", JsonValue::CreateNullValue());
+        if (!device || !device->offset || offset.ValueType() != JsonValueType::Object)
+        {
+            // Nowhere to land from here.
+            ClearPreview();
+            return;
+        }
+        auto point = offset.GetObject();
+        double snappedX = point.GetNamedNumber(L"x", 0), snappedY = point.GetNamedNumber(L"y", 0);
+
+        // What lands, and where (its bounds in this PC's space as drawn now).
+        auto const& displays = m_drag->local ? m_localDisplays : device->displays;
+        auto bounds = m_drag->local ? BoundsOf(m_localDisplays) : device->bounds;
+        double left, top;
+        if (m_drag->local)
+        {
+            // The peer stays where it is drawn; this PC lands beside it.
+            left = bounds.x + device->offset->first - snappedX;
+            top = bounds.y + device->offset->second - snappedY;
+        }
+        else
+        {
+            left = bounds.x + snappedX;
+            top = bounds.y + snappedY;
+        }
+
+        if (!m_preview)
+        {
+            Grid outline;
+            outline.Width(bounds.width * m_layoutScale);
+            outline.Height(bounds.height * m_layoutScale);
+            outline.IsHitTestVisible(false);
+            auto previewTemplate = Root().Resources().Lookup(box_value(L"PreviewScreenTemplate")).as<DataTemplate>();
+            for (size_t i = 0; i < displays.size(); ++i)
+            {
+                auto const& display = displays[i];
+                auto screen = previewTemplate.LoadContent().as<Grid>();
+                screen.Padding(ScreenInsets(displays, i));
+                screen.Width(display.width * m_layoutScale);
+                screen.Height(display.height * m_layoutScale);
+                screen.HorizontalAlignment(HorizontalAlignment::Left);
+                screen.VerticalAlignment(VerticalAlignment::Top);
+                screen.Margin(ThicknessHelper::FromLengths((display.x - bounds.x) * m_layoutScale,
+                    (display.y - bounds.y) * m_layoutScale, 0, 0));
+                outline.Children().Append(screen);
+            }
+            Canvas::SetZIndex(outline, 5);
+            ArrangementCanvas().Children().Append(outline);
+            m_preview = outline;
+        }
+        Canvas::SetLeft(m_preview, (left - m_layoutOriginX) * m_layoutScale);
+        Canvas::SetTop(m_preview, (top - m_layoutOriginY) * m_layoutScale);
+    }
+
+    void MainWindow::ClearPreview()
+    {
+        if (!m_preview) return;
+        uint32_t index = 0;
+        if (ArrangementCanvas().Children().IndexOf(m_preview, index))
+        {
+            ArrangementCanvas().Children().RemoveAt(index);
+        }
+        m_preview = nullptr;
     }
 
     void MainWindow::EndDrag(PointerRoutedEventArgs const& args)
     {
         if (!m_drag) return;
-        auto drag = *m_drag;
-        m_drag.reset();
         args.Handled(true);
-
         auto position = args.GetCurrentPoint(ArrangementCanvas()).Position();
-        bool moved = Distance(position, drag.start) >= DragThreshold;
-        bool inside = position.X >= 0 && position.Y >= 0
-            && position.X <= ArrangementHost().ActualWidth() && position.Y <= ArrangementHost().ActualHeight();
-        auto device = FindLayoutDevice(drag.peerId);
-        if (moved && inside && device)
+        bool moved = Distance(position, m_drag->start) >= DragThreshold;
+        if (moved && m_drag->local)
         {
-            // Propose the drop position; the core snaps it and the next
-            // snapshot draws where it actually landed.
-            double worldX = Canvas::GetLeft(drag.element) / m_layoutScale + m_layoutOriginX;
-            double worldY = Canvas::GetTop(drag.element) / m_layoutScale + m_layoutOriginY;
-            m_agent->SetPlacement(drag.peerId, worldX - device->bounds.x, worldY - device->bounds.y);
+            // This PC moved: every placed peer moves the other way, the
+            // nearest first. The core snaps each one back against this PC.
+            auto [dx, dy] = DraggedOffset();
+            std::vector<LayoutDevice const*> placed;
+            if (auto nearest = NearestPlaced(dx, dy)) placed.push_back(nearest);
+            for (auto const& device : m_layoutDevices)
+            {
+                if (device.offset && (placed.empty() || &device != placed.front())) placed.push_back(&device);
+            }
+            for (auto device : placed)
+            {
+                m_agent->SetPlacement(device->peerId, device->offset->first - dx, device->offset->second - dy);
+            }
         }
-        else if (moved && !drag.fromChip)
+        else if (moved && FindLayoutDevice(m_drag->peerId))
         {
-            m_agent->RemovePlacement(drag.peerId);
+            // Propose where it was dropped, even outside the canvas; the core
+            // snaps it to the spot the preview showed, and the next snapshot
+            // draws it there.
+            auto [x, y] = DraggedOffset();
+            m_agent->SetPlacement(m_drag->peerId, x, y);
         }
+        m_drag.reset();
+        ClearPreview();
+        m_previewQueued = false;
 
         // Redraw from the stored arrangement shortly, in case the drop changed
         // nothing (a click, or dropped back on its spot) and no snapshot comes.

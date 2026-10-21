@@ -22,9 +22,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
     GetMessageW, GetSystemMetrics, HICON, ICONINFO, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
     MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
-    SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-    TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP,
-    WNDCLASSW, WS_OVERLAPPED,
+    SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
+    TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
+    WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -212,7 +212,7 @@ fn show_menu(window: HWND) {
 /// next to the agent (the layout produced by the app's build). A running app
 /// takes the request over (it is single-instance) and shows the main window,
 /// or the tray panel with `--tray`.
-fn open_app(arguments: &[&str]) {
+pub fn open_app(arguments: &[&str]) {
     let path = std::env::var_os("LINKCURSOR_APP_PATH")
         .map(PathBuf::from)
         .or_else(|| {
@@ -252,12 +252,19 @@ fn draw_icon() -> Option<HICON> {
     let back = (0.06 * s, 0.06 * s, 0.66 * s, 0.66 * s, 0.16 * s);
     let front = (0.34 * s, 0.34 * s, 0.94 * s, 0.94 * s, 0.16 * s);
     let gap = 0.07 * s;
-    let inside = |(left, top, right, bottom, radius): (f32, f32, f32, f32, f32), x: f32, y: f32, grow: f32| {
+    let inside = |(left, top, right, bottom, radius): (f32, f32, f32, f32, f32),
+                  x: f32,
+                  y: f32,
+                  grow: f32| {
         let (left, top, right, bottom) = (left - grow, top - grow, right + grow, bottom + grow);
         let radius = radius + grow;
         let cx = x.clamp(left + radius, right - radius);
         let cy = y.clamp(top + radius, bottom - radius);
-        x >= left && x <= right && y >= top && y <= bottom && (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius
+        x >= left
+            && x <= right
+            && y >= top
+            && y <= bottom
+            && (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius
     };
     let mut pixels = vec![0u32; size * size];
     const SAMPLES: usize = 4;
@@ -288,7 +295,8 @@ fn draw_icon() -> Option<HICON> {
                 // Premultiplied BGRA.
                 let alpha = (coverage * 255.0).round() as u32;
                 let channel = |sum: f32| ((sum / a) * coverage).round() as u32;
-                pixels[py * size + px] = alpha << 24 | channel(r) << 16 | channel(g) << 8 | channel(b);
+                pixels[py * size + px] =
+                    alpha << 24 | channel(r) << 16 | channel(g) << 8 | channel(b);
             }
         }
     }

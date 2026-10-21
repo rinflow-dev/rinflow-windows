@@ -25,6 +25,8 @@ namespace LinkCursorApp
 
         // Arrangement, in logical points of this PC's desktop space.
         void SetPlacement(std::wstring_view peerId, double x, double y);
+        // Where SetPlacement would put it, answered with "placement_preview".
+        void PreviewPlacement(std::wstring_view peerId, double x, double y);
         void RemovePlacement(std::wstring_view peerId);
         void PlaceBeside(std::wstring_view peerId, std::wstring_view side);
 
@@ -42,6 +44,10 @@ namespace LinkCursorApp
         void ForgetDevice(std::wstring_view peerId);
         // Quits the agent, as the tray's 退出 does.
         void Quit();
+
+        // The user compared the pairing code and accepts, or declines.
+        void AcceptPairing(std::wstring_view peerId);
+        void RejectPairing(std::wstring_view peerId);
 
     private:
         void Run();

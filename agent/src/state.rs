@@ -43,6 +43,21 @@ pub struct Session {
     pub remote_control: bool,
     /// Round trip to the peer, in whole milliseconds, once measured.
     pub latency_ms: Option<u32>,
+    /// Over QUIC with TLS; false for an older peer on plain TCP.
+    pub encrypted: bool,
+    /// The peer's certificate is the one paired with.
+    pub paired: bool,
+}
+
+/// Pairing in progress: the code both devices show.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PairingView {
+    pub peer_id: String,
+    pub name: String,
+    pub platform: String,
+    pub code: String,
+    /// This side's user accepted; waiting for the other device.
+    pub accepted: bool,
 }
 
 /// The arrangement page: this PC's displays and every known peer, all in
@@ -108,6 +123,12 @@ pub struct Snapshot {
     /// Locked to the current screen with the lock shortcut: no crossing.
     pub locked: bool,
     pub agent_version: &'static str,
+    /// SHA-256 of this PC's certificate (hex), once the core runs with QUIC.
+    pub fingerprint: Option<String>,
+    /// A pairing waiting for the user.
+    pub pairing: Option<PairingView>,
+    /// Device IDs of paired peers.
+    pub paired_peers: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -140,7 +161,24 @@ impl SharedState {
             control_port,
             locked: false,
             agent_version: env!("CARGO_PKG_VERSION"),
+            fingerprint: None,
+            pairing: None,
+            paired_peers: Vec::new(),
         })))
+    }
+
+    pub fn set_paired_peers(&self, peers: Vec<String>) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.paired_peers, peers));
+    }
+
+    /// This side's user accepted the pairing with `peer_id`.
+    pub fn set_pairing_accepted(&self, peer_id: &str) {
+        self.0
+            .send_if_modified(|snapshot| match &mut snapshot.pairing {
+                Some(pairing) if pairing.peer_id == peer_id => replace(&mut pairing.accepted, true),
+                _ => false,
+            });
     }
 
     pub fn set_settings(&self, settings: Settings) {
@@ -228,7 +266,64 @@ impl SharedState {
             return;
         };
         self.0.send_if_modified(|snapshot| match kind {
-            "started" => replace(&mut snapshot.core, CoreStatus::Running),
+            "started" => {
+                let fingerprint = event["fingerprint"].as_str().map(str::to_owned);
+                replace(&mut snapshot.core, CoreStatus::Running)
+                    | replace(&mut snapshot.fingerprint, fingerprint)
+            }
+            "pairing_requested" => {
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                let text = |key: &str| event[key].as_str().unwrap_or_default().to_owned();
+                snapshot.pairing = Some(PairingView {
+                    peer_id: peer_id.to_owned(),
+                    name: event["name"].as_str().unwrap_or(peer_id).to_owned(),
+                    platform: text("platform"),
+                    code: text("code"),
+                    accepted: false,
+                });
+                true
+            }
+            "paired" => {
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                if !snapshot.paired_peers.iter().any(|id| id == peer_id) {
+                    snapshot.paired_peers.push(peer_id.to_owned());
+                }
+                if snapshot
+                    .pairing
+                    .as_ref()
+                    .is_some_and(|p| p.peer_id == peer_id)
+                {
+                    snapshot.pairing = None;
+                }
+                if let Some(session) = snapshot.sessions.iter_mut().find(|s| s.peer_id == peer_id) {
+                    session.paired = true;
+                }
+                true
+            }
+            "unpaired" => {
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                let before = snapshot.paired_peers.len();
+                snapshot.paired_peers.retain(|id| id != peer_id);
+                snapshot.paired_peers.len() != before
+            }
+            "pairing_ended" => {
+                let peer_id = event["peer_id"].as_str();
+                if snapshot
+                    .pairing
+                    .as_ref()
+                    .is_some_and(|p| Some(p.peer_id.as_str()) == peer_id)
+                {
+                    snapshot.pairing = None;
+                    return true;
+                }
+                false
+            }
             "stopped" => replace(&mut snapshot.core, CoreStatus::Stopped),
             "peer_up" => {
                 let Some(peer) = parse_peer(&event["peer"]) else {
@@ -264,6 +359,8 @@ impl SharedState {
                 let session = snapshot.session_mut(&peer.id);
                 session.name = peer.name;
                 session.status = SessionStatus::Connected;
+                session.encrypted = event["encrypted"].as_bool().unwrap_or(false);
+                session.paired = event["paired"].as_bool().unwrap_or(false);
                 snapshot.last_error = None;
                 true
             }
@@ -303,10 +400,16 @@ impl SharedState {
                 snapshot
                     .sessions
                     .retain(|session| session.peer_id != peer_id);
-                // Ending the session here or on the peer is not an error.
+                if snapshot
+                    .pairing
+                    .as_ref()
+                    .is_some_and(|p| p.peer_id == peer_id)
+                {
+                    snapshot.pairing = None;
+                }
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
-                if reason != "local request" && reason != "peer closed the connection" {
-                    snapshot.last_error = Some(format!("{name}: {reason}"));
+                if let Some(message) = disconnect_message(reason) {
+                    snapshot.last_error = Some(format!("{name}：{message}"));
                 }
                 true
             }
@@ -342,6 +445,8 @@ impl Snapshot {
                     status: SessionStatus::Connecting,
                     remote_control: false,
                     latency_ms: None,
+                    encrypted: false,
+                    paired: false,
                 });
                 self.sessions.len() - 1
             }
@@ -356,6 +461,27 @@ fn replace<T: PartialEq>(slot: &mut T, value: T) -> bool {
     }
     *slot = value;
     true
+}
+
+/// What to tell the user about a session that ended, if anything: ending it
+/// here or on the peer, or declining a pairing here, is not an error.
+fn disconnect_message(reason: &str) -> Option<String> {
+    Some(match reason {
+        "local request" | "peer closed the connection" | "pairing declined" => return None,
+        "unencrypted connection refused" => {
+            "这是旧版设备，连接不加密，已拒绝。升级对方，或在设置中关闭“仅允许已配对设备”。"
+                .to_owned()
+        }
+        "the device's identity changed" => {
+            "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。"
+                .to_owned()
+        }
+        "pairing declined on the other device" => "对方拒绝了配对。".to_owned(),
+        "pairing timed out" => "配对超时，没有在两分钟内确认。".to_owned(),
+        "pairing required" => "未配对的设备已断开（已开启“仅允许已配对设备”）。".to_owned(),
+        "unpaired" => "已取消配对。".to_owned(),
+        other => other.to_owned(),
+    })
 }
 
 fn parse_peer(value: &Value) -> Option<Peer> {

@@ -8,6 +8,7 @@ use crate::overlay::{Command, OverlayHandle};
 use crate::settings::{SettingsStore, autostart};
 use crate::state::SharedState;
 use linkcursor_core::Core;
+use linkcursor_core::layout::Offset;
 use serde_json::{Map, Value};
 use std::sync::{Arc, Weak};
 
@@ -77,6 +78,11 @@ impl Services {
         {
             let _ = core.set_remote_control_allowed(settings.sharing);
         }
+        if values.contains_key("paired_only")
+            && let Some(core) = self.core.upgrade()
+        {
+            let _ = core.set_require_pairing(settings.paired_only);
+        }
         self.edge.settings_changed();
         // A shortcut that failed to register may work now; the edge thread
         // reports it again if not.
@@ -87,15 +93,41 @@ impl Services {
         Ok(())
     }
 
+    /// Where a peer dropped at `offset` would land (see `Arrangement::preview`).
+    pub fn preview_placement(&self, peer_id: &str, offset: Offset) -> Option<Offset> {
+        self.arrangement.preview(peer_id, offset)
+    }
+
     /// Forgets a device: disconnected, unplaced, and no longer listed as one
     /// of the user's devices.
     pub fn forget_device(&self, peer_id: &str) -> Result<(), String> {
         if let Some(core) = self.core.upgrade() {
             let _ = core.disconnect_peer(peer_id);
             let _ = core.set_placement(peer_id, None);
+            // Pairing again will be needed.
+            let _ = core.unpair(peer_id);
         }
         self.arrangement.forget(peer_id);
         Ok(())
+    }
+
+    /// The user checked the code shown for `peer_id` and accepts.
+    pub fn accept_pairing(&self, peer_id: &str) -> Result<(), String> {
+        let core = self
+            .core
+            .upgrade()
+            .ok_or("LinkCursor core is shutting down")?;
+        core.accept_pairing(peer_id)?;
+        self.state.set_pairing_accepted(peer_id);
+        Ok(())
+    }
+
+    pub fn reject_pairing(&self, peer_id: &str) -> Result<(), String> {
+        let core = self
+            .core
+            .upgrade()
+            .ok_or("LinkCursor core is shutting down")?;
+        core.reject_pairing(peer_id)
     }
 
     pub fn set_effect(&self, params: EffectParams) {

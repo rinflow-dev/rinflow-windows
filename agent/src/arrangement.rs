@@ -133,6 +133,41 @@ impl Arrangement {
         })
     }
 
+    /// Where a peer dropped at `offset` would land, for showing it while the
+    /// user drags: the core's own snapping, with the same displays and the
+    /// other placed peers as obstacles. `None` when there is no room.
+    pub fn preview(&self, peer_id: &str, offset: Offset) -> Option<Offset> {
+        let inner = self.inner.lock().ok()?;
+        let displays_of = |id: &str| {
+            layout::peer_or_default(
+                inner
+                    .saved
+                    .devices
+                    .get(id)
+                    .map(|device| device.displays.as_slice())
+                    .unwrap_or_default(),
+            )
+        };
+        let obstacles: Vec<Display> = inner
+            .saved
+            .placements
+            .iter()
+            .filter(|record| record.peer_id != peer_id)
+            .filter_map(|record| {
+                record
+                    .offset
+                    .map(|offset| layout::placed(&displays_of(&record.peer_id), offset))
+            })
+            .flatten()
+            .collect();
+        layout::snap(
+            &displays::logical(&inner.monitors),
+            &displays_of(peer_id),
+            offset,
+            &obstacles,
+        )
+    }
+
     /// Forgets a device: its name, displays and placement. It shows up again
     /// as a nearby device while it is online.
     pub fn forget(&self, peer_id: &str) {

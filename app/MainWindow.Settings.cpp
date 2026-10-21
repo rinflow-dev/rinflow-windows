@@ -87,6 +87,19 @@ namespace
         state.Text(on ? L"开" : L"关");
     }
 
+    // "3fa27c…" (64 hex digits) as "3F:A2:7C:…", the way certificate
+    // fingerprints are usually shown.
+    std::wstring ColonHex(std::wstring_view hex)
+    {
+        std::wstring text;
+        for (size_t i = 0; i < hex.size(); ++i)
+        {
+            if (i > 0 && i % 2 == 0) text.push_back(L':');
+            text.push_back(static_cast<wchar_t>(towupper(hex[i])));
+        }
+        return text;
+    }
+
     JsonObject HotkeyValue(uint32_t modifiers, uint32_t key)
     {
         JsonObject value;
@@ -120,6 +133,7 @@ namespace winrt::LinkCursor::implementation
         wire(CornerToggle(), CornerState(), L"corner_guard");
         wire(FullscreenToggle(), FullscreenState(), L"pause_in_fullscreen");
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
+        wire(PairedOnlyToggle(), PairedOnlyState(), L"paired_only");
 
         ThemeCombo().SelectionChanged([weak](auto&&, auto&&)
         {
@@ -180,9 +194,9 @@ namespace winrt::LinkCursor::implementation
         CopyIdButton().Click([weak](auto&&, auto&&)
         {
             auto self = weak.get();
-            if (!self || self->m_deviceId.empty()) return;
+            if (!self || self->m_fingerprint.empty()) return;
             Windows::ApplicationModel::DataTransfer::DataPackage package;
-            package.SetText(self->m_deviceId);
+            package.SetText(self->m_fingerprint);
             Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
         });
 
@@ -205,6 +219,15 @@ namespace winrt::LinkCursor::implementation
         SetSwitch(CornerToggle(), CornerState(), settings.GetNamedBoolean(L"corner_guard", true));
         SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"pause_in_fullscreen", false));
         SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", false));
+        SetSwitch(PairedOnlyToggle(), PairedOnlyState(), settings.GetNamedBoolean(L"paired_only", true));
+
+        // Encryption is not a choice: on whenever this PC has its identity.
+        auto fingerprint = state.GetNamedValue(L"fingerprint", JsonValue::CreateNullValue());
+        bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
+        SetSwitch(TlsToggle(), TlsState(), encrypted);
+        TlsDescription().Text(encrypted
+            ? L"与新版设备之间的连接都用 TLS 1.3 加密，并核对对方的证书。旧版设备仍以不加密的方式连接。"
+            : L"暂不可用：本机证书或 UDP 端口无法使用，现在只能以不加密的方式连接。");
 
         auto theme = settings.GetNamedString(L"theme", L"system");
         int themeIndex = theme == L"light" ? 1 : theme == L"dark" ? 2 : 0;
@@ -249,9 +272,14 @@ namespace winrt::LinkCursor::implementation
             ? hstring(std::format(L"重新启动 LinkCursor 后改用 {}；现在使用 {}。", configured, running))
             : hstring(L"其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。"));
 
-        auto id = std::wstring(m_deviceId);
-        DeviceIdText().Text(id.size() > 18 ? hstring(id.substr(0, 8) + L" … " + id.substr(id.size() - 8)) : hstring(id));
-        ToolTipService::SetToolTip(DeviceIdText(), box_value(m_deviceId));
+        // The first four and last three bytes; the tooltip and 复制 give all 32.
+        m_fingerprint = encrypted ? hstring(ColonHex(fingerprint.GetString())) : hstring();
+        auto full = std::wstring(m_fingerprint);
+        DeviceIdText().Text(full.size() > 24
+            ? hstring(full.substr(0, 11) + L" … " + full.substr(full.size() - 8))
+            : hstring(full.empty() ? L"—" : full));
+        ToolTipService::SetToolTip(DeviceIdText(), full.empty() ? nullptr : box_value(m_fingerprint));
+        CopyIdButton().IsEnabled(!full.empty());
         VersionText().Text(L"版本 " + state.GetNamedString(L"agent_version", L"—"));
 
         m_applying = false;

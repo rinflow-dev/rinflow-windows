@@ -103,6 +103,7 @@ namespace winrt::LinkCursor::implementation
         SetupArrangement();
         SetupSettingsPage();
         SetupEffectPage();
+        SetupPairing();
 
         BackButton().Click([weak](auto&&, auto&&)
         {
@@ -273,6 +274,10 @@ namespace winrt::LinkCursor::implementation
         {
             ApplyState(message);
         }
+        else if (type == L"placement_preview")
+        {
+            ApplyPlacementPreview(message);
+        }
         else if (type == L"error")
         {
             ShowError(message.GetNamedString(L"message", L""));
@@ -288,6 +293,8 @@ namespace winrt::LinkCursor::implementation
         ApplyDevices(state);
         ApplyLayout(state);
         ApplyEffect(state);
+        m_lastState = state;
+        ApplyPairing(state);
     }
 
     void MainWindow::ApplyDevices(JsonObject const& state)

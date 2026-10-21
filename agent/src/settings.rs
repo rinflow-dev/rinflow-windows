@@ -43,6 +43,9 @@ pub struct Settings {
     /// The core's TCP port; `None` uses the core's default. Applies after a
     /// restart.
     pub port: Option<u16>,
+    /// Only paired devices may connect: others pair first (both users check
+    /// a code), and older devices without encryption are refused.
+    pub paired_only: bool,
 }
 
 impl Default for Settings {
@@ -57,6 +60,7 @@ impl Default for Settings {
             pause_in_fullscreen: false,
             lock_hotkey: Hotkey::default(),
             port: None,
+            paired_only: true,
         }
     }
 }
@@ -189,7 +193,8 @@ pub mod autostart {
         let key = wide(RUN_KEY);
         let mut handle: HKEY = null_mut();
         // SAFETY: opens an existing per-user key; `handle` receives it.
-        let status = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, access, &mut handle) };
+        let status =
+            unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, access, &mut handle) };
         if status != ERROR_SUCCESS {
             return Err(io::Error::from_raw_os_error(status as i32));
         }
@@ -204,7 +209,14 @@ pub mod autostart {
         let value = wide(VALUE);
         // SAFETY: queries only whether the value exists; closes the key.
         unsafe {
-            let status = RegQueryValueExW(handle, value.as_ptr(), null(), null_mut(), null_mut(), null_mut());
+            let status = RegQueryValueExW(
+                handle,
+                value.as_ptr(),
+                null(),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+            );
             RegCloseKey(handle);
             status == ERROR_SUCCESS
         }
@@ -269,7 +281,9 @@ mod tests {
     fn merging_checks_every_value() {
         let settings = Settings::default();
         let merged = settings
-            .merged(&values(json!({"sharing": false, "port": 24800, "theme": "dark"})))
+            .merged(&values(
+                json!({"sharing": false, "port": 24800, "theme": "dark"}),
+            ))
             .unwrap();
         assert!(!merged.sharing);
         assert_eq!(merged.port, Some(24800));
@@ -288,6 +302,9 @@ mod tests {
             assert!(settings.merged(&values(bad.clone())).is_err(), "{bad}");
         }
         // Clearing the port goes back to the core's default.
-        assert_eq!(merged.merged(&values(json!({"port": null}))).unwrap().port, None);
+        assert_eq!(
+            merged.merged(&values(json!({"port": null}))).unwrap().port,
+            None
+        );
     }
 }

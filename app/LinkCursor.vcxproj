@@ -162,6 +162,9 @@
     <ClCompile Include="MainWindow.Effect.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="MainWindow.Pairing.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="TrayWindow.xaml.cpp">
       <DependentUpon>TrayWindow.xaml</DependentUpon>
     </ClCompile>

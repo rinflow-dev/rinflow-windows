@@ -57,7 +57,8 @@ namespace winrt::LinkCursor::implementation
             bool remembered{ false };
         };
 
-        // A device being dragged: from the canvas (placed) or a chip.
+        // A device being dragged: a placed peer, a peer from its chip, or
+        // this PC (`local`, which moves every placed peer the other way).
         struct LayoutDrag
         {
             hstring peerId;
@@ -65,6 +66,7 @@ namespace winrt::LinkCursor::implementation
             Windows::Foundation::Point grab{};  // pointer offset inside the element
             Windows::Foundation::Point start{}; // where the pointer went down
             bool fromChip{ false };
+            bool local{ false };
         };
 
     private:
@@ -84,14 +86,37 @@ namespace winrt::LinkCursor::implementation
         void ApplyLayout(Windows::Data::Json::JsonObject const& state);
         void RenderArrangement();
         void RenderDots();
+        // One screen card; `insets` draw it inside its to-scale bounds.
         Microsoft::UI::Xaml::FrameworkElement Screen(hstring const& templateKey, double width, double height,
-            hstring const& glyph, hstring const& title, hstring const& subtitle, bool dashed, bool strong);
+            Microsoft::UI::Xaml::Thickness const& insets, Microsoft::UI::Xaml::CornerRadius const& corners,
+            hstring const& glyph, hstring const& title, hstring const& subtitle);
         Microsoft::UI::Xaml::FrameworkElement DeviceElement(LayoutDevice const& device, bool ghost);
-        void BeginDrag(LayoutDevice const& device, Microsoft::UI::Xaml::FrameworkElement const& element,
+        // Makes a placed peer (or this PC, `local`) draggable.
+        void AttachDrag(Microsoft::UI::Xaml::FrameworkElement const& element, hstring const& peerId, bool local);
+        void BeginDrag(hstring const& peerId, bool local, Microsoft::UI::Xaml::FrameworkElement const& element,
             Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
+        // The placed peer nearest to this PC moved by (dx, dy).
+        LayoutDevice const* NearestPlaced(double dx, double dy) const;
         void MoveDrag(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         void EndDrag(Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& args);
         LayoutDevice const* FindLayoutDevice(hstring const& peerId) const;
+        // The offset the dragged device is at now (this PC's space).
+        std::pair<double, double> DraggedOffset() const;
+        // Asks the agent where the dragged device would land; one request in
+        // flight, the latest position sent when it is answered.
+        void RequestPreview();
+        void ApplyPlacementPreview(Windows::Data::Json::JsonObject const& message);
+        void ClearPreview();
+
+        // ---- Pairing (MainWindow.Pairing.cpp) -----------------------------
+        void SetupPairing();
+        void ApplyPairing(Windows::Data::Json::JsonObject const& state);
+        hstring m_pairingPeer;
+        bool m_pairingOpen{ false };
+        // Set while the dialog is closed because the pairing ended.
+        bool m_pairingClosing{ false };
+        Microsoft::UI::Dispatching::DispatcherQueueTimer m_pairingRetry{ nullptr };
+        Windows::Data::Json::JsonObject m_lastState{ nullptr };
 
         // ---- Settings (MainWindow.Settings.cpp) ----------------------------
         void SetupSettingsPage();
@@ -134,6 +159,8 @@ namespace winrt::LinkCursor::implementation
         hstring m_theme;
         bool m_keepInTray{ true };
         hstring m_deviceId;
+        // This PC's certificate fingerprint, as "3F:A2:…" (empty without QUIC).
+        hstring m_fingerprint;
 
         std::vector<LayoutRect> m_localDisplays;
         std::vector<LayoutDevice> m_layoutDevices;
@@ -147,6 +174,13 @@ namespace winrt::LinkCursor::implementation
         double m_layoutOriginY{ 0.0 };
         std::optional<LayoutDrag> m_drag;
         bool m_layoutDirty{ false };
+        // The landing spot shown while dragging.
+        Microsoft::UI::Xaml::FrameworkElement m_preview{ nullptr };
+        // The peer the last preview was asked for (the nearest one while
+        // this PC is dragged).
+        hstring m_previewPeer;
+        bool m_previewPending{ false };
+        bool m_previewQueued{ false };
         hstring m_localName;
 
         std::vector<EffectSlider> m_effectSliders;

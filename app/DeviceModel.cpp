@@ -172,6 +172,7 @@ namespace LinkCursorApp
                 device.connected = true;
                 device.online = true;
                 device.controlling = session.GetNamedBoolean(L"remote_control", false);
+                device.unencrypted = !session.GetNamedBoolean(L"encrypted", false);
                 auto latency = session.GetNamedValue(L"latency_ms", JsonValue::CreateNullValue());
                 if (latency.ValueType() == JsonValueType::Number) device.latencyMs = static_cast<uint32_t>(latency.GetNumber());
             }
@@ -179,6 +180,15 @@ namespace LinkCursorApp
             {
                 device.connecting = true;
             }
+        }
+        if (auto pairing = state.GetNamedValue(L"pairing", JsonValue::CreateNullValue()); pairing.ValueType() == JsonValueType::Object)
+        {
+            auto view = pairing.GetObject();
+            auto& device = entry(view.GetNamedString(L"peer_id", L""));
+            if (device.name == device.id) device.name = view.GetNamedString(L"name", device.name);
+            if (device.platform.empty()) device.platform = view.GetNamedString(L"platform", L"");
+            device.pairing = true;
+            device.connecting = !device.connected;
         }
 
         for (auto& [id, device] : devices)
@@ -224,10 +234,15 @@ namespace LinkCursorApp
         if (device.connected)
         {
             row->IsConnected(true);
-            row->StatusText(device.controlling ? L"正在控制本机" : L"已连接");
+            hstring status = device.controlling ? L"正在控制本机" : L"已连接";
+            row->StatusText(device.unencrypted ? status + L" · 未加密" : status);
             row->Latency(!device.latencyMs ? hstring(L"…")
                 : *device.latencyMs == 0 ? hstring(L"<1 ms")
                 : hstring(std::format(L"{} ms", *device.latencyMs)));
+        }
+        else if (device.pairing)
+        {
+            row->StatusText(L"等待配对确认…");
         }
         else if (device.connecting)
         {
@@ -252,7 +267,7 @@ namespace LinkCursorApp
         auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
             device.id, device.name, Detail(device), DeviceGlyph(device.platform));
         row->CanConnect(!device.connecting);
-        row->StatusText(device.connecting ? L"连接中…" : L"");
+        row->StatusText(device.pairing ? L"等待配对确认…" : device.connecting ? L"连接中…" : L"");
         return *row;
     }
 

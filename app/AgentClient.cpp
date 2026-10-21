@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 6;
+    constexpr int ProtocolVersion = 8;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
@@ -85,6 +85,15 @@ namespace LinkCursorApp
         Send(message);
     }
 
+    void AgentClient::PreviewPlacement(std::wstring_view peerId, double x, double y)
+    {
+        auto message = Request(L"preview_placement");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        message.Insert(L"x", JsonValue::CreateNumberValue(x));
+        message.Insert(L"y", JsonValue::CreateNumberValue(y));
+        Send(message);
+    }
+
     void AgentClient::RemovePlacement(std::wstring_view peerId)
     {
         auto message = Request(L"remove_placement");
@@ -155,6 +164,20 @@ namespace LinkCursorApp
     void AgentClient::Quit()
     {
         Send(Request(L"quit"));
+    }
+
+    void AgentClient::AcceptPairing(std::wstring_view peerId)
+    {
+        auto message = Request(L"accept_pairing");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
+    }
+
+    void AgentClient::RejectPairing(std::wstring_view peerId)
+    {
+        auto message = Request(L"reject_pairing");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
     }
 
     void AgentClient::Run()
