@@ -23,7 +23,7 @@ Status:
 - It controls a peer when the pointer is pushed through the edge it is placed at, with the push-through effect on this PC's side.
 - Peers can be arranged around this PC's screens, and the arrangement syncs with them.
 - The clipboard can follow control to and from peers (off by default).
-- Connections are encrypted (QUIC, TLS 1.3) with peers whose core supports it, and new devices can be required to pair with a six-digit code (see [Pairing and encryption](#pairing-and-encryption)).
+- Every connection is encrypted (QUIC, TLS 1.3), and new devices can be required to pair with a six-digit code (see [Pairing and encryption](#pairing-and-encryption)). Devices with a core older than ABI 7 cannot connect.
 - Sharing can be paused, crossing has a switch delay, corners and full-screen games can be excluded, and a shortcut locks the pointer to the current screen (see [Settings](#settings)).
 - The edge effect can be tuned with a single-machine demo (development builds).
 
@@ -142,7 +142,7 @@ Start either program:
 
 Both programs look next to themselves for the other one. Override this with `LINKCURSOR_AGENT_PATH` (used by the app) or `LINKCURSOR_APP_PATH` (used by the agent).
 
-The first time the agent listens, Windows Defender Firewall asks for permission. Allow it on private networks. LinkCursor uses UDP 42420 (discovery), UDP 42421 (QUIC), TCP 42421 (older peers) and one more UDP port the system picks for file and clipboard transfers. The prompt allows the program, which covers all of them. Other LinkCursor devices on the same network appear in the list within a few seconds.
+The first time the agent listens, Windows Defender Firewall asks for permission. Allow it on private networks. LinkCursor uses UDP 42420 (discovery), UDP 42421 (connections) and one more UDP port the system picks for file and clipboard transfers. It uses no TCP. The prompt allows the program, which covers all of them. Other LinkCursor devices on the same network appear in the list within a few seconds.
 
 ## Arranging devices
 
@@ -213,7 +213,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Privacy | Contents marked with `ExcludeClipboardContentFromMonitorProcessing` or `Clipboard Viewer Ignore`, or `CanIncludeInClipboardHistory` = 0 (password managers), are never shared. |
 | Copied files | Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`, with their names as text. The core sends a manifest, and the peer pulls the files while this PC runs. Files a peer copied land in `Downloads\LinkCursor` (folders kept, names never overwritten). They are then put on the clipboard as `CF_HDROP` with a copy drop effect, so Ctrl+V in Explorer copies them. |
 | Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While sharing is off it is refused. A failed transfer shows as the error bar. |
-| Setting | Off by default. With an older peer (shown as **未加密**) contents travel unencrypted. Saved to `%LOCALAPPDATA%\LinkCursor\settings.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
+| Setting | Off by default. Saved to `%LOCALAPPDATA%\LinkCursor\settings.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
 ## Edge push-through effect
 
@@ -272,9 +272,9 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
 | 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
-| 端口 | `port` | The core's port (`null`: 42421), UDP for QUIC and TCP for older peers. Applies after LinkCursor restarts; must not be the discovery port 42420. |
-| 加密传输 (TLS) | (none) | Shown on, and not switchable, while the core has its certificate and QUIC port. See [Pairing and encryption](#pairing-and-encryption). |
-| 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once, and older unencrypted peers are refused. Off: unknown devices connect without pairing (still encrypted when both sides can), and older peers over plain TCP too. Applied at once: turning it on drops connected devices that are not paired. |
+| 端口 | `port` | The core's UDP port for connections (`null`: 42421). Applies after LinkCursor restarts; must not be the discovery port 42420. |
+| 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
+| 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
 
 ## Pairing and encryption
@@ -286,8 +286,8 @@ The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing co
 | Certificate | core | A self-signed certificate and its key, made on first start, in `%LOCALAPPDATA%\LinkCursor\identity.pem` (`CoreConfig::identity_path`). Peers know this PC by its fingerprint. Deleting the file gives this PC a new identity, and paired devices then refuse it until they pair again. |
 | Paired devices | agent ([trust.rs](agent/src/trust.rs)) | Device ID → fingerprint, in `%LOCALAPPDATA%\LinkCursor\trusted.json`. Passed to the core at start (`trusted_peers`); updated on the core's `paired` and `unpaired` events. **移除此设备** also unpairs. |
 | Pairing | core, app | When a device wants to pair, the core reports `pairing_requested` with a six-digit code computed from both certificates. The agent opens the main window, and the **配对** dialog ([MainWindow.Pairing.cpp](app/MainWindow.Pairing.cpp)) shows the code. **配对** accepts and waits for the other device; **取消** (or Esc) declines, and the other device says **对方拒绝了配对**. Two minutes without an answer ends it. |
-| Device rows | app | A device connected without encryption (an older LinkCursor) says **已连接 · 未加密**; a device waiting for its code to be confirmed says **等待配对确认…**. |
-| Refusals | agent | A paired device that shows another certificate is refused (the error bar says its identity certificate changed and to remove and pair it again), and so is an older peer while **仅允许已配对设备** is on (it says to update the peer or turn the setting off). |
+| Device rows | app | A device waiting for its code to be confirmed says **等待配对确认…**. |
+| Refusals | agent | A paired device that shows another certificate is refused; the error bar says its identity certificate changed and to remove and pair it again. |
 
 ## Agent IPC protocol
 
@@ -297,7 +297,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":8}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":9}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -319,14 +319,14 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":8,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":9,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
 A `state` message looks like this:
 
-- `sessions` lists every peer this PC is connecting or connected to, one entry per peer and possibly several. `status` is `connecting` or `connected`, `remote_control` is true while that peer drives this PC, `latency_ms` is the round trip (from the core's `latency` event, about once a second), `encrypted` is false for an older peer over plain TCP, and `paired` is true when the peer showed the certificate it was paired with.
-- `fingerprint` is this PC's certificate fingerprint (64 hex digits; `null` when the core runs without QUIC). `paired_peers` lists the device IDs of paired devices. `pairing` is `null`, or the pairing waiting for the user: `{"peer_id", "name", "platform", "code", "accepted"}` (`accepted` once this side confirmed).
+- `sessions` lists every peer this PC is connecting or connected to, one entry per peer and possibly several. `status` is `connecting` or `connected`, `remote_control` is true while that peer drives this PC, `latency_ms` is the round trip (from the core's `latency` event, about once a second), and `paired` is true when the peer showed the certificate it was paired with.
+- `fingerprint` is this PC's certificate fingerprint (64 hex digits; `null` until the core has started). `paired_peers` lists the device IDs of paired devices. `pairing` is `null`, or the pairing waiting for the user: `{"peer_id", "name", "platform", "code", "accepted"}` (`accepted` once this side confirmed).
 - `layout` is what the arrangement draws, in logical points:
   - `displays` are this PC's monitors.
   - `devices` lists every known peer, online or not. Each has its `displays` in its own space (a default 1440 × 900 until it describes them), its `offset` in this PC's space (`null` while not placed), the `side` of this PC it touches, `remembered` (connected at least once, or placed: one of the user's devices) and `last_seen_ms` (Unix milliseconds).
@@ -374,4 +374,4 @@ The agent sends whole snapshots instead of individual events, so the app never h
 
 ## Security
 
-Between devices whose core speaks QUIC, all traffic is encrypted with TLS 1.3 and each side knows the other's certificate. With **仅允许已配对设备** on (the default), only devices the user paired can connect, and older peers that cannot encrypt are refused. With it off, an older peer still connects over plain TCP, unencrypted and unauthenticated; its row says **未加密**. The pipe between the app and the agent is local to the signed-in user (see [Agent IPC protocol](#agent-ipc-protocol)).
+All traffic between devices is encrypted with TLS 1.3, and each side knows the other's certificate. With **仅允许已配对设备** on (the default), only devices the user paired can connect. With it off, any LinkCursor device on the network can connect: encrypted, but nobody checked who it is. The pipe between the app and the agent is local to the signed-in user (see [Agent IPC protocol](#agent-ipc-protocol)).

@@ -43,8 +43,6 @@ pub struct Session {
     pub remote_control: bool,
     /// Round trip to the peer, in whole milliseconds, once measured.
     pub latency_ms: Option<u32>,
-    /// Over QUIC with TLS; false for an older peer on plain TCP.
-    pub encrypted: bool,
     /// The peer's certificate is the one paired with.
     pub paired: bool,
 }
@@ -359,7 +357,6 @@ impl SharedState {
                 let session = snapshot.session_mut(&peer.id);
                 session.name = peer.name;
                 session.status = SessionStatus::Connected;
-                session.encrypted = event["encrypted"].as_bool().unwrap_or(false);
                 session.paired = event["paired"].as_bool().unwrap_or(false);
                 snapshot.last_error = None;
                 true
@@ -445,7 +442,6 @@ impl Snapshot {
                     status: SessionStatus::Connecting,
                     remote_control: false,
                     latency_ms: None,
-                    encrypted: false,
                     paired: false,
                 });
                 self.sessions.len() - 1
@@ -468,10 +464,6 @@ fn replace<T: PartialEq>(slot: &mut T, value: T) -> bool {
 fn disconnect_message(reason: &str) -> Option<String> {
     Some(match reason {
         "local request" | "peer closed the connection" | "pairing declined" => return None,
-        "unencrypted connection refused" => {
-            "这是旧版设备，连接不加密，已拒绝。升级对方，或在设置中关闭“仅允许已配对设备”。"
-                .to_owned()
-        }
         "the device's identity changed" => {
             "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。"
                 .to_owned()

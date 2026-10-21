@@ -340,7 +340,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
-                                        <!-- Statuses line up; a longer one (已连接 · 未加密) widens its row's column. -->
+                                        <!-- Statuses line up; a longer one (等待配对确认…) widens its row's column. -->
                                         <ColumnDefinition Width="Auto" MinWidth="120" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -615,7 +615,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" Text="仅允许已配对设备" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。不加密的旧版设备会被拒绝。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。" />
                         </StackPanel>
                         <TextBlock x:Name="PairedOnlyState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />

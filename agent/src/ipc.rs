@@ -23,9 +23,10 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// `last_seen_ms`.
 /// 7: `preview_placement`, answered with `placement_preview`.
 /// 8: `accept_pairing`, `reject_pairing`; the snapshot gains `fingerprint`,
-/// `pairing`, `paired_peers`, session `encrypted` / `paired`, and the
-/// `paired_only` setting.
-pub const PROTOCOL_VERSION: u32 = 8;
+/// `pairing`, `paired_peers`, session `paired`, and the `paired_only`
+/// setting.
+/// 9: sessions lose `encrypted`: every connection is encrypted now.
+pub const PROTOCOL_VERSION: u32 = 9;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")

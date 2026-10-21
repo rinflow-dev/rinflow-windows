@@ -172,7 +172,6 @@ namespace LinkCursorApp
                 device.connected = true;
                 device.online = true;
                 device.controlling = session.GetNamedBoolean(L"remote_control", false);
-                device.unencrypted = !session.GetNamedBoolean(L"encrypted", false);
                 auto latency = session.GetNamedValue(L"latency_ms", JsonValue::CreateNullValue());
                 if (latency.ValueType() == JsonValueType::Number) device.latencyMs = static_cast<uint32_t>(latency.GetNumber());
             }
@@ -234,8 +233,7 @@ namespace LinkCursorApp
         if (device.connected)
         {
             row->IsConnected(true);
-            hstring status = device.controlling ? L"正在控制本机" : L"已连接";
-            row->StatusText(device.unencrypted ? status + L" · 未加密" : status);
+            row->StatusText(device.controlling ? L"正在控制本机" : L"已连接");
             row->Latency(!device.latencyMs ? hstring(L"…")
                 : *device.latencyMs == 0 ? hstring(L"<1 ms")
                 : hstring(std::format(L"{} ms", *device.latencyMs)));

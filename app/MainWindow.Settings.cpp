@@ -221,13 +221,14 @@ namespace winrt::LinkCursor::implementation
         SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", false));
         SetSwitch(PairedOnlyToggle(), PairedOnlyState(), settings.GetNamedBoolean(L"paired_only", true));
 
-        // Encryption is not a choice: on whenever this PC has its identity.
+        // Encryption is not a choice: every connection is encrypted. Without
+        // a fingerprint the core is not running (no certificate or port).
         auto fingerprint = state.GetNamedValue(L"fingerprint", JsonValue::CreateNullValue());
         bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
         SetSwitch(TlsToggle(), TlsState(), encrypted);
         TlsDescription().Text(encrypted
-            ? L"与新版设备之间的连接都用 TLS 1.3 加密，并核对对方的证书。旧版设备仍以不加密的方式连接。"
-            : L"暂不可用：本机证书或 UDP 端口无法使用，现在只能以不加密的方式连接。");
+            ? L"所有连接都用 TLS 1.3 加密，并核对对方的证书。"
+            : L"LinkCursor 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。");
 
         auto theme = settings.GetNamedString(L"theme", L"system");
         int themeIndex = theme == L"light" ? 1 : theme == L"dark" ? 2 : 0;

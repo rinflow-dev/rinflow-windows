@@ -18,8 +18,6 @@ namespace LinkCursorApp
         bool connecting{ false };
         // This peer drives this PC's keyboard and mouse now.
         bool controlling{ false };
-        // Connected without encryption (an older LinkCursor over TCP).
-        bool unencrypted{ false };
         // Waiting for the users to compare the pairing code.
         bool pairing{ false };
         bool remembered{ false };

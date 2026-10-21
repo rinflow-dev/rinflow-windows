@@ -20,8 +20,8 @@ const DISCOVERY_PORT: u16 = 42420;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// Share the clipboard with peers. Off by default: traffic is not
-    /// encrypted yet, and clipboards can hold passwords.
+    /// Share the clipboard with peers. Off by default: clipboards can hold
+    /// passwords, and a device that is not paired could be on the other end.
     pub clipboard: bool,
     /// Share the keyboard and mouse at all: cross into peers, and let peers
     /// drive this PC. Off pauses both; sessions and the clipboard stay.
@@ -40,11 +40,11 @@ pub struct Settings {
     pub pause_in_fullscreen: bool,
     /// Toggles "locked to the current screen": no crossing either way.
     pub lock_hotkey: Hotkey,
-    /// The core's TCP port; `None` uses the core's default. Applies after a
-    /// restart.
+    /// The core's control port (UDP); `None` uses the core's default.
+    /// Applies after a restart.
     pub port: Option<u16>,
     /// Only paired devices may connect: others pair first (both users check
-    /// a code), and older devices without encryption are refused.
+    /// a code).
     pub paired_only: bool,
 }
 
