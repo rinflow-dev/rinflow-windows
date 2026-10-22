@@ -463,7 +463,14 @@ fn replace<T: PartialEq>(slot: &mut T, value: T) -> bool {
 /// here or on the peer, or declining a pairing here, is not an error.
 fn disconnect_message(reason: &str) -> Option<String> {
     Some(match reason {
-        "local request" | "peer closed the connection" | "pairing declined" => return None,
+        "local request"
+        | "peer closed the connection"
+        | "disconnected on the other device"
+        | "pairing declined" => return None,
+        "refused by the other device" => {
+            "对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。"
+                .to_owned()
+        }
         "the device's identity changed" => {
             "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。"
                 .to_owned()

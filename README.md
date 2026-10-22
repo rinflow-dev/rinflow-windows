@@ -23,6 +23,7 @@ Status:
 - It controls a peer when the pointer is pushed through the edge it is placed at, with the push-through effect on this PC's side.
 - Peers can be arranged around this PC's screens, and the arrangement syncs with them.
 - The clipboard can follow control to and from peers (off by default).
+- The user's devices connect by themselves and reconnect after a drop (see [Arranging devices](#arranging-devices)).
 - Every connection is encrypted (QUIC, TLS 1.3), and new devices can be required to pair with a six-digit code (see [Pairing and encryption](#pairing-and-encryption)). Devices with a core older than ABI 7 cannot connect.
 - Sharing can be paused, crossing has a switch delay, corners and full-screen games can be excluded, and a shortcut locks the pointer to the current screen (see [Settings](#settings)).
 - The edge effect can be tuned with a single-machine demo (development builds).
@@ -148,7 +149,8 @@ The first time the agent listens, Windows Defender Firewall asks for permission.
 
 The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](../README.md#arrangement).
 
-- **The user's devices.** **我的设备** lists the devices this PC has been connected to (or placed), online or not, with their round-trip time. **添加设备** lists the other LinkCursor devices on the network; connecting one adds it. The **⋯** menu of a row connects or disconnects, places the device on a side, and **移除此设备** forgets it (disconnected, unplaced; it shows up under 添加设备 again while online).
+- **The user's devices.** **我的设备** lists the devices this PC has been connected to (or placed), online or not, with their round-trip time. **添加设备** lists the other LinkCursor devices on the network; connecting one adds it. The **⋯** menu of a row connects or disconnects, places the device on a side, and **移除此设备** forgets it (disconnected, unplaced, unpaired; it shows up under 添加设备 again while online).
+- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core README](../README.md#how-it-works)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
 - **Placing a device.** The user's online devices that are not placed yet wait as **未放置** chips at the top of the canvas. Drag one next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. This PC can be dragged too, once something is placed: that moves every placed peer the other way (each snapped back against this PC, the nearest one first). A press that does not move is not a drag. Screens are drawn to scale but inset by 3 pixels on sides facing another device, so devices that touch show a small gap; the monitors of one computer stay flush against each other, with square corners where they meet, and read as one shape.
 - **Quick placement.** The **⋯** menu puts a device on the left, right, top or bottom, centred on that side, or removes it (**取消放置**, the only way to unplace: a drop outside the canvas still places the device).
 - **Snapping.** While a device is dragged, a dashed outline shows where it will land: the agent answers `preview_placement` with the core's own snapping (`layout::snap`, same displays and obstacles). The drop is then proposed to the core, which snaps it to that spot, and the canvas draws where it actually landed.
@@ -287,7 +289,7 @@ The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing co
 | Paired devices | agent ([trust.rs](agent/src/trust.rs)) | Device ID → fingerprint, in `%LOCALAPPDATA%\LinkCursor\trusted.json`. Passed to the core at start (`trusted_peers`); updated on the core's `paired` and `unpaired` events. **移除此设备** also unpairs. |
 | Pairing | core, app | When a device wants to pair, the core reports `pairing_requested` with a six-digit code computed from both certificates. The agent opens the main window, and the **配对** dialog ([MainWindow.Pairing.cpp](app/MainWindow.Pairing.cpp)) shows the code. **配对** accepts and waits for the other device; **取消** (or Esc) declines, and the other device says **对方拒绝了配对**. Two minutes without an answer ends it. |
 | Device rows | app | A device waiting for its code to be confirmed says **等待配对确认…**. |
-| Refusals | agent | A paired device that shows another certificate is refused; the error bar says its identity certificate changed and to remove and pair it again. |
+| Refusals | agent | A paired device that shows another certificate is refused; the error bar says its identity certificate changed and to remove and pair it again. When the other device refuses this PC (it removed it, or takes only paired devices), the error bar says so and suggests **连接** to pair again. Neither side then reconnects by itself. |
 
 ## Agent IPC protocol
 
