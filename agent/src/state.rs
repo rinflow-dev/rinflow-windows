@@ -466,7 +466,13 @@ fn disconnect_message(reason: &str) -> Option<String> {
         "local request"
         | "peer closed the connection"
         | "disconnected on the other device"
+        | "going to sleep"
         | "pairing declined" => return None,
+        // The peer vanished without closing (slept, lost the network); the
+        // core reconnects once it is back.
+        "heartbeat timeout" => {
+            "对方没有响应（可能睡眠了或断网），回来后会自动重新连接。".to_owned()
+        }
         "refused by the other device" => {
             "对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。"
                 .to_owned()

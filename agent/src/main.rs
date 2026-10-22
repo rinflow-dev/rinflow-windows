@@ -12,6 +12,7 @@ mod inject;
 mod ipc;
 mod keymap;
 mod overlay;
+mod power;
 mod services;
 mod settings;
 mod spring;
@@ -150,6 +151,10 @@ fn main() {
         let _ = core.set_remote_control_allowed(false);
     }
 
+    // Sleep, wake and network changes: sessions end in order before sleep
+    // and come back right after waking or a network change.
+    let power = power::PowerWatch::start(Arc::downgrade(&core));
+
     // Resolution, scaling or monitor changes reach the core (which re-fits
     // placements and tells peers) and the arrangement view.
     let watched_core = Arc::downgrade(&core);
@@ -210,6 +215,7 @@ fn main() {
     // Gives back the keyboard and mouse if a peer is being driven.
     drop(edge);
     drop(clipboard_thread);
+    drop(power);
     drop(overlay);
     // The IPC thread only holds a weak reference, so this stops the core and
     // lets connected peers see a clean disconnect before the process exits.
