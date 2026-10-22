@@ -38,9 +38,9 @@ use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Shell::{FOLDERID_Downloads, SHGetKnownFolderPath};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, HWND_MESSAGE,
-    IDYES, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MSG, MessageBoxW, PostMessageW,
-    PostThreadMessageW, RegisterClassW, TranslateMessage, WM_APP, WM_CLIPBOARDUPDATE, WM_QUIT,
-    WNDCLASSW,
+    IDYES, KillTimer, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MSG, MessageBoxW,
+    PostMessageW, PostThreadMessageW, RegisterClassW, SetTimer, TranslateMessage, WM_APP,
+    WM_CLIPBOARDUPDATE, WM_QUIT, WM_TIMER, WNDCLASSW,
 };
 
 const CF_UNICODETEXT: u32 = 13;
@@ -56,6 +56,15 @@ const WM_WRITE_CLIPBOARD: u32 = WM_APP + 1;
 const WM_REPORT_CLIPBOARD: u32 = WM_APP + 2;
 /// Largest image converted between PNG and DIB, in pixels.
 const MAX_PIXELS: usize = 50_000_000;
+/// What the core shares at most (`MAX_CLIPBOARD_SIZE`): larger contents
+/// lose their image, then their HTML, so the text at least goes.
+const SHARE_LIMIT: usize = 8 * 1024 * 1024 - 4096;
+/// Timers on the clipboard window: try again when another program held the
+/// clipboard too long, a few times.
+const REPORT_RETRY_TIMER: usize = 1;
+const WRITE_RETRY_TIMER: usize = 2;
+const RETRY_DELAY_MS: u32 = 300;
+const RETRY_ATTEMPTS: u32 = 5;
 
 /// Shared by the clipboard thread, the core's event callback and IPC.
 #[derive(Clone, Default)]
@@ -108,6 +117,12 @@ impl ClipboardHandle {
         self.0.enabled.load(Ordering::SeqCst)
     }
 
+    /// The core, as soon as it runs: offered files are decided from its
+    /// first events on, also if the clipboard thread could not start.
+    pub fn set_core(&self, core: Weak<Core>) {
+        let _ = self.0.core.set(core);
+    }
+
     /// Turns sharing on or off. Turned on, the current clipboard is reported
     /// at once; turned off, the core forgets it and nothing is sent.
     pub fn set_enabled(&self, enabled: bool) {
@@ -142,6 +157,7 @@ impl ClipboardHandle {
             return;
         };
         let Some(core) = self.0.core.get().and_then(Weak::upgrade) else {
+            // Only while shutting down: nobody is left to decide.
             return;
         };
         if !self.enabled() {
@@ -239,6 +255,8 @@ impl ClipboardThread {
                         handle: handle.clone(),
                         core,
                         written: None,
+                        report_attempts: 0,
+                        write_attempts: 0,
                     });
                 });
                 // Whatever is on the clipboard already counts as a change.
@@ -288,6 +306,9 @@ struct State {
     /// The clipboard sequence number right after writing a peer's clipboard:
     /// that change is not reported back.
     written: Option<u32>,
+    /// Tries left for a report or write that found the clipboard busy.
+    report_attempts: u32,
+    write_attempts: u32,
 }
 
 impl State {
@@ -297,13 +318,26 @@ impl State {
         if self.written == Some(sequence) {
             return;
         }
+        self.report_attempts = RETRY_ATTEMPTS;
         self.report(window);
     }
 
     /// Hands the core the clipboard as it is (nothing while sharing is off).
+    /// Another program holding the clipboard is not an empty clipboard: the
+    /// report is tried again shortly.
     fn report(&mut self, window: HWND) {
         let clipboard = if self.handle.enabled() {
-            read(window)
+            match read(window) {
+                Some(clipboard) => clipboard,
+                None => {
+                    if self.report_attempts > 0 {
+                        self.report_attempts -= 1;
+                        // SAFETY: a timer on this thread's window.
+                        unsafe { SetTimer(window, REPORT_RETRY_TIMER, RETRY_DELAY_MS, None) };
+                    }
+                    return;
+                }
+            }
         } else {
             Clipboard::default()
         };
@@ -312,6 +346,8 @@ impl State {
         }
     }
 
+    /// Writes a peer's clipboard. When another program holds the clipboard
+    /// it waits for another try (unless a newer one arrived meanwhile).
     fn write_incoming(&mut self, window: HWND) {
         let incoming = self
             .handle
@@ -320,13 +356,33 @@ impl State {
             .lock()
             .ok()
             .and_then(|mut incoming| incoming.take());
-        if let Some(clipboard) = incoming
-            && self.handle.enabled()
-            && write(window, &clipboard)
-        {
+        let Some(clipboard) = incoming else {
+            return;
+        };
+        if !self.handle.enabled() {
+            return;
+        }
+        if write(window, &clipboard) {
             // SAFETY: plain clipboard query.
             self.written = Some(unsafe { GetClipboardSequenceNumber() });
+            self.write_attempts = RETRY_ATTEMPTS;
+            return;
         }
+        if self.write_attempts == 0 {
+            eprintln!(
+                "linkcursor-agent: the clipboard stayed busy; a peer's clipboard was not written"
+            );
+            self.write_attempts = RETRY_ATTEMPTS;
+            return;
+        }
+        self.write_attempts -= 1;
+        if let Ok(mut slot) = self.handle.0.incoming.lock()
+            && slot.is_none()
+        {
+            *slot = Some(clipboard);
+        }
+        // SAFETY: a timer on this thread's window.
+        unsafe { SetTimer(window, WRITE_RETRY_TIMER, RETRY_DELAY_MS, None) };
     }
 }
 
@@ -348,8 +404,23 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     match message {
         WM_CLIPBOARDUPDATE => with_state(|state| state.changed(window)),
-        WM_WRITE_CLIPBOARD => with_state(|state| state.write_incoming(window)),
-        WM_REPORT_CLIPBOARD => with_state(|state| state.report(window)),
+        WM_WRITE_CLIPBOARD => with_state(|state| {
+            state.write_attempts = RETRY_ATTEMPTS;
+            state.write_incoming(window);
+        }),
+        WM_REPORT_CLIPBOARD => with_state(|state| {
+            state.report_attempts = RETRY_ATTEMPTS;
+            state.report(window);
+        }),
+        WM_TIMER => {
+            // SAFETY: this window's own one-shot timer.
+            unsafe { KillTimer(window, wparam) };
+            match wparam {
+                REPORT_RETRY_TIMER => with_state(|state| state.report(window)),
+                WRITE_RETRY_TIMER => with_state(|state| state.write_incoming(window)),
+                _ => {}
+            }
+        }
         _ => {
             // SAFETY: default handling for everything else.
             return unsafe { DefWindowProcW(window, message, wparam, lparam) };
@@ -492,17 +563,54 @@ fn is_private() -> bool {
         .is_some_and(|bytes| bytes.len() >= 4 && bytes[..4] == [0, 0, 0, 0])
 }
 
-/// The clipboard in the shared formats, most specific first.
-fn read(window: HWND) -> Clipboard {
-    let Some(_opened) = Opened::new(window) else {
-        return Clipboard::default();
+/// What `read` copies while the clipboard is open; converted after closing
+/// it, so other programs never wait on the conversions.
+#[derive(Default)]
+struct Raw {
+    drop: Option<Vec<u8>>,
+    html: Option<Vec<u8>>,
+    png: Option<Vec<u8>>,
+    dib: Option<Vec<u8>>,
+    text: Option<Vec<u8>>,
+}
+
+/// The clipboard in the shared formats, most specific first; `None` when
+/// another program held it too long to read.
+fn read(window: HWND) -> Option<Clipboard> {
+    let raw = {
+        let _opened = Opened::new(window)?;
+        if is_private() {
+            return Some(Clipboard::default());
+        }
+        let drop = get_bytes(CF_HDROP);
+        if drop.is_some() {
+            Raw {
+                drop,
+                ..Raw::default()
+            }
+        } else {
+            let png = get_bytes(register("PNG"));
+            Raw {
+                drop: None,
+                html: get_bytes(register("HTML Format")),
+                // A bitmap only when there is no PNG to take as it is.
+                dib: if png.is_none() {
+                    get_bytes(CF_DIB)
+                } else {
+                    None
+                },
+                png,
+                text: get_bytes(CF_UNICODETEXT),
+            }
+        }
     };
-    if is_private() {
-        return Clipboard::default();
-    }
+    Some(convert(raw))
+}
+
+fn convert(raw: Raw) -> Clipboard {
     // Files copied in Explorer: the files (the core turns the URLs into a
     // manifest) and their names as text, never their icons.
-    if let Some(paths) = get_bytes(CF_HDROP).and_then(|data| drop_files(&data))
+    if let Some(paths) = raw.drop.and_then(|data| drop_files(&data))
         && !paths.is_empty()
     {
         let urls: Vec<String> = paths.iter().map(|path| file_url(path)).collect();
@@ -527,25 +635,45 @@ fn read(window: HWND) -> Clipboard {
             ],
         };
     }
+    let text = raw
+        .text
+        .and_then(|data| utf16_text(&data))
+        // Line breaks travel as LF.
+        .map(|text| text.replace("\r\n", "\n").into_bytes());
+    let html = raw.html.and_then(|data| html_fragment(&data));
+    let budget =
+        |parts: &[Option<&Vec<u8>>]| parts.iter().flatten().map(|data| data.len()).sum::<usize>();
+    // The image only when it fits with the rest; a bitmap is not even
+    // converted when it could not.
+    let png = match raw.png {
+        Some(png) => Some(png),
+        None => raw
+            .dib
+            .filter(|dib| dib.len() / 4 < SHARE_LIMIT)
+            .and_then(|dib| dib_to_png(&dib)),
+    }
+    .filter(|png| budget(&[Some(png), html.as_ref(), text.as_ref()]) <= SHARE_LIMIT);
+    let html =
+        html.filter(|html| budget(&[png.as_ref(), Some(html), text.as_ref()]) <= SHARE_LIMIT);
+    let text = text.filter(|text| text.len() <= SHARE_LIMIT);
+
     let mut formats = Vec::new();
-    if let Some(html) = get_bytes(register("HTML Format")).and_then(|data| html_fragment(&data)) {
+    if let Some(html) = html {
         formats.push(ClipboardFormat {
             mime: MIME_HTML.to_owned(),
             data: html,
         });
     }
-    let png =
-        get_bytes(register("PNG")).or_else(|| get_bytes(CF_DIB).and_then(|dib| dib_to_png(&dib)));
     if let Some(png) = png {
         formats.push(ClipboardFormat {
             mime: MIME_PNG.to_owned(),
             data: png,
         });
     }
-    if let Some(text) = get_bytes(CF_UNICODETEXT).and_then(|data| utf16_text(&data)) {
+    if let Some(text) = text {
         formats.push(ClipboardFormat {
             mime: MIME_TEXT.to_owned(),
-            data: text.into_bytes(),
+            data: text,
         });
     }
     Clipboard { formats }
@@ -553,6 +681,8 @@ fn read(window: HWND) -> Clipboard {
 
 /// Replaces the clipboard with a peer's. False when it could not be opened.
 fn write(window: HWND, clipboard: &Clipboard) -> bool {
+    // Everything converted first: the clipboard is held only to copy it in.
+    let entries = clipboard_entries(clipboard);
     let Some(_opened) = Opened::new(window) else {
         return false;
     };
@@ -560,6 +690,15 @@ fn write(window: HWND, clipboard: &Clipboard) -> bool {
     unsafe {
         EmptyClipboard();
     }
+    for (format, bytes) in entries {
+        set_bytes(format, &bytes);
+    }
+    true
+}
+
+/// A peer's clipboard as Windows formats and their bytes.
+fn clipboard_entries(clipboard: &Clipboard) -> Vec<(u32, Vec<u8>)> {
+    let mut entries = Vec::new();
     // Files received from the peer (a text/uri-list of their paths here): as
     // files, so Ctrl+V in Explorer copies them.
     if let Some(list) = clipboard
@@ -567,38 +706,64 @@ fn write(window: HWND, clipboard: &Clipboard) -> bool {
         .iter()
         .find(|format| format.mime == MIME_URI_LIST)
     {
+        // Only files the core received, in the downloads folder: never a
+        // path elsewhere on this PC or on a network share, whatever a peer
+        // might send.
         let paths: Vec<String> = String::from_utf8_lossy(&list.data)
             .lines()
             .map(str::trim)
             .filter(|line| !line.is_empty() && !line.starts_with('#'))
             .filter_map(path_from_file_url)
+            .filter(|path| is_received_file(path))
             .collect();
         if !paths.is_empty() {
-            set_bytes(CF_HDROP, &drop_files_block(&paths));
+            entries.push((CF_HDROP, drop_files_block(&paths)));
             // DROPEFFECT_COPY: pasting copies rather than moves.
-            set_bytes(register("Preferred DropEffect"), &1u32.to_le_bytes());
+            entries.push((
+                register("Preferred DropEffect"),
+                1u32.to_le_bytes().to_vec(),
+            ));
         }
     }
     for format in &clipboard.formats {
         match format.mime.as_str() {
             MIME_TEXT => {
-                let text = String::from_utf8_lossy(&format.data);
+                // Line breaks travel as LF; Windows text uses CRLF (classic
+                // edit controls show bare LF as one long line).
+                let text = String::from_utf8_lossy(&format.data)
+                    .replace("\r\n", "\n")
+                    .replace('\n', "\r\n");
                 let units: Vec<u16> = text.encode_utf16().chain(Some(0)).collect();
                 let bytes: Vec<u8> = units.iter().flat_map(|unit| unit.to_le_bytes()).collect();
-                set_bytes(CF_UNICODETEXT, &bytes);
+                entries.push((CF_UNICODETEXT, bytes));
             }
-            MIME_HTML => set_bytes(register("HTML Format"), &cf_html(&format.data)),
+            MIME_HTML => entries.push((register("HTML Format"), cf_html(&format.data))),
             MIME_PNG => {
-                set_bytes(register("PNG"), &format.data);
+                entries.push((register("PNG"), format.data.clone()));
                 // For programs that only take bitmaps.
                 if let Some(dib) = png_to_dib(&format.data) {
-                    set_bytes(CF_DIB, &dib);
+                    entries.push((CF_DIB, dib));
                 }
             }
             _ => {}
         }
     }
-    true
+    entries
+}
+
+/// Whether `path` is inside the downloads folder (where the core puts files
+/// it received), not on a network share.
+fn is_received_file(path: &str) -> bool {
+    if path.starts_with(r"\\") {
+        return false;
+    }
+    match (
+        std::fs::canonicalize(path),
+        std::fs::canonicalize(download_directory()),
+    ) {
+        (Ok(path), Ok(folder)) => path.starts_with(folder),
+        _ => false,
+    }
 }
 
 /// The paths in a `CF_HDROP` block (`DROPFILES` and NUL-separated names).

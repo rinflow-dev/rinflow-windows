@@ -53,7 +53,7 @@ namespace winrt::LinkCursor::implementation
         m_pairingRetry.Tick([weak](auto&& timer, auto&&)
         {
             timer.Stop();
-            if (auto self = weak.get(); self && self->m_lastState) self->ApplyPairing(self->m_lastState);
+            if (auto self = weak.get(); self && !self->m_closed && self->m_lastState) self->ApplyPairing(self->m_lastState);
         });
     }
 
@@ -101,11 +101,15 @@ namespace winrt::LinkCursor::implementation
         }
         m_pairingPeer = peerId;
         m_pairingOpen = true;
+        m_pairingClosing = false;
         auto failed = [weak = get_weak()]
         {
             auto self = weak.get();
-            if (!self) return;
+            if (!self || self->m_closed) return;
             self->m_pairingOpen = false;
+            // Never opened, so no Closed event resets it: a pairing that
+            // ended meanwhile must not make the next 取消 skip declining.
+            self->m_pairingClosing = false;
             self->m_pairingPeer = L"";
             self->m_pairingRetry.Start();
         };

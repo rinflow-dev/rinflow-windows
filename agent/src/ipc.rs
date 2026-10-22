@@ -27,7 +27,8 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// setting.
 /// 9: sessions lose `encrypted`: every connection is encrypted now.
 /// 10: the snapshot gains `elevated_input`.
-pub const PROTOCOL_VERSION: u32 = 10;
+/// 11: `clear_error`; the snapshot gains `quitting`.
+pub const PROTOCOL_VERSION: u32 = 11;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -96,6 +97,8 @@ enum Request {
     RejectPairing {
         peer_id: String,
     },
+    /// The user dismissed `last_error`.
+    ClearError,
     /// Quits the agent as the tray's 退出 does.
     Quit,
 }
@@ -126,6 +129,7 @@ pub fn spawn(user_sid: &str, services: Arc<Services>) {
         .spawn(move || {
             let runtime = match tokio::runtime::Builder::new_current_thread()
                 .enable_io()
+                .enable_time()
                 .build()
             {
                 Ok(runtime) => runtime,
@@ -152,10 +156,26 @@ async fn serve(user_sid: &str, services: Arc<Services>) -> io::Result<()> {
     // owns the name, so nothing can squat on the pipe before the agent.
     let mut server = create_instance(&name, &mut security, true)?;
     loop {
-        server.connect().await?;
-        let connected = server;
-        server = create_instance(&name, &mut security, false)?;
-        tokio::spawn(handle_client(connected, services.clone()));
+        // A client that went away before being accepted fails only its own
+        // connection; the next instance exists before this one is let go, so
+        // the name stays this process's.
+        let connected = server.connect().await;
+        let next = loop {
+            match create_instance(&name, &mut security, false) {
+                Ok(next) => break next,
+                Err(error) => {
+                    eprintln!("linkcursor-agent: cannot open another IPC pipe: {error}");
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                }
+            }
+        };
+        let current = std::mem::replace(&mut server, next);
+        match connected {
+            Ok(()) => {
+                tokio::spawn(handle_client(current, services.clone()));
+            }
+            Err(error) => eprintln!("linkcursor-agent: IPC client failed to connect: {error}"),
+        }
     }
 }
 
@@ -284,6 +304,10 @@ fn handle_request(
         Request::ForgetDevice { peer_id } => services.forget_device(&peer_id),
         Request::AcceptPairing { peer_id } => services.accept_pairing(&peer_id),
         Request::RejectPairing { peer_id } => services.reject_pairing(&peer_id),
+        Request::ClearError => {
+            services.state.clear_error();
+            Ok(())
+        }
         Request::Quit => {
             crate::tray::quit();
             Ok(())

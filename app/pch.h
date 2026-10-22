@@ -4,6 +4,7 @@
 #include <restrictederrorinfo.h>
 #include <hstring.h>
 #include <sddl.h>
+#include <aclapi.h>
 #include <shellapi.h>
 #include <dwmapi.h>
 #include <ShellScalingApi.h>
@@ -13,6 +14,7 @@
 #undef GetCurrentTime
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <ctime>
 #include <format>

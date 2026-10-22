@@ -198,11 +198,17 @@ namespace winrt::LinkCursor::implementation
         ElevatedInputToggle().Toggled([weak](auto&&, auto&&)
         {
             auto self = weak.get();
-            if (!self || self->m_applying) return;
+            if (!self || self->m_applying || self->m_elevatedPending) return;
             bool on = self->ElevatedInputToggle().IsOn();
             self->ElevatedInputState().Text(on ? L"开" : L"关");
             self->ElevatedInputToggle().IsEnabled(false);
-            std::thread([weak, on]
+            // Snapshots leave the switch alone until this is over: it would
+            // flip back while UAC asks.
+            self->m_elevatedPending = true;
+            // The thread touches no window: only the dispatcher, which may
+            // be used from anywhere.
+            auto dispatcher = self->DispatcherQueue();
+            std::thread([dispatcher, weak, on]
             {
                 auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
                 std::wstring service = exe.get();
@@ -216,20 +222,22 @@ namespace winrt::LinkCursor::implementation
                 info.nShow = SW_HIDE;
                 if (ShellExecuteExW(&info) && info.hProcess)
                 {
+                    DWORD exitCode = 1;
                     WaitForSingleObject(info.hProcess, 10000);
+                    GetExitCodeProcess(info.hProcess, &exitCode);
                     CloseHandle(info.hProcess);
+                    // Changed: the input helper reads the setting every two
+                    // seconds; wait for it rather than show the old value.
+                    if (exitCode == 0) Sleep(2500);
                 }
-                if (auto self = weak.get())
+                dispatcher.TryEnqueue([weak]
                 {
-                    self->DispatcherQueue().TryEnqueue([weak]
-                    {
-                        auto self = weak.get();
-                        if (!self) return;
-                        self->ElevatedInputToggle().IsEnabled(true);
-                        // Back to what the agent reports, should nothing change.
-                        if (self->m_lastState) self->ApplySettings(self->m_lastState);
-                    });
-                }
+                    auto self = weak.get();
+                    if (!self || self->m_closed) return;
+                    self->m_elevatedPending = false;
+                    // What the agent reports, whatever happened.
+                    if (self->m_lastState) self->ApplySettings(self->m_lastState);
+                });
             }).detach();
         });
 
@@ -237,9 +245,19 @@ namespace winrt::LinkCursor::implementation
         {
             auto self = weak.get();
             if (!self || self->m_fingerprint.empty()) return;
-            Windows::ApplicationModel::DataTransfer::DataPackage package;
-            package.SetText(self->m_fingerprint);
-            Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+            try
+            {
+                Windows::ApplicationModel::DataTransfer::DataPackage package;
+                package.SetText(self->m_fingerprint);
+                Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+                // Still there after LinkCursor closes.
+                Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
+            }
+            catch (hresult_error const&)
+            {
+                // Another program holds the clipboard; the button can be
+                // clicked again.
+            }
         });
 
         CheckUpdateButton().Click([](auto&&, auto&&)
@@ -318,8 +336,11 @@ namespace winrt::LinkCursor::implementation
         // The input service: present only when installed.
         auto elevated = state.GetNamedObject(L"elevated_input", JsonObject{});
         bool elevatedAvailable = elevated.GetNamedBoolean(L"available", false);
-        SetSwitch(ElevatedInputToggle(), ElevatedInputState(), elevatedAvailable && elevated.GetNamedBoolean(L"enabled", false));
-        ElevatedInputToggle().IsEnabled(elevatedAvailable);
+        if (!m_elevatedPending)
+        {
+            SetSwitch(ElevatedInputToggle(), ElevatedInputState(), elevatedAvailable && elevated.GetNamedBoolean(L"enabled", false));
+            ElevatedInputToggle().IsEnabled(elevatedAvailable);
+        }
         ElevatedInputDescription().Text(elevatedAvailable
             ? L"其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。"
             : L"需要用安装包安装 LinkCursor：由随附的输入服务完成。");
@@ -389,9 +410,21 @@ namespace winrt::LinkCursor::implementation
             self->HotkeyHint().Text(valid || key == 0 ? L"" : L"需要包含 Ctrl、Alt 或 Win");
         });
 
-        HotkeyDialog().XamlRoot(Root().XamlRoot());
-        auto result = co_await HotkeyDialog().ShowAsync();
+        auto result = ContentDialogResult::None;
+        try
+        {
+            HotkeyDialog().XamlRoot(Root().XamlRoot());
+            result = co_await HotkeyDialog().ShowAsync();
+        }
+        catch (hresult_error const&)
+        {
+            // Another dialog is open (or still closing): nothing changes.
+        }
         HotkeyDialog().PreviewKeyDown(token);
+        if (m_closed)
+        {
+            co_return;
+        }
         if (result == ContentDialogResult::Primary && IsValidHotkey(m_newHotkeyModifiers, m_newHotkeyKey))
         {
             m_agent->UpdateSetting(L"lock_hotkey", HotkeyValue(m_newHotkeyModifiers, m_newHotkeyKey));

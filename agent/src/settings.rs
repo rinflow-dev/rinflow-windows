@@ -5,7 +5,6 @@
 use crate::identity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::fs;
 use std::sync::Mutex;
 
 /// `RegisterHotKey` modifier bits.
@@ -136,10 +135,7 @@ pub struct SettingsStore(Mutex<Settings>);
 
 impl SettingsStore {
     pub fn load() -> Self {
-        let settings: Settings = fs::read_to_string(path())
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default();
+        let settings: Settings = identity::read_json(&path()).unwrap_or_default();
         // A file edited by hand falls back to defaults for what is invalid.
         let settings = settings.merged(&Map::new()).unwrap_or_else(|_| Settings {
             clipboard: settings.clipboard,

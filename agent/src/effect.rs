@@ -6,7 +6,6 @@
 
 use crate::identity;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -97,9 +96,7 @@ pub struct EffectStore(Arc<RwLock<EffectParams>>);
 
 impl EffectStore {
     pub fn load() -> Self {
-        let params = fs::read_to_string(path())
-            .ok()
-            .and_then(|text| serde_json::from_str::<EffectParams>(&text).ok())
+        let params = crate::identity::read_json::<EffectParams>(&path())
             .unwrap_or_default()
             .sanitized();
         Self(Arc::new(RwLock::new(params)))

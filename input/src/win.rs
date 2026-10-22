@@ -6,11 +6,12 @@ use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, LocalFree};
 use windows_sys::Win32::Security::Authorization::{
-    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
+    SDDL_REVISION_1, SE_KERNEL_OBJECT,
 };
 use windows_sys::Win32::Security::{
-    GetTokenInformation, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
-    TokenUser,
+    GetTokenInformation, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+    SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows_sys::Win32::System::Registry::{
     HKEY, HKEY_LOCAL_MACHINE, KEY_SET_VALUE, KEY_WOW64_64KEY, REG_DWORD, REG_OPTION_NON_VOLATILE,
@@ -103,13 +104,18 @@ pub fn is_sibling_process(pid: u32, exe: &str) -> bool {
     same && process_session(pid) == Some(current_session())
 }
 
-/// SID string of the user signed in to `session`; the user running this
-/// process when that is not possible (not LocalSystem: a development run).
+/// SID string of the user signed in to `session`. As LocalSystem, an error
+/// while nobody is signed in there (the sign-in screen). Not as LocalSystem
+/// (a development run), the user running this process.
 pub fn session_user_sid(session: u32) -> io::Result<String> {
     let mut token: HANDLE = null_mut();
     // SAFETY: needs SeTcbPrivilege (LocalSystem); the handle is closed below.
     let from_session = unsafe { WTSQueryUserToken(session, &mut token) } != 0;
     if !from_session {
+        let error = io::Error::last_os_error();
+        if is_local_system() {
+            return Err(error);
+        }
         // SAFETY: the pseudo-handle of this process needs no cleanup.
         if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
             return Err(io::Error::last_os_error());
@@ -117,6 +123,40 @@ pub fn session_user_sid(session: u32) -> io::Result<String> {
     }
     let token = Handle(token);
     token_user_sid(token.0)
+}
+
+/// SID string of a kernel object's owner, read through `object`'s handle
+/// (opened with `READ_CONTROL`).
+pub fn object_owner_sid(object: &impl std::os::windows::io::AsRawHandle) -> io::Result<String> {
+    let mut owner: PSID = null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+    // SAFETY: an open handle; `owner` points into `descriptor`, freed below.
+    let status = unsafe {
+        GetSecurityInfo(
+            object.as_raw_handle(),
+            SE_KERNEL_OBJECT,
+            OWNER_SECURITY_INFORMATION,
+            &mut owner,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    let sid = sid_string(owner);
+    // SAFETY: allocated by GetSecurityInfo.
+    unsafe { LocalFree(descriptor) };
+    sid
+}
+
+/// LocalSystem, or the Administrators group (the default owner LocalSystem
+/// gives its objects): only an elevated or system process can make either
+/// the owner.
+pub fn is_privileged_owner(sid: &str) -> bool {
+    sid == "S-1-5-18" || sid == "S-1-5-32-544"
 }
 
 fn token_user_sid(token: HANDLE) -> io::Result<String> {
@@ -140,9 +180,14 @@ fn token_user_sid(token: HANDLE) -> io::Result<String> {
     }
     // SAFETY: GetTokenInformation filled the buffer with a TOKEN_USER.
     let user = unsafe { &*(buffer.as_ptr() as *const TOKEN_USER) };
+    // The SID points into `buffer`, which is still alive.
+    sid_string(user.User.Sid)
+}
+
+fn sid_string(sid: PSID) -> io::Result<String> {
     let mut text = null_mut();
-    // SAFETY: the SID points into `buffer`, which is still alive.
-    if unsafe { ConvertSidToStringSidW(user.User.Sid, &mut text) } == 0 {
+    // SAFETY: the caller passes a valid SID.
+    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
         return Err(io::Error::last_os_error());
     }
     let mut length = 0;

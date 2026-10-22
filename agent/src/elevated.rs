@@ -146,9 +146,18 @@ async fn keep_connected(
     }
 }
 
-/// The pipe's server is `linkcursor-input.exe` from this folder, in this
-/// session (installed together, where only administrators can write).
+/// The pipe belongs to LinkCursor's helper: it was created by LocalSystem
+/// (its owner says so; only a system or elevated process can make that the
+/// owner), as the installed helper does. A development run of the helper,
+/// as this user, must be `linkcursor-input.exe` from this folder in this
+/// session. (This process cannot look into a LocalSystem process, so the
+/// first check is the one that works when installed.)
 fn is_helper(pipe: &NamedPipeClient) -> bool {
+    if linkcursor_input::win::object_owner_sid(pipe)
+        .is_ok_and(|owner| linkcursor_input::win::is_privileged_owner(&owner))
+    {
+        return true;
+    }
     let mut pid = 0;
     // SAFETY: a connected pipe handle of this process.
     let known = unsafe { GetNamedPipeServerProcessId(pipe.as_raw_handle(), &mut pid) } != 0;

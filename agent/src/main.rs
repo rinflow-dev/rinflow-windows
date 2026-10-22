@@ -27,6 +27,8 @@ use services::Services;
 use std::sync::{Arc, OnceLock};
 
 const INSTANCE_MUTEX: &str = "Local\\LinkCursor.Agent";
+/// Pairing requests open the main window at most this often.
+const PAIRING_WINDOW_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
 fn main() {
     // `--launch-at-login on|off`: the installer turns starting at sign-in on
@@ -131,6 +133,7 @@ fn main() {
     // so nothing can be revoked either.
     let edge_slot = Arc::new(OnceLock::<edge::EdgeHandle>::new());
     let edge_events = edge_slot.clone();
+    let window_opened = std::sync::Mutex::new(None::<std::time::Instant>);
     let core = match Core::start(
         config,
         move |json| {
@@ -139,9 +142,15 @@ fn main() {
                 events.set_paired_peers(paired_ids(&trust_events));
             }
             // A device asks to pair: bring the main window up, where the
-            // code shows.
-            if json.contains("\"pairing_requested\"") {
-                tray::open_app(&[]);
+            // code shows. Off the core's event thread, and at most every few
+            // seconds: a device asking over and over must not start a stream
+            // of processes.
+            if json.contains("\"pairing_requested\"")
+                && let Ok(mut opened) = window_opened.lock()
+                && opened.is_none_or(|at| at.elapsed() >= PAIRING_WINDOW_INTERVAL)
+            {
+                *opened = Some(std::time::Instant::now());
+                std::thread::spawn(|| tray::open_app(&[]));
             }
             layout_events.core_event(&json);
             control.core_event(&json);
@@ -158,6 +167,8 @@ fn main() {
             return;
         }
     };
+    // Offered files are decided from the core's first events on.
+    clipboard.set_core(Arc::downgrade(&core));
     // Sharing paused in the settings: peers may not drive this PC either.
     if !preferences.sharing {
         let _ = core.set_remote_control_allowed(false);
@@ -238,6 +249,10 @@ fn main() {
     if let Err(error) = tray::run() {
         eprintln!("linkcursor-agent: tray failed: {error}");
     }
+    // An open settings app learns that the user quit, and quits too rather
+    // than starting the agent again.
+    services.state.set_quitting();
+    std::thread::sleep(std::time::Duration::from_millis(150));
 
     let _ = services.set_effect_demo(false);
     // Gives back the keyboard and mouse if a peer is being driven.

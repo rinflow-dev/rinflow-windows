@@ -9,6 +9,7 @@
 #include "MainWindow.g.cpp"
 #endif
 #include "PeerItem.h"
+#include "AppShell.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -25,11 +26,12 @@ namespace
     constexpr bool DevelopmentBuild = false;
 #endif
 
-    // What a row shows, to skip rebuilding rows that did not change.
+    // What a row shows, to skip rebuilding rows that did not change. The
+    // latency changes all the time and is updated in place instead.
     std::wstring RowSignature(LinkCursor::PeerItem const& row)
     {
         std::wstring signature;
-        for (auto const& part : { row.Id(), row.Name(), row.Detail(), row.Glyph(), row.Latency(), row.StatusText() })
+        for (auto const& part : { row.Id(), row.Name(), row.Detail(), row.Glyph(), row.StatusText() })
         {
             signature += part;
             signature += L'\x1f';
@@ -54,9 +56,15 @@ namespace
         {
             for (uint32_t i = 0; i < rows.size(); ++i)
             {
-                if (RowSignature(target.GetAt(i).as<LinkCursor::PeerItem>()) != RowSignature(rows[i]))
+                auto current = target.GetAt(i).as<LinkCursor::PeerItem>();
+                if (RowSignature(current) != RowSignature(rows[i]))
                 {
                     target.SetAt(i, rows[i]);
+                }
+                else
+                {
+                    // An open menu or the pointer over the row stays put.
+                    current.Latency(rows[i].Latency());
                 }
             }
             return;
@@ -88,14 +96,14 @@ namespace winrt::LinkCursor::implementation
             {
                 dispatcher.TryEnqueue([weak, message]
                 {
-                    if (auto self = weak.get()) self->ApplyMessage(message);
+                    if (auto self = weak.get(); self && !self->m_closed) self->ApplyMessage(message);
                 });
             },
             [dispatcher, weak](bool linked)
             {
                 dispatcher.TryEnqueue([weak, linked]
                 {
-                    if (auto self = weak.get()) self->SetAgentLinked(linked);
+                    if (auto self = weak.get(); self && !self->m_closed) self->SetAgentLinked(linked);
                 });
             });
 
@@ -119,10 +127,19 @@ namespace winrt::LinkCursor::implementation
             if (auto self = weak.get()) self->ShowPage(Page::Effect);
         });
 
+        ErrorBar().CloseButtonClick([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self) return;
+            if (self->m_errorFromAgent) self->m_agent->ClearError();
+            self->m_errorFromAgent = false;
+        });
+
         Closed([weak](auto&&, auto&&)
         {
             auto self = weak.get();
             if (!self) return;
+            self->m_closed = true;
             // 关闭窗口时保留在托盘 off: closing the window quits LinkCursor.
             if (!self->m_keepInTray)
             {
@@ -180,8 +197,24 @@ namespace winrt::LinkCursor::implementation
             return;
         }
         m_addDeviceOpen = true;
-        AddDeviceDialog().XamlRoot(Root().XamlRoot());
-        AddDeviceDialog().ShowAsync();
+        // Another dialog (pairing, the shortcut) may still be closing: then
+        // it does not open, and the button works again.
+        auto failed = [weak = get_weak()]
+        {
+            if (auto self = weak.get()) self->m_addDeviceOpen = false;
+        };
+        try
+        {
+            AddDeviceDialog().XamlRoot(Root().XamlRoot());
+            AddDeviceDialog().ShowAsync().Completed([failed](auto const&, Windows::Foundation::AsyncStatus status)
+            {
+                if (status == Windows::Foundation::AsyncStatus::Error) failed();
+            });
+        }
+        catch (hresult_error const&)
+        {
+            failed();
+        }
     }
 
     void MainWindow::OnConnectDevice(Windows::Foundation::IInspectable const& sender, RoutedEventArgs const&)
@@ -257,12 +290,19 @@ namespace winrt::LinkCursor::implementation
             confirm.CloseButtonText(L"取消");
             confirm.DefaultButton(ContentDialogButton::Close);
             auto weak = self.get_weak();
-            auto operation = confirm.ShowAsync();
-            operation.Completed([weak, peerId](auto const& result, auto&&)
+            try
             {
-                if (result.GetResults() != ContentDialogResult::Primary) return;
-                if (auto self = weak.get()) self->m_agent->ForgetDevice(peerId);
-            });
+                // Not shown while another dialog is open (or closing).
+                confirm.ShowAsync().Completed([weak, peerId](auto const& result, Windows::Foundation::AsyncStatus status)
+                {
+                    if (status != Windows::Foundation::AsyncStatus::Completed
+                        || result.GetResults() != ContentDialogResult::Primary) return;
+                    if (auto self = weak.get(); self && !self->m_closed) self->m_agent->ForgetDevice(peerId);
+                });
+            }
+            catch (hresult_error const&)
+            {
+            }
         });
         return menu;
     }
@@ -280,15 +320,28 @@ namespace winrt::LinkCursor::implementation
         }
         else if (type == L"error")
         {
-            ShowError(message.GetNamedString(L"message", L""));
+            // A request failed: shown until closed or replaced.
+            ShowError(message.GetNamedString(L"message", L""), false);
         }
     }
 
     void MainWindow::ApplyState(JsonObject const& state)
     {
+        // The user quit LinkCursor (the agent's tray): every window goes too.
+        if (state.GetNamedBoolean(L"quitting", false))
+        {
+            LinkCursorApp::QuitApp();
+            return;
+        }
         m_localName = state.GetNamedString(L"device_name", L"LinkCursor");
         m_deviceId = state.GetNamedString(L"device_id", L"");
-        ShowError(state.GetNamedString(L"last_error", L""));
+        auto error = state.GetNamedString(L"last_error", L"");
+        if (error != m_agentError)
+        {
+            m_agentError = error;
+            if (!error.empty()) ShowError(error, true);
+            else if (m_errorFromAgent) ShowError(L"", true);
+        }
         ApplySettings(state);
         ApplyDevices(state);
         ApplyLayout(state);
@@ -374,11 +427,16 @@ namespace winrt::LinkCursor::implementation
             // A restarted agent may have different values; reload them.
             m_effectRevision = -1;
             m_layoutSignature.clear();
+            m_agentError = L"";
+            // A preview asked of the agent that went away is never answered.
+            m_previewPending = false;
+            m_previewQueued = false;
         }
     }
 
-    void MainWindow::ShowError(hstring const& message)
+    void MainWindow::ShowError(hstring const& message, bool fromAgent)
     {
+        m_errorFromAgent = fromAgent && !message.empty();
         ErrorBar().Message(message);
         ErrorBar().IsOpen(!message.empty());
     }

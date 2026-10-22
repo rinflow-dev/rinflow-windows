@@ -14,7 +14,6 @@ use linkcursor_core::layout::{self, Display, Offset, Portal};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::fs;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default, Serialize, Deserialize)]
@@ -67,10 +66,7 @@ struct Inner {
 
 impl Arrangement {
     pub fn load(state: SharedState, monitors: Vec<Monitor>) -> Arc<Self> {
-        let saved = fs::read_to_string(path())
-            .ok()
-            .and_then(|text| serde_json::from_str::<Saved>(&text).ok())
-            .unwrap_or_default();
+        let saved = identity::read_json::<Saved>(&path()).unwrap_or_default();
         let arrangement = Arc::new(Self {
             inner: Mutex::new(Inner {
                 saved,

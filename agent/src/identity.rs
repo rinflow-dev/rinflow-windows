@@ -31,9 +31,36 @@ pub fn data_directory() -> PathBuf {
 /// Replaces a settings file without ever leaving it half written: a crash or
 /// power loss mid-write would otherwise make it unreadable and lose it.
 pub fn write_file(path: &std::path::Path, text: &str) -> io::Result<()> {
+    use std::io::Write;
     let temporary = path.with_extension("tmp");
-    fs::write(&temporary, text)?;
+    {
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(text.as_bytes())?;
+        // On disk before it replaces the old file, not only in the cache.
+        file.sync_all()?;
+    }
     fs::rename(&temporary, path)
+}
+
+/// Reads a JSON settings file; `None` when there is none. One that cannot be
+/// read is moved aside to `<name>.corrupt` and the defaults are used, so the
+/// next save does not overwrite what may still be recovered by hand.
+pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Option<T> {
+    let bytes = fs::read(path).ok()?;
+    match serde_json::from_slice(&bytes) {
+        Ok(value) => Some(value),
+        Err(error) => {
+            let mut aside = path.as_os_str().to_owned();
+            aside.push(".corrupt");
+            eprintln!(
+                "linkcursor-agent: {} is unreadable ({error}); kept as {} and using defaults",
+                path.display(),
+                std::path::Path::new(&aside).display()
+            );
+            let _ = fs::rename(path, &aside);
+            None
+        }
+    }
 }
 
 fn load_or_create_device_id(directory: &std::path::Path) -> io::Result<String> {
@@ -45,6 +72,6 @@ fn load_or_create_device_id(directory: &std::path::Path) -> io::Result<String> {
         }
     }
     let id = win::new_guid_string()?;
-    fs::write(&path, &id)?;
+    write_file(&path, &id)?;
     Ok(id)
 }

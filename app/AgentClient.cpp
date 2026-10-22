@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 10;
+    constexpr int ProtocolVersion = 11;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
@@ -163,7 +163,13 @@ namespace LinkCursorApp
 
     void AgentClient::Quit()
     {
+        m_agentQuit = true;
         Send(Request(L"quit"));
+    }
+
+    void AgentClient::ClearError()
+    {
+        Send(Request(L"clear_error"));
     }
 
     void AgentClient::AcceptPairing(std::wstring_view peerId)
@@ -208,13 +214,23 @@ namespace LinkCursorApp
     bool AgentClient::Open()
     {
         // Overlapped I/O lets the reader thread block in ReadFile while the
-        // UI thread writes; synchronous handles would serialize the two.
+        // UI thread writes; synchronous handles would serialize the two. The
+        // server may identify this user but not act as it.
         HANDLE pipe = CreateFileW(m_pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-            OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+            OPEN_EXISTING, FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, nullptr);
         if (pipe != INVALID_HANDLE_VALUE)
         {
+            wil::unique_hfile opened{ pipe };
+            if (!IsAgentPipe(opened.get()))
+            {
+                OutputDebugStringW(L"LinkCursor: the agent pipe belongs to another user; not using it\n");
+                WaitOrStop(2000);
+                return false;
+            }
             std::lock_guard lock(m_pipeLock);
-            m_pipe.reset(pipe);
+            m_pipe = std::move(opened);
+            // Answered: should it go away later (not quit), start it again.
+            m_agentLaunched = false;
             return true;
         }
 
@@ -226,7 +242,7 @@ namespace LinkCursorApp
         case ERROR_FILE_NOT_FOUND:
             // Launch once; after that keep retrying while the agent starts
             // or while the user restarts it from the tray.
-            if (!m_agentLaunched)
+            if (!m_agentLaunched && !m_agentQuit)
             {
                 m_agentLaunched = true;
                 LaunchAgent();
@@ -234,6 +250,22 @@ namespace LinkCursorApp
             break;
         }
         return false;
+    }
+
+    bool AgentClient::IsAgentPipe(HANDLE pipe)
+    {
+        // The agent creates the pipe as this user (or, run as administrator,
+        // owned by Administrators); a pipe another user created first is not
+        // the agent.
+        PSID owner = nullptr;
+        wil::unique_hlocal_security_descriptor descriptor;
+        if (GetSecurityInfo(pipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr,
+                descriptor.put()) != ERROR_SUCCESS || !owner)
+        {
+            return false;
+        }
+        auto user = wil::get_token_information<TOKEN_USER>();
+        return EqualSid(owner, user->User.Sid) || IsWellKnownSid(owner, WinBuiltinAdministratorsSid);
     }
 
     void AgentClient::LaunchAgent()
@@ -287,6 +319,12 @@ namespace LinkCursorApp
                 JsonObject message{ nullptr };
                 if (JsonObject::TryParse(winrt::to_hstring(std::string_view(buffer).substr(0, newline)), message))
                 {
+                    // The user quit LinkCursor: the agent is not started
+                    // again when its pipe closes in a moment.
+                    if (message.GetNamedBoolean(L"quitting", false))
+                    {
+                        m_agentQuit = true;
+                    }
                     m_onMessage(message);
                 }
                 buffer.erase(0, newline + 1);

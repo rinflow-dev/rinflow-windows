@@ -153,6 +153,107 @@ pub fn new_guid_string() -> io::Result<String> {
     ))
 }
 
+/// Whether the desktop with input is the user's own (`Default`): false while
+/// the lock screen, a UAC prompt or the Ctrl+Alt+Del screen has it, which a
+/// normal process cannot even open.
+pub fn input_desktop_is_default() -> bool {
+    use windows_sys::Win32::System::StationsAndDesktops::{
+        CloseDesktop, DESKTOP_READOBJECTS, GetUserObjectInformationW, OpenInputDesktop, UOI_NAME,
+    };
+    // SAFETY: opened to read its name, closed below.
+    let desktop = unsafe { OpenInputDesktop(0, 0, DESKTOP_READOBJECTS) };
+    if desktop.is_null() {
+        return false;
+    }
+    let mut name = [0u16; 64];
+    let mut needed = 0;
+    // SAFETY: `name` is large enough for desktop names; its size is given.
+    let read = unsafe {
+        GetUserObjectInformationW(
+            desktop,
+            UOI_NAME,
+            name.as_mut_ptr().cast(),
+            size_of_val(&name) as u32,
+            &mut needed,
+        )
+    } != 0;
+    // SAFETY: the handle opened above.
+    unsafe { CloseDesktop(desktop) };
+    let length = name.iter().position(|&unit| unit == 0).unwrap_or(0);
+    read && String::from_utf16_lossy(&name[..length]).eq_ignore_ascii_case("Default")
+}
+
+/// Whether the foreground window belongs to a process running at a higher
+/// integrity level than this one (an elevated program): Windows then keeps
+/// its keyboard input from this process's low-level hook.
+pub fn foreground_is_elevated() -> bool {
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId,
+    };
+    // SAFETY: plain window queries.
+    let pid = unsafe {
+        let window = GetForegroundWindow();
+        if window.is_null() {
+            return false;
+        }
+        let mut pid = 0;
+        GetWindowThreadProcessId(window, &mut pid);
+        pid
+    };
+    if pid == 0 || pid == std::process::id() {
+        return false;
+    }
+    // SAFETY: a query-only handle, closed by `OwnedHandle`.
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if process.is_null() {
+        return false;
+    }
+    let process = OwnedHandle(process);
+    let theirs = integrity_level(process.0);
+    // SAFETY: the pseudo-handle of this process needs no cleanup.
+    let ours = integrity_level(unsafe { GetCurrentProcess() });
+    matches!((theirs, ours), (Some(theirs), Some(ours)) if theirs > ours)
+}
+
+/// The integrity level RID of a process (0x2000 medium, 0x3000 high).
+fn integrity_level(process: HANDLE) -> Option<u32> {
+    use windows_sys::Win32::Security::{
+        GetSidSubAuthority, GetSidSubAuthorityCount, TOKEN_MANDATORY_LABEL, TokenIntegrityLevel,
+    };
+    let mut token: HANDLE = null_mut();
+    // SAFETY: a query-only token handle, closed by `OwnedHandle`.
+    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
+        return None;
+    }
+    let token = OwnedHandle(token);
+    let mut length = 0u32;
+    // SAFETY: a null buffer queries the required size.
+    unsafe { GetTokenInformation(token.0, TokenIntegrityLevel, null_mut(), 0, &mut length) };
+    let mut buffer = vec![0u64; (length as usize).div_ceil(8)];
+    // SAFETY: `buffer` holds at least `length` bytes.
+    if unsafe {
+        GetTokenInformation(
+            token.0,
+            TokenIntegrityLevel,
+            buffer.as_mut_ptr().cast(),
+            length,
+            &mut length,
+        )
+    } == 0
+    {
+        return None;
+    }
+    // SAFETY: filled with a TOKEN_MANDATORY_LABEL whose SID points into
+    // `buffer`; its last sub-authority is the level.
+    unsafe {
+        let label = &*(buffer.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+        let sid = label.Label.Sid;
+        let count = *GetSidSubAuthorityCount(sid);
+        (count > 0).then(|| *GetSidSubAuthority(sid, u32::from(count) - 1))
+    }
+}
+
 /// Security attributes that let only the given user and LocalSystem open the
 /// pipe. LocalSystem is kept for the future service that relaunches the agent.
 pub struct PipeSecurity {

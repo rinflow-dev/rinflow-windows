@@ -360,7 +360,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":10}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":11}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -372,6 +372,7 @@ App → agent:
 | `{"type":"forget_device","peer_id":"…"}` | Disconnect, unplace, unpair and stop listing a device. |
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
 | `{"type":"reject_pairing","peer_id":"…"}` | The user declined the pairing; the connection closes. |
+| `{"type":"clear_error"}` | The user closed the error bar: `last_error` is cleared. |
 | `{"type":"quit"}` | Quit the agent, as the tray's 退出. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
@@ -382,7 +383,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":10,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":11,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
@@ -395,7 +396,8 @@ A `state` message looks like this:
   - `displays` are this PC's monitors.
   - `devices` lists every known peer, online or not. Each has its `displays` in its own space (a default 1440 × 900 until it describes them), its `offset` in this PC's space (`null` while not placed), the `side` of this PC it touches, `remembered` (connected at least once, or placed: one of the user's devices) and `last_seen_ms` (Unix milliseconds).
 - `settings` holds the [Settings](#settings); `launch_at_login`, `control_port` (the port in use now), `locked` (the lock shortcut is on) and `agent_version` sit beside it.
-- `last_error` is omitted when there is none. A session the user or the peer ended normally does not set it.
+- `last_error` is omitted when there is none. A session the user or the peer ended normally does not set it, nor do file transfers that were declined or replaced by a newer copy. The app shows it when it changes, and `clear_error` removes it once the user closes it.
+- `quitting` turns true just before the agent exits because the user quit LinkCursor: the app closes too and does not start the agent again.
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
 - `demo_side` is `local` or `remote` while the demo runs.

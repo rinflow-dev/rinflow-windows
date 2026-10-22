@@ -38,6 +38,12 @@ namespace
             {
                 return 0;
             }
+            // Taken only by an app that stays: one about to exit says no, and
+            // the launch waits to become the app itself.
+            if (!s_app->AcceptRequest())
+            {
+                return 0;
+            }
             std::wstring request(static_cast<wchar_t const*>(data->lpData), data->cbData / sizeof(wchar_t) - 1);
             // Handled after this message: the sender is waiting, and windows
             // are better not opened from inside a sent message.
@@ -105,6 +111,18 @@ namespace winrt::LinkCursor::implementation
         Launch(commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray" : L"main");
     }
 
+    bool App::AcceptRequest()
+    {
+        if (m_shuttingDown)
+        {
+            return false;
+        }
+        // The window this request opens comes after this message; the app
+        // must not end in between.
+        if (m_exitTimer) m_exitTimer.Stop();
+        return true;
+    }
+
     void App::Launch(std::wstring_view request)
     {
         if (m_shuttingDown)
@@ -119,6 +137,8 @@ namespace winrt::LinkCursor::implementation
         {
             ShowMain(false);
         }
+        // The click that closed the panel opens nothing: end as usual.
+        ExitWhenIdle();
     }
 
     void App::ShowMain(bool settings)

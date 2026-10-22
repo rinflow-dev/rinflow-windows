@@ -4,7 +4,9 @@ namespace LinkCursor
     // panel. Rows are rebuilt from every agent state snapshot. Colours stay
     // in XAML (ThemeResource), so rows only say which parts show.
     // (MIDL reads this file in the system code page: keep it ASCII.)
-    runtimeclass PeerItem
+    // Latency changes in place (PropertyChanged); everything else replaces
+    // the row.
+    runtimeclass PeerItem : Microsoft.UI.Xaml.Data.INotifyPropertyChanged
     {
         PeerItem(String id, String name, String detail, String glyph);
 

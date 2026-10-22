@@ -19,7 +19,13 @@ namespace winrt::LinkCursor::implementation
         hstring Glyph() const { return m_glyph; }
 
         hstring Latency() const { return m_latency; }
-        void Latency(hstring const& value) { m_latency = value; }
+        void Latency(hstring const& value)
+        {
+            if (m_latency == value) return;
+            m_latency = value;
+            Changed(L"Latency");
+            Changed(L"LatencyVisibility");
+        }
         hstring StatusText() const { return m_statusText; }
         void StatusText(hstring const& value) { m_statusText = value; }
         bool IsConnected() const { return m_connected; }
@@ -35,8 +41,20 @@ namespace winrt::LinkCursor::implementation
         Visibility ConnectVisibility() const { return Show(m_canConnect); }
         double ContentOpacity() const { return m_offline ? 0.55 : 1.0; }
 
+        event_token PropertyChanged(Microsoft::UI::Xaml::Data::PropertyChangedEventHandler const& handler)
+        {
+            return m_propertyChanged.add(handler);
+        }
+        void PropertyChanged(event_token const& token) noexcept { m_propertyChanged.remove(token); }
+
     private:
         static Visibility Show(bool visible) { return visible ? Visibility::Visible : Visibility::Collapsed; }
+        void Changed(wchar_t const* name)
+        {
+            m_propertyChanged(*this, Microsoft::UI::Xaml::Data::PropertyChangedEventArgs{ name });
+        }
+
+        event<Microsoft::UI::Xaml::Data::PropertyChangedEventHandler> m_propertyChanged;
 
         hstring m_id;
         hstring m_name;

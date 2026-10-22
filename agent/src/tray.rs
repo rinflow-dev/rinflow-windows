@@ -15,22 +15,28 @@ use windows_sys::Win32::Graphics::Gdi::{CreateBitmap, DeleteObject};
 use windows_sys::Win32::System::Console::{CTRL_CLOSE_EVENT, SetConsoleCtrlHandler};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::{
-    NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY,
+    NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreateIconIndirect, CreatePopupMenu,
     CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
-    GetMessageW, GetSystemMetrics, HICON, ICONINFO, IDI_APPLICATION, LoadIconW, MF_SEPARATOR,
-    MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
-    SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
-    WS_OVERLAPPED,
+    GetMessageW, GetSystemMetrics, HICON, ICONINFO, IDI_APPLICATION, KillTimer, LoadIconW,
+    MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SM_CXSMICON, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
+    WM_LBUTTONUP, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
 const TRAY_ID: u32 = 1;
 const MENU_OPEN: usize = 1;
 const MENU_QUIT: usize = 2;
+/// Retries adding the icon: Explorer may not take it yet (busy at sign-in,
+/// or restarting). The agent works on meanwhile.
+const ICON_RETRY_TIMER: usize = 1;
+/// Notifications of one kind no more often than this.
+const NOTIFY_INTERVAL: Duration = Duration::from_secs(15);
 
 /// Explorer broadcasts this after it restarts; the icon must be re-added.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
@@ -46,6 +52,42 @@ pub fn quit() -> bool {
     }
     // SAFETY: posts to this process's tray window; harmless if it is gone.
     unsafe { PostMessageW(window as HWND, WM_CLOSE, 0, 0) != 0 }
+}
+
+/// Shows a notification from the tray icon, at most once per
+/// [`NOTIFY_INTERVAL`] for the same `title`. Any thread.
+pub fn notify(title: &str, text: &str) {
+    static LAST: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
+        std::sync::Mutex::new(Vec::new());
+    let window = WINDOW.load(Ordering::Acquire);
+    if window == 0 {
+        return;
+    }
+    if let Ok(mut last) = LAST.lock() {
+        let now = std::time::Instant::now();
+        last.retain(|(_, at)| now.duration_since(*at) < NOTIFY_INTERVAL);
+        if last.iter().any(|(shown, _)| shown == title) {
+            return;
+        }
+        last.push((title.to_owned(), now));
+    }
+    let mut data = icon_data(window as HWND);
+    data.uFlags = NIF_INFO;
+    data.dwInfoFlags = NIIF_INFO;
+    for (slot, unit) in data
+        .szInfoTitle
+        .iter_mut()
+        .zip(title.encode_utf16().take(63))
+    {
+        *slot = unit;
+    }
+    for (slot, unit) in data.szInfo.iter_mut().zip(text.encode_utf16().take(255)) {
+        *slot = unit;
+    }
+    // SAFETY: `data` names this process's icon; only the balloon changes.
+    unsafe {
+        Shell_NotifyIconW(NIM_MODIFY, &data);
+    }
 }
 
 /// Debug builds run in a console (`make run`, `cargo run`): Ctrl+C and
@@ -102,8 +144,14 @@ pub fn run() -> io::Result<()> {
         if window.is_null() {
             return Err(io::Error::last_os_error());
         }
+        // Explorer may not take the icon yet (busy at sign-in, restarting):
+        // keep trying instead of giving up on LinkCursor altogether.
         if !add_icon(window) {
-            return Err(io::Error::last_os_error());
+            eprintln!(
+                "linkcursor-agent: no tray icon yet ({}); trying again",
+                io::Error::last_os_error()
+            );
+            SetTimer(window, ICON_RETRY_TIMER, 2000, None);
         }
         WINDOW.store(window as isize, Ordering::Release);
         SetConsoleCtrlHandler(Some(console_control), 1);
@@ -140,8 +188,18 @@ unsafe extern "system" fn window_proc(
             }
             0
         }
+        WM_TIMER if wparam == ICON_RETRY_TIMER => {
+            if add_icon(window) {
+                // SAFETY: this window's own timer.
+                unsafe { KillTimer(window, ICON_RETRY_TIMER) };
+            }
+            0
+        }
         _ if message == TASKBAR_CREATED.load(Ordering::Relaxed) && message != 0 => {
-            add_icon(window);
+            if !add_icon(window) {
+                // SAFETY: this window's own timer.
+                unsafe { SetTimer(window, ICON_RETRY_TIMER, 2000, None) };
+            }
             0
         }
         // SAFETY: default handling for everything else.

@@ -69,8 +69,79 @@ impl Shared {
 enum Job {
     Input(RawInput),
     MoveBy(i32, i32),
+    /// The agent went away: release whatever it left pressed.
+    ReleaseAll,
     /// Log how many events were played so far.
     Report,
+}
+
+/// Keys and buttons played down and not up yet, so they can be released if
+/// the agent goes away in between (its key-ups would never come).
+#[derive(Default)]
+struct Held {
+    /// (virtual key, scan code, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_SCANCODE)
+    keys: std::collections::HashSet<(u16, u16, u32)>,
+    /// MOUSEEVENTF_*UP flags (with their `mouseData`) that would release
+    /// each button down.
+    buttons: std::collections::HashSet<(u32, u32)>,
+}
+
+impl Held {
+    fn note(&mut self, input: RawInput) {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE,
+            MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+            MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP,
+        };
+        match input {
+            RawInput::Key { vk, scan, flags } if flags & KEYEVENTF_UNICODE == 0 => {
+                let key = (
+                    vk,
+                    scan,
+                    flags & (KEYEVENTF_EXTENDEDKEY | KEYEVENTF_SCANCODE),
+                );
+                if flags & KEYEVENTF_KEYUP != 0 {
+                    self.keys.remove(&key);
+                } else {
+                    self.keys.insert(key);
+                }
+            }
+            RawInput::Mouse { data, flags, .. } => {
+                for (down, up) in [
+                    (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+                    (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+                    (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+                    (MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP),
+                ] {
+                    let data = if down == MOUSEEVENTF_XDOWN { data } else { 0 };
+                    if flags & down != 0 {
+                        self.buttons.insert((up, data));
+                    }
+                    if flags & up != 0 {
+                        self.buttons.remove(&(up, data));
+                    }
+                }
+            }
+            RawInput::Key { .. } => {}
+        }
+    }
+
+    /// The events that release everything held.
+    fn releases(&mut self) -> Vec<RawInput> {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_KEYUP;
+        let keys = self.keys.drain().map(|(vk, scan, flags)| RawInput::Key {
+            vk,
+            scan,
+            flags: flags | KEYEVENTF_KEYUP,
+        });
+        let buttons = self.buttons.drain().map(|(up, data)| RawInput::Mouse {
+            dx: 0,
+            dy: 0,
+            data,
+            flags: up,
+        });
+        keys.chain(buttons).collect()
+    }
 }
 
 fn main() {
@@ -109,9 +180,16 @@ fn main() {
             return;
         }
     };
+    // At the sign-in screen this fails every few seconds until someone signs
+    // in; said once.
+    let mut last_error = String::new();
     loop {
         if let Err(error) = runtime.block_on(serve(session, &shared, &jobs, &state)) {
-            log!("pipe server failed: {error}; trying again");
+            let error = error.to_string();
+            if error != last_error {
+                log!("pipe server: {error}; trying again");
+                last_error = error;
+            }
         }
         std::thread::sleep(Duration::from_secs(5));
     }
@@ -200,10 +278,25 @@ fn spawn_injector(shared: Arc<Shared>) -> std::sync::mpsc::Sender<Job> {
         let mut desktop = ThreadDesktop::default();
         let mut played = 0u64;
         let mut failing = false;
+        let mut held = Held::default();
         while let Ok(job) = receiver.recv() {
             if matches!(job, Job::Report) {
                 log!("played {played} events");
                 continue;
+            }
+            if matches!(job, Job::ReleaseAll) {
+                let releases = held.releases();
+                if !releases.is_empty() {
+                    log!("releasing {} keys and buttons left down", releases.len());
+                    desktop.follow(&shared, true);
+                    for release in releases {
+                        play(&Job::Input(release));
+                    }
+                }
+                continue;
+            }
+            if let Job::Input(raw) = job {
+                held.note(raw);
             }
             if !shared.allowed() {
                 continue;
@@ -231,7 +324,7 @@ fn spawn_injector(shared: Arc<Shared>) -> std::sync::mpsc::Sender<Job> {
 /// Plays one job on this thread's desktop; false if that failed.
 fn play(job: &Job) -> bool {
     let input = match *job {
-        Job::Report => return true,
+        Job::Report | Job::ReleaseAll => return true,
         Job::Input(raw) => raw,
         Job::MoveBy(dx, dy) => {
             let mut cursor = POINT { x: 0, y: 0 };
@@ -303,10 +396,15 @@ async fn serve(
     state: &watch::Receiver<State>,
 ) -> std::io::Result<()> {
     let name = pipe_name(session);
+    // Nobody signed in yet (the sign-in screen): try again later; the
+    // service also starts a new helper when someone signs in.
     let user = win::session_user_sid(session)?;
-    // LocalSystem and the session's user, nobody else; not across the
-    // network either (`reject_remote_clients`).
-    let sddl = format!("D:P(A;;GA;;;SY)(A;;GRGW;;;{user})");
+    // Owned by LocalSystem (the agent checks), open to LocalSystem and the
+    // session's user, nobody else; not across the network either
+    // (`reject_remote_clients`). A development run (not LocalSystem) owns
+    // it itself.
+    let owner = if win::is_local_system() { "O:SY" } else { "" };
+    let sddl = format!("{owner}D:P(A;;GA;;;SY)(A;;GRGW;;;{user})");
     let mut security = SecurityAttributes::from_sddl(&sddl)?;
     // The first instance must be ours: if something else took the name, a
     // client could talk to it instead.
@@ -421,7 +519,9 @@ async fn handle_client(
             }
         }
     }
-    // Without its agent nobody drives this PC.
+    // Without its agent nobody drives this PC, and nothing it pressed may
+    // stay down.
+    let _ = jobs.send(Job::ReleaseAll);
     shared.remote_control.store(false, Ordering::SeqCst);
     writing.abort();
     let _ = jobs.send(Job::Report);

@@ -46,9 +46,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetSystemMetrics, MKF_AVAILABLE, MKF_MOUSEKEYSON, MKF_REPLACENUMBERS,
-    SM_MOUSEPRESENT, SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW,
-    XBUTTON1, XBUTTON2,
+    GetCursorPos, GetSystemMetrics, MKF_AVAILABLE, MKF_MOUSEKEYSON, SM_MOUSEPRESENT,
+    SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
 };
 
 /// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
@@ -162,6 +161,10 @@ struct Player {
     /// Where the pointer was last seen, for its monitor's scale while a UAC
     /// prompt or the lock screen hides it from this process.
     last_cursor: Option<POINT>,
+    /// Where the last move put the pointer, and what `GetCursorPos` said
+    /// before it. Windows applies injected moves a moment later; reading the
+    /// old position again then means the move is still on its way.
+    last_move: Option<(POINT, POINT)>,
 }
 
 impl Player {
@@ -212,6 +215,14 @@ impl Player {
         // another desktop (UAC prompt, lock screen) has input.
         let seen = unsafe { GetCursorPos(&mut cursor) } != 0;
         if seen {
+            // Still where it was before the previous move: that move has not
+            // landed yet, so go on from where it is going.
+            if let Some((target, before)) = self.last_move
+                && cursor.x == before.x
+                && cursor.y == before.y
+            {
+                cursor = target;
+            }
             self.last_cursor = Some(cursor);
         }
         let Some(at) = self.last_cursor else {
@@ -226,9 +237,24 @@ impl Player {
         }
         // The helper moves it from where the pointer really is.
         if elevated::move_by(step_x, step_y) || !seen {
+            self.last_move = None;
             return;
         }
-        place_cursor(cursor.x + step_x, cursor.y + step_y);
+        let target = POINT {
+            x: cursor.x + step_x,
+            y: cursor.y + step_y,
+        };
+        let mut before = POINT { x: 0, y: 0 };
+        // SAFETY: writes the cursor position into `before`.
+        unsafe { GetCursorPos(&mut before) };
+        place_cursor(target.x, target.y);
+        // Clamped onto the desktop, as the move itself is.
+        let desktop = VirtualDesktop::current();
+        let landed = POINT {
+            x: target.x.clamp(desktop.x, desktop.x + desktop.width - 1),
+            y: target.y.clamp(desktop.y, desktop.y + desktop.height - 1),
+        };
+        self.last_move = (landed.x != before.x || landed.y != before.y).then_some((landed, before));
     }
 
     fn move_to(&mut self, x: f64, y: f64) {
@@ -236,6 +262,7 @@ impl Player {
             return;
         }
         self.motion_rest = (0.0, 0.0);
+        self.last_move = None;
         if let Some((x, y)) = displays::to_physical(&displays::monitors(), x, y) {
             place_cursor(x, y);
         }
@@ -425,7 +452,9 @@ fn show_cursor_without_mouse() {
         {
             return;
         }
-        keys.dwFlags |= MKF_AVAILABLE | MKF_MOUSEKEYSON | MKF_REPLACENUMBERS;
+        // Without MKF_REPLACENUMBERS: the numeric keypad keeps typing
+        // digits instead of moving the pointer.
+        keys.dwFlags |= MKF_AVAILABLE | MKF_MOUSEKEYSON;
         SystemParametersInfoW(
             SPI_SETMOUSEKEYS,
             keys.cbSize,

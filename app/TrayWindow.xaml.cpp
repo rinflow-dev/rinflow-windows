@@ -53,8 +53,9 @@ namespace winrt::LinkCursor::implementation
             {
                 dispatcher.TryEnqueue([weak, message]
                 {
+                    // Not once the panel is closing: its window may be gone.
                     auto self = weak.get();
-                    if (self && message.GetNamedString(L"type", L"") == L"state") self->ApplyState(message);
+                    if (self && !self->m_closing && message.GetNamedString(L"type", L"") == L"state") self->ApplyState(message);
                 });
             },
             [](bool) {});
@@ -184,6 +185,12 @@ namespace winrt::LinkCursor::implementation
 
     void TrayWindow::ApplyState(JsonObject const& state)
     {
+        // The user quit LinkCursor (the agent's tray): every window goes too.
+        if (state.GetNamedBoolean(L"quitting", false))
+        {
+            LinkCursorApp::QuitApp();
+            return;
+        }
         auto settings = state.GetNamedObject(L"settings", JsonObject{});
         auto theme = settings.GetNamedString(L"theme", L"system");
         if (theme != m_theme)

@@ -55,12 +55,13 @@ pub fn monitors() -> Vec<Monitor> {
             &mut handles as *mut Vec<HMONITOR> as LPARAM,
         );
     }
-    let mut monitors: Vec<Monitor> = handles.into_iter().filter_map(describe).collect();
-    monitors.sort_by_key(|monitor| (monitor.physical.left, monitor.physical.top));
-    monitors
+    let mut found: Vec<(RECT, f64)> = handles.into_iter().filter_map(describe).collect();
+    found.sort_by_key(|(rect, _)| (rect.left, rect.top));
+    lay_out(&found)
 }
 
-fn describe(handle: HMONITOR) -> Option<Monitor> {
+/// A monitor's rectangle in physical pixels and its scale.
+fn describe(handle: HMONITOR) -> Option<(RECT, f64)> {
     // SAFETY: plain monitor queries with properly sized out-structs.
     unsafe {
         let mut info: MONITORINFO = std::mem::zeroed();
@@ -74,18 +75,76 @@ fn describe(handle: HMONITOR) -> Option<Monitor> {
         } else {
             1.0
         };
-        let rect = info.rcMonitor;
-        Some(Monitor {
-            logical: Display {
-                x: rect.left as f64 / scale,
-                y: rect.top as f64 / scale,
-                width: (rect.right - rect.left) as f64 / scale,
-                height: (rect.bottom - rect.top) as f64 / scale,
-                scale,
-            },
-            physical: rect,
-        })
+        Some((info.rcMonitor, scale))
     }
+}
+
+/// The monitors in logical points, keeping the ones that touch in physical
+/// pixels touching. Dividing each monitor's pixel position by its own scale
+/// would not: with mixed scaling (a 150 % laptop beside a 100 % monitor)
+/// that leaves gaps or overlaps between them, which a peer's model of the
+/// pointer could not cross while Windows moves the real cursor on.
+///
+/// The primary monitor (at the origin) keeps `position / scale`; each
+/// neighbour is then put against the edge it shares, outwards, its offset
+/// along that edge converted at the scale of the monitor already placed.
+/// A monitor touching none (not something Windows allows) keeps
+/// `position / scale`. Points convert through their own monitor.
+fn lay_out(found: &[(RECT, f64)]) -> Vec<Monitor> {
+    let natural = |(rect, scale): &(RECT, f64)| Display {
+        x: rect.left as f64 / scale,
+        y: rect.top as f64 / scale,
+        width: (rect.right - rect.left) as f64 / scale,
+        height: (rect.bottom - rect.top) as f64 / scale,
+        scale: *scale,
+    };
+    let mut placed: Vec<Option<Display>> = vec![None; found.len()];
+    let primary = found
+        .iter()
+        .position(|(rect, _)| rect.left <= 0 && rect.top <= 0 && rect.right > 0 && rect.bottom > 0)
+        .unwrap_or(0);
+    if let Some(first) = found.get(primary) {
+        placed[primary] = Some(natural(first));
+    }
+    let mut queue = vec![primary];
+    while let Some(index) = queue.pop() {
+        let Some(anchor) = placed[index] else {
+            continue;
+        };
+        let (a, _) = found[index];
+        for (other, entry) in found.iter().enumerate() {
+            if placed[other].is_some() {
+                continue;
+            }
+            let (m, _) = *entry;
+            let mut display = natural(entry);
+            let along_y = anchor.y + f64::from(m.top - a.top) / anchor.scale;
+            let along_x = anchor.x + f64::from(m.left - a.left) / anchor.scale;
+            let spans_y = m.top < a.bottom && m.bottom > a.top;
+            let spans_x = m.left < a.right && m.right > a.left;
+            if m.left == a.right && spans_y {
+                (display.x, display.y) = (anchor.right(), along_y);
+            } else if m.right == a.left && spans_y {
+                (display.x, display.y) = (anchor.x - display.width, along_y);
+            } else if m.top == a.bottom && spans_x {
+                (display.x, display.y) = (along_x, anchor.bottom());
+            } else if m.bottom == a.top && spans_x {
+                (display.x, display.y) = (along_x, anchor.y - display.height);
+            } else {
+                continue;
+            }
+            placed[other] = Some(display);
+            queue.push(other);
+        }
+    }
+    found
+        .iter()
+        .zip(placed)
+        .map(|(entry, display)| Monitor {
+            logical: display.unwrap_or_else(|| natural(entry)),
+            physical: entry.0,
+        })
+        .collect()
 }
 
 pub fn logical(monitors: &[Monitor]) -> Vec<Display> {
@@ -272,37 +331,57 @@ unsafe extern "system" fn window_proc(
 mod tests {
     use super::*;
 
-    fn monitor(left: i32, top: i32, width: i32, height: i32, scale: f64) -> Monitor {
-        Monitor {
-            logical: Display {
-                x: left as f64 / scale,
-                y: top as f64 / scale,
-                width: width as f64 / scale,
-                height: height as f64 / scale,
-                scale,
-            },
-            physical: RECT {
-                left,
-                top,
-                right: left + width,
-                bottom: top + height,
-            },
+    fn rect(left: i32, top: i32, width: i32, height: i32) -> RECT {
+        RECT {
+            left,
+            top,
+            right: left + width,
+            bottom: top + height,
         }
     }
 
     #[test]
     fn logical_points_map_through_their_monitor() {
-        let monitors = [
-            monitor(0, 0, 2880, 1920, 2.0),
-            monitor(2880, 0, 1920, 1080, 1.0),
-        ];
+        let monitors = lay_out(&[
+            (rect(0, 0, 2880, 1920), 2.0),
+            (rect(2880, 0, 1920, 1080), 1.0),
+        ]);
         assert_eq!(to_physical(&monitors, 720.0, 480.0), Some((1440, 960)));
-        assert_eq!(to_physical(&monitors, 2980.0, 50.0), Some((2980, 50)));
+        // The 100 % monitor starts where the 200 % one ends in points.
+        assert_eq!(to_physical(&monitors, 1540.0, 50.0), Some((2980, 50)));
         // Outside every monitor: clamped into the nearest one.
         assert_eq!(to_physical(&monitors, -50.0, 100.0), Some((0, 200)));
         assert_eq!(to_physical(&[], 0.0, 0.0), None);
         // And back.
         assert_eq!(to_logical(&monitors, 1440, 960), Some((720.0, 480.0)));
-        assert_eq!(to_logical(&monitors, 2980, 50), Some((2980.0, 50.0)));
+        assert_eq!(to_logical(&monitors, 2980, 50), Some((1540.0, 50.0)));
+    }
+
+    #[test]
+    fn monitors_that_touch_keep_touching_with_mixed_scaling() {
+        // A 150 % laptop with a 100 % monitor to its right, one above it
+        // (offset), and one to the left of the laptop at 125 %.
+        let monitors = lay_out(&[
+            (rect(-2000, 200, 2000, 1000), 1.25),
+            (rect(0, 0, 1920, 1200), 1.5),
+            (rect(1920, 0, 2560, 1440), 1.0),
+            (rect(2200, -1080, 1920, 1080), 1.0),
+        ]);
+        let laptop = monitors[1].logical;
+        assert_eq!((laptop.x, laptop.y, laptop.width), (0.0, 0.0, 1280.0));
+        // Right of the laptop: no gap.
+        let right = monitors[2].logical;
+        assert_eq!((right.x, right.y), (laptop.right(), 0.0));
+        // Above the right-hand monitor, at its offset along that edge.
+        let top = monitors[3].logical;
+        assert_eq!(top.bottom(), right.y);
+        assert_eq!(top.x, right.x + 280.0);
+        // Left of the laptop, 200 px down at the laptop's 150 %.
+        let left = monitors[0].logical;
+        assert_eq!(left.right(), laptop.x);
+        assert!((left.y - 200.0 / 1.5).abs() < 1e-9);
+        // A single monitor keeps its plain logical size.
+        let single = lay_out(&[(rect(0, 0, 2880, 1920), 2.0)]);
+        assert_eq!(single[0].logical.width, 1440.0);
     }
 }

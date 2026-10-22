@@ -129,6 +129,9 @@ pub struct Snapshot {
     pub paired_peers: Vec<String>,
     /// The LocalSystem input helper (see `elevated.rs`).
     pub elevated_input: ElevatedInputView,
+    /// The user quit LinkCursor (tray 退出): the app quits too instead of
+    /// starting the agent again.
+    pub quitting: bool,
 }
 
 /// Whether input can reach elevated windows, UAC prompts and the lock screen.
@@ -174,7 +177,13 @@ impl SharedState {
             pairing: None,
             paired_peers: Vec::new(),
             elevated_input: ElevatedInputView::default(),
+            quitting: false,
         })))
+    }
+
+    pub fn set_quitting(&self) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.quitting, true));
     }
 
     pub fn set_elevated_input(&self, view: ElevatedInputView) {
@@ -433,6 +442,17 @@ impl SharedState {
             }
             "files_failed" => {
                 let reason = event["reason"].as_str().unwrap_or("unknown error");
+                let reason = match reason {
+                    // Declined here (or sharing is off), or the peer copied
+                    // something else meanwhile: nothing went wrong.
+                    "cancelled"
+                    | "replaced by a newer copy"
+                    | "files are no longer on the clipboard" => {
+                        return false;
+                    }
+                    "connection lost" => "连接断开了",
+                    other => other,
+                };
                 snapshot.last_error = Some(format!("接收文件失败：{reason}"));
                 true
             }

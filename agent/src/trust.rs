@@ -9,17 +9,13 @@
 use crate::identity;
 use linkcursor_core::TrustedPeer;
 use serde_json::Value;
-use std::fs;
 use std::sync::Mutex;
 
 pub struct TrustStore(Mutex<Vec<TrustedPeer>>);
 
 impl TrustStore {
     pub fn load() -> Self {
-        let peers: Vec<TrustedPeer> = fs::read_to_string(path())
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default();
+        let peers: Vec<TrustedPeer> = identity::read_json(&path()).unwrap_or_default();
         // A hand-edited file must not stop the core from starting.
         let peers = peers
             .into_iter()

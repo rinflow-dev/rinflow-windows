@@ -55,8 +55,22 @@ const USAGE_SHIFT: [u32; 2] = [0xE1, 0xE5];
 const USAGE_ALT: [u32; 2] = [0xE2, 0xE6];
 const USAGE_GUI: [u32; 2] = [0xE3, 0xE7];
 
+/// How long keys still held when a capture ended are kept from this PC, at
+/// most (their release may never come, e.g. after the secure desktop).
+const DRAIN_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
+
 thread_local! {
     static CAPTURE: RefCell<Option<Capture>> = const { RefCell::new(None) };
+    /// Keys (HID usages) the peer held when the capture ended: their
+    /// auto-repeats and releases still come and must not reach this PC (a
+    /// held Win key would open Start). The keyboard hook stays for them.
+    static DRAIN: RefCell<Option<Drain>> = const { RefCell::new(None) };
+}
+
+struct Drain {
+    hook: HHOOK,
+    keys: HashSet<u32>,
+    until: std::time::Instant,
 }
 
 struct Capture {
@@ -83,6 +97,8 @@ struct Capture {
     notify: HWND,
     /// Set once the capture is ending.
     ending: Option<Exit>,
+    /// The lock shortcut's key is down (its auto-repeat toggles nothing).
+    hotkey_down: bool,
 }
 
 /// Where the cursor goes when a capture ends.
@@ -116,6 +132,16 @@ pub fn begin(
     notify: HWND,
 ) -> bool {
     if active() {
+        return false;
+    }
+    // Windows keeps keyboard input meant for an elevated window from this
+    // process's hook: typing "on the peer" would go into that window here
+    // (an administrator's terminal, say). Not across, then, and say why.
+    if crate::win::foreground_is_elevated() {
+        crate::tray::notify(
+            "键盘和鼠标没有切换",
+            "当前窗口以管理员身份运行，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
+        );
         return false;
     }
     let Some(core) = core.upgrade() else {
@@ -171,7 +197,9 @@ pub fn begin(
         )
     });
 
-    let (local_keys, local_buttons) = held_on_this_pc();
+    // Keys still draining from an earlier capture are held on this PC now,
+    // which the snapshot below records.
+    end_drain();
     let cursor_window = create_cursor_window(park);
     // SAFETY: moves the cursor onto the window that hides it, then installs
     // the hooks on this thread, which runs a message loop.
@@ -183,6 +211,9 @@ pub fn begin(
             SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), module, 0),
         )
     };
+    // After the hooks: whatever is pressed from now on reaches them, so
+    // nothing falls between this snapshot and the capture.
+    let (local_keys, local_buttons) = held_on_this_pc();
     let capture = Capture {
         core,
         peer_id: portal.peer_id.clone(),
@@ -199,6 +230,7 @@ pub fn begin(
         cursor_window,
         notify,
         ending: None,
+        hotkey_down: false,
     };
     let hooked = !mouse_hook.is_null() && !keyboard_hook.is_null();
     eprintln!(
@@ -215,14 +247,38 @@ pub fn begin(
     true
 }
 
-/// Ends the capture when its peer is no longer connected. Called from the
-/// edge thread's timer.
+/// Ends the capture when its peer is no longer connected, or when another
+/// desktop takes input (the lock screen after Win+L, a UAC prompt, the
+/// Ctrl+Alt+Del screen): this PC's keyboard is needed here then, and the
+/// hooks would never see the releases of keys held on the peer. Called from
+/// the edge thread's timer.
 pub fn check(connected: impl Fn(&str) -> bool) {
-    with_capture(|capture| {
-        if !connected(&capture.peer_id) {
-            capture.request_end(capture.home());
-        }
+    if active() {
+        let elsewhere = !crate::win::input_desktop_is_default();
+        with_capture(|capture| {
+            if elsewhere || !connected(&capture.peer_id) {
+                capture.request_end(capture.home());
+            }
+        });
+    }
+    // Drained keys whose release never came are let go.
+    let done = DRAIN.with(|drain| {
+        drain
+            .borrow()
+            .as_ref()
+            .is_some_and(|drain| drain.keys.is_empty() || std::time::Instant::now() >= drain.until)
     });
+    if done {
+        end_drain();
+    }
+}
+
+/// Removes the hook kept for draining keys.
+fn end_drain() {
+    if let Some(drain) = DRAIN.with(|drain| drain.borrow_mut().take()) {
+        // SAFETY: the hook this thread installed for the capture.
+        unsafe { UnhookWindowsHookEx(drain.hook) };
+    }
 }
 
 /// Gives control back without crossing (release, shutdown).
@@ -253,7 +309,18 @@ pub fn finish() -> Option<Ended> {
             UnhookWindowsHookEx(capture.mouse_hook);
         }
         if !capture.keyboard_hook.is_null() {
-            UnhookWindowsHookEx(capture.keyboard_hook);
+            if capture.keys.is_empty() {
+                UnhookWindowsHookEx(capture.keyboard_hook);
+            } else {
+                // Keys the peer holds are still down here too: their repeats
+                // and releases are swallowed until they come up.
+                let drain = Drain {
+                    hook: capture.keyboard_hook,
+                    keys: capture.keys.clone(),
+                    until: std::time::Instant::now() + DRAIN_LIMIT,
+                };
+                DRAIN.with(|slot| *slot.borrow_mut() = Some(drain));
+            }
         }
         DestroyWindow(capture.cursor_window);
     }
@@ -391,6 +458,11 @@ impl Capture {
             return false;
         }
         if down {
+            // Pressed again: its earlier release went unseen, and this press
+            // belongs to the peer.
+            self.local_buttons &= !bit;
+        }
+        if down {
             self.buttons |= bit;
         } else {
             self.buttons &= !bit;
@@ -446,12 +518,23 @@ impl Capture {
         // The lock shortcut toggles the lock here too; the peer never sees
         // the key (it did see the modifiers).
         let hotkey = edge::lock_hotkey();
-        if down && info.vkCode == hotkey.key && self.modifier_bits() == hotkey.modifiers {
-            // SAFETY: posts to the edge thread's own window.
-            unsafe {
-                PostMessageW(self.notify, edge::WM_TOGGLE_LOCK, 0, 0);
+        if info.vkCode == hotkey.key && (self.hotkey_down || down) {
+            if !down {
+                self.hotkey_down = false;
+                return true;
             }
-            return true;
+            if self.hotkey_down {
+                // Its auto-repeat: toggled once already.
+                return true;
+            }
+            if self.modifier_bits() == hotkey.modifiers {
+                self.hotkey_down = true;
+                // SAFETY: posts to the edge thread's own window.
+                unsafe {
+                    PostMessageW(self.notify, edge::WM_TOGGLE_LOCK, 0, 0);
+                }
+                return true;
+            }
         }
         // Low-level hooks report auto-repeat as further key-downs.
         let repeat = if down {
@@ -571,14 +654,40 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     if code == HC_ACTION as i32 {
         // SAFETY: for WH_KEYBOARD_LL, lparam points to a KBDLLHOOKSTRUCT.
         let info = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
-        if info.dwExtraInfo != INJECTED_MARKER
-            && with_capture(|capture| capture.key(info)) == Some(true)
-        {
-            return 1;
+        if info.dwExtraInfo != INJECTED_MARKER {
+            match with_capture(|capture| capture.key(info)) {
+                Some(true) => return 1,
+                Some(false) => {}
+                // No capture: this hook is only draining keys.
+                None if drained(info) => return 1,
+                None => {}
+            }
         }
     }
     // SAFETY: passes the event on to the next hook.
     unsafe { CallNextHookEx(null_mut(), code, wparam, lparam) }
+}
+
+/// Swallows a key event of a key still held from the capture; its release
+/// ends that.
+fn drained(info: &KBDLLHOOKSTRUCT) -> bool {
+    let extended = info.flags & LLKHF_EXTENDED != 0;
+    let Some(usage) = keymap::hid_usage(info.scanCode, extended, info.vkCode) else {
+        return false;
+    };
+    DRAIN.with(|drain| {
+        let mut drain = drain.borrow_mut();
+        let Some(drain) = drain.as_mut() else {
+            return false;
+        };
+        if !drain.keys.contains(&usage) {
+            return false;
+        }
+        if info.flags & LLKHF_UP != 0 {
+            drain.keys.remove(&usage);
+        }
+        true
+    })
 }
 
 /// A tiny, nearly transparent topmost window under the parked cursor whose

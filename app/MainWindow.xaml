@@ -367,8 +367,8 @@
                                         Grid.Column="2"
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind Latency}"
-                                        Visibility="{x:Bind LatencyVisibility}" />
+                                        Text="{x:Bind Latency, Mode=OneWay}"
+                                        Visibility="{x:Bind LatencyVisibility, Mode=OneWay}" />
                                     <HyperlinkButton
                                         Grid.Column="2"
                                         VerticalAlignment="Center"

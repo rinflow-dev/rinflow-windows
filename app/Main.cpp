@@ -16,7 +16,7 @@
 namespace
 {
     // How long a launch keeps trying to reach a running app, or to become it.
-    constexpr int Attempts = 40;
+    constexpr auto Patience = std::chrono::seconds(15);
     constexpr DWORD RetryDelayMs = 100;
     constexpr UINT HandOverTimeoutMs = 3000;
 
@@ -49,12 +49,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     std::wstring_view commandLine = GetCommandLineW();
     std::wstring request = commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray" : L"main";
 
-    for (int attempt = 0; attempt < Attempts; ++attempt)
+    auto deadline = std::chrono::steady_clock::now() + Patience;
+    bool owner = false;
+    while (!owner && std::chrono::steady_clock::now() < deadline)
     {
         wil::unique_mutex mutex{ CreateMutexW(nullptr, FALSE, LinkCursorApp::InstanceMutexName) };
         if (mutex && GetLastError() != ERROR_ALREADY_EXISTS)
         {
             LinkCursorApp::KeepInstanceMutex(mutex.release());
+            owner = true;
             break;
         }
         mutex.reset();
@@ -65,8 +68,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         // Starting up (no window yet) or shutting down: try again.
         Sleep(RetryDelayMs);
     }
-    // Became the app, or the running one never answered: show a window
-    // rather than nothing.
+    // A running app that never answered: never a second one beside it (two
+    // would both talk to the agent and fight over the windows).
+    if (!owner)
+    {
+        return 0;
+    }
 
     winrt::init_apartment(winrt::apartment_type::single_threaded);
     ::winrt::Microsoft::UI::Xaml::Application::Start([](auto&&)

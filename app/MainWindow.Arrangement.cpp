@@ -702,6 +702,8 @@ namespace winrt::LinkCursor::implementation
         }
         m_drag.reset();
         ClearPreview();
+        // The next drag asks afresh, whether or not this answer still comes.
+        m_previewPending = false;
         m_previewQueued = false;
 
         // Redraw from the stored arrangement shortly, in case the drop changed

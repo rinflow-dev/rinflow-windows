@@ -76,7 +76,8 @@ namespace winrt::LinkCursor::implementation
         void ApplyDevices(Windows::Data::Json::JsonObject const& state);
         void ApplyTheme(hstring const& theme);
         void SetAgentLinked(bool linked);
-        void ShowError(hstring const& message);
+        // `fromAgent`: the agent's last_error, which closing the bar clears.
+        void ShowError(hstring const& message, bool fromAgent);
         void SetupDevicesPage();
         void ShowAddDevice();
         Microsoft::UI::Xaml::Controls::MenuFlyout DeviceMenu(LinkCursorApp::DeviceInfo const& device);
@@ -140,6 +141,13 @@ namespace winrt::LinkCursor::implementation
         void UpdateEffectLabels();
 
         std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
+        // Set once the window closed: messages still queued are dropped.
+        bool m_closed{ false };
+        // The agent's last_error as last seen; shown when it changes, so a
+        // dismissed error does not come back with the next snapshot.
+        hstring m_agentError;
+        bool m_errorFromAgent{ false };
+        bool m_elevatedPending{ false };
         Page m_page{ Page::Devices };
         LinkCursorApp::DeviceModel m_model;
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{

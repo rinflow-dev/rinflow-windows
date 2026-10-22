@@ -14,6 +14,9 @@ namespace winrt::LinkCursor::implementation
         // A request, from this launch or handed over by a later one
         // (Main.cpp): "main" or "tray".
         void Launch(std::wstring_view request);
+        // A later launch hands over a request: false while shutting down.
+        // Otherwise the app stays until the request has opened its window.
+        bool AcceptRequest();
 
         // See AppShell.h.
         void ShowMain(bool settings);

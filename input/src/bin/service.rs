@@ -22,7 +22,8 @@ use std::ptr::null_mut;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use windows_service::service::{
-    ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
+    ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+    ServiceType, SessionChangeReason,
 };
 use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 use windows_service::{define_windows_service, service_dispatcher};
@@ -159,7 +160,10 @@ fn uninstall() -> windows_service::Result<()> {
 
 enum Event {
     Stop,
-    SessionChanged,
+    /// `renew`: someone signed in or out, so the helper starts afresh.
+    SessionChanged {
+        renew: bool,
+    },
 }
 
 fn service_main(_arguments: Vec<OsString>) {
@@ -175,8 +179,15 @@ fn run() -> windows_service::Result<()> {
             let _ = events.send(Event::Stop);
             ServiceControlHandlerResult::NoError
         }
-        ServiceControl::SessionChange(_) => {
-            let _ = events.send(Event::SessionChanged);
+        ServiceControl::SessionChange(change) => {
+            // Someone signed in or out: the session may keep its number, but
+            // the helper's pipe is for the user signed in, so a new helper
+            // starts.
+            let renew = matches!(
+                change.reason,
+                SessionChangeReason::SessionLogon | SessionChangeReason::SessionLogoff
+            );
+            let _ = events.send(Event::SessionChanged { renew });
             ServiceControlHandlerResult::NoError
         }
         ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
@@ -207,7 +218,12 @@ fn run() -> windows_service::Result<()> {
         supervisor.check();
         match received.recv_timeout(Duration::from_secs(1)) {
             Ok(Event::Stop) => break,
-            Ok(Event::SessionChanged) => log!("session change"),
+            Ok(Event::SessionChanged { renew }) => {
+                log!("session change (sign-in or sign-out: {renew})");
+                if renew {
+                    supervisor.renew();
+                }
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
@@ -240,6 +256,15 @@ impl Supervisor {
             helper: None,
             not_before: None,
         }
+    }
+
+    /// Ends the helper; the next check starts a new one, without waiting.
+    fn renew(&mut self) {
+        if let Some(helper) = self.helper.take() {
+            // SAFETY: the helper's process handle, still open.
+            unsafe { TerminateProcess(helper.process.0, 0) };
+        }
+        self.not_before = None;
     }
 
     fn check(&mut self) {
