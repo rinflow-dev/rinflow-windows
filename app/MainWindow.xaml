@@ -627,6 +627,19 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="被控时可操作管理员窗口、UAC 和锁屏" />
+                            <TextBlock x:Name="ElevatedInputDescription" Style="{StaticResource RowDescriptionStyle}" />
+                        </StackPanel>
+                        <TextBlock x:Name="ElevatedInputState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="ElevatedInputToggle" Grid.Column="2" AutomationProperties.Name="被控时可操作管理员窗口、UAC 和锁屏" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" Text="本机指纹" />
                             <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。" />
                         </StackPanel>

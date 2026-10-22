@@ -7,6 +7,7 @@ mod clipboard;
 mod displays;
 mod edge;
 mod effect;
+mod elevated;
 mod identity;
 mod inject;
 mod ipc;
@@ -28,6 +29,17 @@ use std::sync::{Arc, OnceLock};
 const INSTANCE_MUTEX: &str = "Local\\LinkCursor.Agent";
 
 fn main() {
+    // `--launch-at-login on|off`: the installer turns starting at sign-in on
+    // (or off) for the user who runs it, the same value as the 开机时启动
+    // switch, and nothing else happens.
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if let [flag, value] = arguments.as_slice()
+        && flag == "--launch-at-login"
+    {
+        let result = settings::autostart::set(value == "on");
+        std::process::exit(i32::from(result.is_err()));
+    }
+
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
         eprintln!("linkcursor-agent: another instance is already running in this session");
         return;
@@ -184,6 +196,22 @@ fn main() {
         }
     };
     let _ = edge_slot.set(edge.handle());
+
+    // The LocalSystem input helper, when installed: input then reaches
+    // elevated windows, UAC prompts and the lock screen. When one of those
+    // takes input, a peer this PC drives is given back so it can be
+    // answered here.
+    let elevated_state = state.clone();
+    let elevated_edge = edge.handle();
+    elevated::start(move |status| {
+        elevated_state.set_elevated_input(state::ElevatedInputView {
+            available: status.available,
+            enabled: status.enabled,
+        });
+        if status.secure {
+            elevated_edge.release_capture();
+        }
+    });
 
     // Reports clipboard changes and writes peers' clipboards.
     let clipboard_thread =

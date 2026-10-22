@@ -1,5 +1,9 @@
-# Rust agent
+# Rust agent and input helper
 /agent/target/
+/input/target/
+
+# Setup programs built by installer\build-installer.ps1
+/installer/output/
 
 # MSBuild / C++ app (outputs, intermediates, NuGet restore)
 /app/x64/

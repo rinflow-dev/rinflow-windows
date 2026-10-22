@@ -127,6 +127,17 @@ pub struct Snapshot {
     pub pairing: Option<PairingView>,
     /// Device IDs of paired peers.
     pub paired_peers: Vec<String>,
+    /// The LocalSystem input helper (see `elevated.rs`).
+    pub elevated_input: ElevatedInputView,
+}
+
+/// Whether input can reach elevated windows, UAC prompts and the lock screen.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct ElevatedInputView {
+    /// The helper runs (the service is installed and started).
+    pub available: bool,
+    /// The machine-wide setting is on.
+    pub enabled: bool,
 }
 
 #[derive(Clone)]
@@ -162,7 +173,13 @@ impl SharedState {
             fingerprint: None,
             pairing: None,
             paired_peers: Vec::new(),
+            elevated_input: ElevatedInputView::default(),
         })))
+    }
+
+    pub fn set_elevated_input(&self, view: ElevatedInputView) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.elevated_input, view));
     }
 
     pub fn set_paired_peers(&self, peers: Vec<String>) {

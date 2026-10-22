@@ -77,6 +77,10 @@ const WM_SETTINGS_CHANGED: u32 = WM_APP + 4;
 /// Window message from the capture hooks: the lock shortcut was pressed
 /// while a peer is driven (the hooks keep it from `RegisterHotKey`).
 pub const WM_TOGGLE_LOCK: u32 = WM_APP + 5;
+/// Thread message: another desktop took input (a UAC prompt, the lock
+/// screen); a driven peer is given back so this PC's own keyboard and mouse
+/// reach it.
+const WM_RELEASE_CAPTURE: u32 = WM_APP + 6;
 const HOTKEY_ID: i32 = 1;
 
 /// Control this PC lost (`control_revoked`), queued by the core's callback
@@ -128,6 +132,14 @@ impl EdgeHandle {
         // SAFETY: posts to the edge thread's message queue.
         unsafe {
             PostThreadMessageW(self.thread_id, WM_SETTINGS_CHANGED, 0, 0);
+        }
+    }
+
+    /// Gives a driven peer back, as Ctrl+Alt+Esc does.
+    pub fn release_capture(&self) {
+        // SAFETY: posts to the edge thread's message queue.
+        unsafe {
+            PostThreadMessageW(self.thread_id, WM_RELEASE_CAPTURE, 0, 0);
         }
     }
 
@@ -209,6 +221,10 @@ impl EdgeThread {
                         }
                         if message.hwnd.is_null() && message.message == WM_SETTINGS_CHANGED {
                             with_tracker(Tracker::settings_changed);
+                            continue;
+                        }
+                        if message.hwnd.is_null() && message.message == WM_RELEASE_CAPTURE {
+                            capture::release();
                             continue;
                         }
                         if message.hwnd.is_null() && message.message == WM_CONTROL_REVOKED {

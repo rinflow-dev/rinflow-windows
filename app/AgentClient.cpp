@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 9;
+    constexpr int ProtocolVersion = 10;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()

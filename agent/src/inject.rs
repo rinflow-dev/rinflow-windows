@@ -13,14 +13,20 @@
 //! - While a peer is in control the PC stays awake, and on a PC without a
 //!   mouse the MouseKeys accessibility feature is enabled so Windows draws
 //!   the cursor at all.
+//! - When the LocalSystem input helper is in use (see `elevated.rs`), every
+//!   event goes to it instead, so it also reaches elevated windows, UAC
+//!   prompts and the lock screen. Motion then goes as pixels: on those
+//!   desktops this process cannot even see where the pointer is.
 
 use crate::displays;
+use crate::elevated;
 use crate::keymap::{WinKey, windows_key};
 use linkcursor_core::{
     LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
     LC_INPUT_SCROLL, LcInputEvent,
 };
+use linkcursor_input::VirtualDesktop;
 use std::collections::HashSet;
 use std::io;
 use std::sync::mpsc;
@@ -34,21 +40,20 @@ use windows_sys::Win32::UI::Accessibility::MOUSEKEYS;
 use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC_EX,
-    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
-    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC_EX, MOUSEEVENTF_HWHEEL,
+    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN,
     MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetSystemMetrics, MKF_AVAILABLE, MKF_MOUSEKEYSON, MKF_REPLACENUMBERS,
-    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_MOUSEPRESENT, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
+    SM_MOUSEPRESENT, SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW,
+    XBUTTON1, XBUTTON2,
 };
 
 /// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
 /// own low-level hooks can tell played input from the user's hardware.
-pub const INJECTED_MARKER: usize = 0x4C43_494E;
+pub use linkcursor_input::INJECTED_MARKER;
 
 /// Windows apps such as Chrome and Edge scroll 100 DIPs per wheel notch of
 /// 120 units, so this keeps trackpad distances the same as on the sender.
@@ -154,6 +159,9 @@ struct Player {
     motion_rest: (f64, f64),
     /// Sub-unit wheel movement carried to the next event, in wheel units.
     wheel_rest: (f64, f64),
+    /// Where the pointer was last seen, for its monitor's scale while a UAC
+    /// prompt or the lock screen hides it from this process.
+    last_cursor: Option<POINT>,
 }
 
 impl Player {
@@ -180,6 +188,8 @@ impl Player {
         self.controlled = controlled;
         self.motion_rest = (0.0, 0.0);
         self.wheel_rest = (0.0, 0.0);
+        // The helper plays into UAC prompts and the lock screen only now.
+        elevated::set_remote_control(controlled);
         let state = if controlled {
             // While a peer drives this PC, nobody touches its own mouse or
             // keyboard, so Windows would otherwise sleep or blank the screen.
@@ -198,15 +208,24 @@ impl Player {
 
     fn move_by(&mut self, dx: f64, dy: f64) {
         let mut cursor = POINT { x: 0, y: 0 };
-        // SAFETY: writes the cursor position into `cursor`.
-        if unsafe { GetCursorPos(&mut cursor) } == 0 {
-            return;
+        // SAFETY: writes the cursor position into `cursor`. It fails while
+        // another desktop (UAC prompt, lock screen) has input.
+        let seen = unsafe { GetCursorPos(&mut cursor) } != 0;
+        if seen {
+            self.last_cursor = Some(cursor);
         }
-        let scale = monitor_scale(cursor);
+        let Some(at) = self.last_cursor else {
+            return;
+        };
+        let scale = monitor_scale(at);
         let (step_x, rest_x) = scaled_step(dx, scale, self.motion_rest.0);
         let (step_y, rest_y) = scaled_step(dy, scale, self.motion_rest.1);
         self.motion_rest = (rest_x, rest_y);
         if step_x == 0 && step_y == 0 {
+            return;
+        }
+        // The helper moves it from where the pointer really is.
+        if elevated::move_by(step_x, step_y) || !seen {
             return;
         }
         place_cursor(cursor.x + step_x, cursor.y + step_y);
@@ -263,34 +282,6 @@ fn wheel_step(points: f64, units_per_point: f64, rest: f64) -> (i32, f64) {
     let total = points * units_per_point + rest;
     let whole = total.trunc();
     (whole as i32, total - whole)
-}
-
-/// Maps a virtual-desktop pixel to SendInput's 0…65535 range, aiming at the
-/// pixel's centre so Windows' conversion back lands on the same pixel.
-fn normalize(value: i32, origin: i32, extent: i32) -> i32 {
-    let extent = extent.max(1) as f64;
-    (((value - origin) as f64 + 0.5) * 65536.0 / extent).clamp(0.0, 65535.0) as i32
-}
-
-struct VirtualDesktop {
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-}
-
-impl VirtualDesktop {
-    fn current() -> Self {
-        // SAFETY: plain system metric queries.
-        unsafe {
-            Self {
-                x: GetSystemMetrics(SM_XVIRTUALSCREEN),
-                y: GetSystemMetrics(SM_YVIRTUALSCREEN),
-                width: GetSystemMetrics(SM_CXVIRTUALSCREEN),
-                height: GetSystemMetrics(SM_CYVIRTUALSCREEN),
-            }
-        }
-    }
 }
 
 fn monitor_scale(point: POINT) -> f64 {
@@ -375,17 +366,9 @@ fn key(event: &LcInputEvent, down: bool) {
 /// Puts the cursor on a physical pixel of the virtual desktop. Played as an
 /// absolute move, so Windows applies no pointer acceleration on top.
 fn place_cursor(x: i32, y: i32) {
-    let desktop = VirtualDesktop::current();
-    let x = x.clamp(desktop.x, desktop.x + desktop.width - 1);
-    let y = y.clamp(desktop.y, desktop.y + desktop.height - 1);
-    send_mouse(MOUSEINPUT {
-        dx: normalize(x, desktop.x, desktop.width),
-        dy: normalize(y, desktop.y, desktop.height),
-        mouseData: 0,
-        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
-        time: 0,
-        dwExtraInfo: INJECTED_MARKER,
-    });
+    if let Some(input) = VirtualDesktop::current().move_to(x, y).to_input() {
+        send(input);
+    }
 }
 
 fn send_mouse(mi: MOUSEINPUT) {
@@ -403,6 +386,9 @@ fn send_key(ki: KEYBDINPUT) {
 }
 
 fn send(input: INPUT) {
+    if elevated::forward(&input) {
+        return;
+    }
     // SAFETY: one fully initialised INPUT with its exact size.
     let sent = unsafe { SendInput(1, &input, size_of::<INPUT>() as i32) };
     // No retry: SendInput fails when another desktop (UAC, lock screen) has
@@ -451,9 +437,7 @@ fn show_cursor_without_mouse() {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, normalize, scaled_step, wheel_step,
-    };
+    use super::{WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, scaled_step, wheel_step};
 
     #[test]
     fn motion_scales_and_keeps_fractions() {
@@ -468,18 +452,6 @@ mod tests {
         assert_eq!(total, 5);
         assert!(rest.abs() < 1e-9);
         assert_eq!(scaled_step(-3.0, 2.0, 0.0).0, -6);
-    }
-
-    #[test]
-    fn normalized_coordinates_map_back_to_the_same_pixel() {
-        // Windows converts back with floor(n * width / 65536).
-        for (origin, width) in [(0, 2880), (-1920, 4800), (0, 1366)] {
-            for x in [origin, origin + 1, origin + width / 2, origin + width - 1] {
-                let n = normalize(x, origin, width) as i64;
-                let back = origin as i64 + n * width as i64 / 65536;
-                assert_eq!(back, x as i64, "origin {origin} width {width}");
-            }
-        }
     }
 
     #[test]

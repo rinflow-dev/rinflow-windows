@@ -26,7 +26,8 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// `pairing`, `paired_peers`, session `paired`, and the `paired_only`
 /// setting.
 /// 9: sessions lose `encrypted`: every connection is encrypted now.
-pub const PROTOCOL_VERSION: u32 = 9;
+/// 10: the snapshot gains `elevated_input`.
+pub const PROTOCOL_VERSION: u32 = 10;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")

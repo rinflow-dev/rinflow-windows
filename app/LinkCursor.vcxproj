@@ -24,14 +24,13 @@
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
     <!--
-      Unpackaged and framework-dependent: the app uses the shared Windows App
-      Runtime installed on the machine instead of bundling it. MSIX packaging
-      comes later.
+      Unpackaged and self-contained: the Windows App Runtime ships next to
+      the app (installer\LinkCursor.iss copies the whole folder), so a PC
+      without the runtime installed runs it too.
     -->
     <AppxPackage>false</AppxPackage>
     <WindowsPackageType>None</WindowsPackageType>
-    <!-- Windows App SDK 2.x defaults unpackaged apps to self-contained. -->
-    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <RuntimeIdentifiers>win10-x64;win10-arm64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
@@ -188,10 +187,13 @@
   <!--
     Build the Rust agent with Cargo and place linkcursor-agent.exe next to
     LinkCursor.exe, which is where the app looks for it. Pass
-    -p:SkipAgentBuild=true to build the app alone.
+    -p:SkipAgentBuild=true to build the app alone. The input helper and its
+    service (..\input) go to the same folder: each checks that the other is
+    its sibling there.
   -->
   <PropertyGroup>
     <AgentDir>$(MSBuildThisFileDirectory)..\agent\</AgentDir>
+    <InputDir>$(MSBuildThisFileDirectory)..\input\</InputDir>
     <AgentRustTarget Condition="'$(Platform)'=='ARM64'">aarch64-pc-windows-msvc</AgentRustTarget>
     <AgentRustTarget Condition="'$(AgentRustTarget)'==''">x86_64-pc-windows-msvc</AgentRustTarget>
     <AgentCargoProfile Condition="'$(Configuration)'=='Release'">release</AgentCargoProfile>
@@ -202,6 +204,8 @@
     <!-- Cargo and rustc always write UTF-8, whatever the console code page. -->
     <Exec Command="cargo build --manifest-path &quot;$(AgentDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
     <Copy SourceFiles="$(AgentDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-agent.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <Exec Command="cargo build --manifest-path &quot;$(InputDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
+    <Copy SourceFiles="$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-input.exe;$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-service.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

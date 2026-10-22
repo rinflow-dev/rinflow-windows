@@ -53,11 +53,21 @@ agent/
   src/identity.rs            device ID (%LOCALAPPDATA%\LinkCursor\device-id) and name
   src/trust.rs               paired devices (%LOCALAPPDATA%\LinkCursor\trusted.json)
   src/power.rs               sleep, wake and IP address changes, reported to the core
-  src/inject.rs              plays a controlling peer's input with SendInput
+  src/inject.rs              plays a controlling peer's input with SendInput (or through the input helper)
+  src/elevated.rs            the agent's end of the input helper's pipe
   src/keymap.rs              USB HID usage → Windows scan code
   src/win.rs                 Win32 helpers: mutex, user SID, pipe security
+input/                       input beyond a normal process (elevated windows, UAC prompts, lock screen)
+  src/lib.rs                 pipe protocol shared with the agent, SendInput helpers
+  src/bin/input.rs           linkcursor-input.exe: LocalSystem helper in the user's session
+  src/bin/service.rs         linkcursor-service.exe: the LinkCursorInput service that starts it
+  src/win.rs, src/log.rs     process checks, pipe security, the machine-wide setting; logs
+installer/
+  LinkCursor.iss             Inno Setup script for the setup program
+  build-installer.ps1        Release build + setup program
+  ChineseSimplified.isl      Chinese messages for the setup program
 app/
-  LinkCursor.vcxproj         unpackaged WinUI 3; also builds the agent with Cargo
+  LinkCursor.vcxproj         unpackaged, self-contained WinUI 3; also builds the Rust programs with Cargo
   Directory.Packages.props   NuGet versions (central package management)
   Main.cpp                   entry point: single instance, later launches handed to the running app
   App.xaml(.cpp)             shared styles; keeps the main window and the tray panel
@@ -93,7 +103,9 @@ workspace/
   ```powershell
   winget install --id Microsoft.VisualStudio.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --add Microsoft.VisualStudio.Workload.UniversalBuildTools --add Microsoft.VisualStudio.ComponentGroup.UWP.VC.BuildTools --add Microsoft.VisualStudio.ComponentGroup.WindowsAppDevelopment.VC.BuildTools --add Microsoft.VisualStudio.Component.NuGet.BuildTools"
   ```
-- The **Windows App Runtime 2.4 or later** (framework package `Microsoft.WindowsAppRuntime.2`). The app is framework-dependent and does not bundle it. Recent Windows 11 machines usually have it; otherwise install it with `winget install Microsoft.WindowsAppRuntime.2`. The minimum comes from the `Microsoft.WindowsAppSDK.Runtime` version in [Directory.Packages.props](app/Directory.Packages.props).
+- For the setup program only: [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`; a per-user install is enough).
+
+The Windows App Runtime is not needed on the machine: the app is self-contained (`WindowsAppSDKSelfContained`) and ships the runtime next to itself.
 
 ## Building
 
@@ -111,7 +123,7 @@ cd linkcursor-windows
 
 - finds Visual Studio or Build Tools and loads its developer environment;
 - switches the console to UTF-8, so output from MSBuild, the C++ compiler and Cargo is never decoded with the wrong code page (for example 932 on a machine whose system locale is Japanese);
-- runs MSBuild on `app\LinkCursor.vcxproj`. That restores NuGet packages, builds `LinkCursor.exe`, runs `cargo build` for the agent, and copies `linkcursor-agent.exe` next to the app. Everything ends up in `app\<Platform>\<Configuration>\LinkCursor\`. Release builds the agent with `--release`.
+- runs MSBuild on `app\LinkCursor.vcxproj`. That restores NuGet packages, builds `LinkCursor.exe`, runs `cargo build` for the agent and for [input](input/) (the input helper and its service), and copies `linkcursor-agent.exe`, `linkcursor-input.exe` and `linkcursor-service.exe` next to the app. Everything ends up in `app\<Platform>\<Configuration>\LinkCursor\`. Release builds the Rust programs with `--release`.
 
 Build messages are in Chinese by default. Pass `-Language en-US` (or another culture name) to change this. MSBuild and NuGet messages follow it right away. The C++ compiler only speaks the Visual Studio language packs that are installed, so add one for compiler messages too:
 
@@ -124,7 +136,24 @@ Inside a Developer PowerShell you can also call MSBuild directly: `msbuild app\L
 
 For a debugging loop, use `make build`, `make run` and `make stop` from the workspace root (see [Make shortcuts](../README.md#make-shortcuts)). They call [dev.ps1](dev.ps1). Building never stops a running copy: [build.ps1](build.ps1) renames the files it holds open to `*.old` (Windows refuses to overwrite them but allows the rename), so `.\build.cmd` also works while LinkCursor runs. `make run` builds first, then stops the old copy, deletes the `*.old` files and starts the new build, keeping the agent in your terminal with its log. The settings window it opens does not start an agent of its own, so the terminal stays in charge of the agent. Ctrl+C, or closing a debug agent's console, quits the agent the same way as the tray's 退出: the tray icon goes away and peers see a clean disconnect.
 
-A Release x64 build is about 3.2 MB of files (1.2 MB zipped): the agent is 1.3 MB, `LinkCursor.exe` 0.6 MB and the Windows App SDK bootstrapper 0.4 MB. The other 0.8 MB is a WebView2 DLL that the WinUI package brings in and the app does not use. At run time the agent uses about 13 MB of memory and no CPU while idle; the settings window uses about 120 MB, but only while it is open.
+A Release x64 build is about 64 MB of files, most of it the Windows App Runtime it carries; the setup program is about 16 MB. The agent is 5 MB, `LinkCursor.exe` 1 MB, the input helper 1 MB and the service 0.4 MB. The WebView2 DLL that the WinUI package brings in is not used and is left out of the setup program. At run time the agent uses about 13 MB of memory and no CPU while idle; the settings window uses about 120 MB, but only while it is open.
+
+### Setup program
+
+```powershell
+.\installer\build-installer.ps1             # Release build, then the setup program
+.\installer\build-installer.ps1 -SkipBuild  # package the existing Release build
+```
+
+[build-installer.ps1](installer/build-installer.ps1) runs the Release build and compiles [LinkCursor.iss](installer/LinkCursor.iss) with Inno Setup into `installer\output\LinkCursor-Setup-<version>-x64.exe` (the version comes from [agent/Cargo.toml](agent/Cargo.toml)). The setup program, in Chinese ([ChineseSimplified.isl](installer/ChineseSimplified.isl), MIT, from [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation)), needs an administrator and:
+
+- installs into `Program Files\LinkCursor`, where only administrators can change files (the input helper and the agent rely on that when they check each other);
+- adds a firewall rule for the agent on private **and public** networks (Windows often marks a new Wi-Fi network public, and nothing would be found without saying why);
+- registers and starts the `LinkCursorInput` service (`linkcursor-service.exe --install`) and writes the 被控时可操作管理员窗口、UAC 和锁屏 setting (a task, checked by default; see [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen));
+- turns on starting at sign-in (a task) for the user who ran it (`linkcursor-agent.exe --launch-at-login on`, run as that user, not as the administrator);
+- before replacing files (an upgrade), removes the service and closes LinkCursor; uninstalling removes the service, the firewall rule and the logs, and keeps each user's settings and pairings.
+
+It is not code-signed yet, so SmartScreen warns before it runs; `SignTool` in the script is ready for a certificate.
 
 To work on the agent alone:
 
@@ -144,7 +173,7 @@ Start either program:
 
 Both programs look next to themselves for the other one. Override this with `LINKCURSOR_AGENT_PATH` (used by the app) or `LINKCURSOR_APP_PATH` (used by the agent).
 
-The first time the agent listens, Windows Defender Firewall asks for permission. Allow it on private networks. LinkCursor uses UDP 42420 (discovery), UDP 42421 (connections) and one more UDP port the system picks for file and clipboard transfers. It uses no TCP. The prompt allows the program, which covers all of them. Other LinkCursor devices on the same network appear in the list within a few seconds.
+Installed with the setup program, the firewall is already set up. A build run from the source tree makes Windows Defender Firewall ask the first time the agent listens; allow it on private networks (and public ones if the network is marked public). LinkCursor uses UDP 42420 (discovery), UDP 42421 (connections) and one more UDP port the system picks for file and clipboard transfers. It uses no TCP. The prompt allows the program, which covers all of them. Other LinkCursor devices on the same network appear in the list within a few seconds.
 
 ## Arranging devices
 
@@ -202,7 +231,36 @@ Known limits:
 - The secure desktop (Ctrl+Alt+Del, UAC prompts) cannot be hooked; it takes input back from the hooks.
 - With mixed DPI across several monitors, logical monitor positions can leave gaps. A peer placed in such a gap is not reachable.
 
-Known limits: windows of elevated programs (such as Task Manager), UAC prompts and the lock screen ignore injected input until the LocalSystem service exists (M4). Scroll speeds and Mac function-key behavior still need checking against a real Mac.
+Windows of elevated programs (such as Task Manager), UAC prompts and the lock screen ignore input played by a normal process; installed with the setup program, they get it through the input helper (see [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen)). Scroll speeds and Mac function-key behavior still need checking against a real Mac.
+
+## Elevated windows, UAC prompts and the lock screen
+
+Windows keeps a normal process like the agent from playing input into windows of elevated programs (UIPI) and onto the Winlogon desktop, where UAC prompts and the lock screen live. As in Mouse Without Borders and Deskflow, a process running as LocalSystem does it instead. Unlike them, only the input runs with that privilege: the network, pairing, clipboard, files and UI stay in the agent, running as the user.
+
+```
+linkcursor-agent (user)  ── named pipe ──►  linkcursor-input (LocalSystem, in the user's session)
+                                                   ▲ started, restarted on session change or exit
+                                             linkcursor-service (LinkCursorInput service, automatic)
+```
+
+| | What |
+| --- | --- |
+| Service ([service.rs](input/src/bin/service.rs)) | Keeps one helper running in the session at the console: its own LocalSystem token moved to that session, `winsta0\default`, in a job that ends it with the service. Restarted after a failure (1 s). `--install` / `--uninstall` / `--elevated-input on\|off` are for the setup program and the settings page. |
+| Helper ([input.rs](input/src/bin/input.rs)) | Plays what the agent sends: `SendInput` values (keys, buttons, wheel, absolute moves) and motion in pixels (it reads the pointer on the input desktop, which the agent cannot see there). Every 200 ms it checks which desktop has input; its injecting thread has no windows or hooks, so it follows with `SetThreadDesktop`. No network, no files. |
+| Agent ([elevated.rs](agent/src/elevated.rs)) | Connects when the helper exists and hands it every event while the setting is on; otherwise plays input itself as before (a build from the source tree, the setting off). When a UAC prompt or the lock screen takes input while this PC drives a peer, the peer is given back so the prompt can be answered here. |
+| Protocol ([lib.rs](input/src/lib.rs)) | Length-prefixed binary frames: `Hello`, `Input`, `MoveBy`, `RemoteControl` to the helper; `State { enabled, secure }` back. |
+| Logs | `%ProgramData%\LinkCursor\logs\service.log` and `input.log`. |
+
+Safeguards, since the helper acts with LocalSystem's rights:
+
+- **The setting** (`HKLM\SOFTWARE\LinkCursor\ElevatedInput`, a setup task checked by default) can only be changed by an administrator: the settings switch runs `linkcursor-service.exe --elevated-input on|off` elevated (UAC asks). Off, the helper plays nothing.
+- **Who talks to whom.** The pipe (`\\.\pipe\LinkCursor.Input.<session>`) admits only LocalSystem and the session's user, never remote clients, and is created as the first instance of its name, so nothing can take the name first. Each end checks the other's process: the helper accepts only `linkcursor-agent.exe` from its own folder in its own session, and the agent talks only to `linkcursor-input.exe` from its folder. Installed in Program Files, only administrators can put a program there.
+- **The Winlogon desktop only while controlled.** UAC prompts and the lock screen get input only while a peer is driving this PC (the agent says so); other times only the user's desktop does.
+- **No new network surface.** The helper accepts nothing from the network; whatever it plays came from a paired, encrypted session through the agent.
+
+Not covered: the sign-in screen before anyone has signed in (the agent runs per user, so nothing is connected yet), and Ctrl+Alt+Del (a later `SendSAS` from the service).
+
+**Trying it without installing.** `linkcursor-input.exe --dev` runs the helper as the current user from a build folder (it ignores the setting); the agent from the same folder connects to it. It cannot reach elevated windows or the Winlogon desktop that way, but the pipe, the checks and the routing are the same.
 
 ## Clipboard
 
@@ -280,6 +338,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
 | 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
+| 被控时可操作管理员窗口、UAC 和锁屏 | (machine-wide) | `HKLM\SOFTWARE\LinkCursor\ElevatedInput`, set by the setup program (on by default). Changing it asks for an administrator. Disabled when the input service is not installed. See [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen). |
 
 ## Pairing and encryption
 
@@ -301,7 +360,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":9}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":10}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -323,13 +382,14 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":9,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":10,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
 A `state` message looks like this:
 
 - `sessions` lists every peer this PC is connecting or connected to, one entry per peer and possibly several. `status` is `connecting` or `connected`, `remote_control` is true while that peer drives this PC, `latency_ms` is the round trip (from the core's `latency` event, about once a second), and `paired` is true when the peer showed the certificate it was paired with.
+- `elevated_input` is `{"available", "enabled"}`: the input helper is connected, and the machine-wide setting is on.
 - `fingerprint` is this PC's certificate fingerprint (64 hex digits; `null` until the core has started). `paired_peers` lists the device IDs of paired devices. `pairing` is `null`, or the pairing waiting for the user: `{"peer_id", "name", "platform", "code", "accepted"}` (`accepted` once this side confirmed).
 - `layout` is what the arrangement draws, in logical points:
   - `displays` are this PC's monitors.
@@ -373,7 +433,7 @@ The agent sends whole snapshots instead of individual events, so the app never h
 2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app uses it with a side menu; it has no drag canvas yet.
 3. **Send input (M2):** done; see [Controlling another device](#controlling-another-device). It still needs a pass with the real Mac for pointer speed and keys.
 4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
-5. **Productize (M4):** MSIX packaging, a LocalSystem service for UAC prompts and the lock screen, firewall rules, code signing, and dropping the unused WebView2 DLL from the output. The settings app is single-instance already.
+5. **Productize (M4):** the setup program, the self-contained runtime, firewall rules and the input service for elevated windows, UAC prompts and the lock screen are done (see [Setup program](#setup-program)). Remaining: code signing, Ctrl+Alt+Del through the service (`SendSAS`), a log file for the agent, and updates.
 6. **Security:** done; see [Pairing and encryption](#pairing-and-encryption). Next: send pointer motion as QUIC datagrams, so a lost packet never holds up the ones after it.
 
 ## Security

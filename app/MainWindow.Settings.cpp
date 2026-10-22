@@ -191,6 +191,48 @@ namespace winrt::LinkCursor::implementation
             if (auto self = weak.get()) self->EditHotkey();
         });
 
+        // A machine-wide setting: only an administrator may change it, so
+        // the service's command line runs elevated (UAC asks). The helper
+        // notices within seconds and the next snapshot shows the result;
+        // until then, and if the user says no, the switch goes back.
+        ElevatedInputToggle().Toggled([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self || self->m_applying) return;
+            bool on = self->ElevatedInputToggle().IsOn();
+            self->ElevatedInputState().Text(on ? L"开" : L"关");
+            self->ElevatedInputToggle().IsEnabled(false);
+            std::thread([weak, on]
+            {
+                auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
+                std::wstring service = exe.get();
+                service.resize(service.find_last_of(L'\\') + 1);
+                service += L"linkcursor-service.exe";
+                SHELLEXECUTEINFOW info{ sizeof(info) };
+                info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+                info.lpVerb = L"runas";
+                info.lpFile = service.c_str();
+                info.lpParameters = on ? L"--elevated-input on" : L"--elevated-input off";
+                info.nShow = SW_HIDE;
+                if (ShellExecuteExW(&info) && info.hProcess)
+                {
+                    WaitForSingleObject(info.hProcess, 10000);
+                    CloseHandle(info.hProcess);
+                }
+                if (auto self = weak.get())
+                {
+                    self->DispatcherQueue().TryEnqueue([weak]
+                    {
+                        auto self = weak.get();
+                        if (!self) return;
+                        self->ElevatedInputToggle().IsEnabled(true);
+                        // Back to what the agent reports, should nothing change.
+                        if (self->m_lastState) self->ApplySettings(self->m_lastState);
+                    });
+                }
+            }).detach();
+        });
+
         CopyIdButton().Click([weak](auto&&, auto&&)
         {
             auto self = weak.get();
@@ -272,6 +314,15 @@ namespace winrt::LinkCursor::implementation
         PortHint().Text(configured != running
             ? hstring(std::format(L"重新启动 LinkCursor 后改用 {}；现在使用 {}。", configured, running))
             : hstring(L"其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。"));
+
+        // The input service: present only when installed.
+        auto elevated = state.GetNamedObject(L"elevated_input", JsonObject{});
+        bool elevatedAvailable = elevated.GetNamedBoolean(L"available", false);
+        SetSwitch(ElevatedInputToggle(), ElevatedInputState(), elevatedAvailable && elevated.GetNamedBoolean(L"enabled", false));
+        ElevatedInputToggle().IsEnabled(elevatedAvailable);
+        ElevatedInputDescription().Text(elevatedAvailable
+            ? L"其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。"
+            : L"需要用安装包安装 LinkCursor：由随附的输入服务完成。");
 
         // The first four and last three bytes; the tooltip and 复制 give all 32.
         m_fingerprint = encrypted ? hstring(ColonHex(fingerprint.GetString())) : hstring();

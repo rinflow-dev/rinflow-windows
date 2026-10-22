@@ -1,0 +1,108 @@
+﻿; LinkCursor for Windows: the setup program (Inno Setup 6).
+;
+; Built by build-installer.ps1, which builds the Release app first and
+; passes the version and the folder to package:
+;   ISCC.exe /DAppVersion=0.1.0 /DSourceDir=..\app\x64\Release\LinkCursor LinkCursor.iss
+;
+; What it installs, into Program Files\LinkCursor (only administrators can
+; change files there, which the input helper and the agent rely on when they
+; check each other):
+; - LinkCursor.exe with the Windows App Runtime it needs (self-contained),
+;   linkcursor-agent.exe, linkcursor-input.exe and linkcursor-service.exe.
+; - The LinkCursorInput service (linkcursor-service.exe --install).
+; - A firewall rule for the agent, on private and public networks: Windows
+;   often marks a new Wi-Fi network public, and LinkCursor would then find
+;   no device without saying why.
+; - HKLM\SOFTWARE\LinkCursor ElevatedInput: whether devices controlling this
+;   PC may operate elevated windows, UAC prompts and the lock screen (a task,
+;   on by default; the settings page changes it later).
+
+#ifndef AppVersion
+  #define AppVersion "0.1.0"
+#endif
+#ifndef SourceDir
+  #define SourceDir "..\app\x64\Release\LinkCursor"
+#endif
+
+[Setup]
+AppId={{6B0E5C1A-3F4D-4E8B-9A27-5C1D2E8F4A90}
+AppName=LinkCursor
+AppVersion={#AppVersion}
+AppVerName=LinkCursor {#AppVersion}
+AppPublisher=LinkCursor
+AppPublisherURL=https://github.com/akarineren/linkcursor-windows
+DefaultDirName={autopf}\LinkCursor
+DisableProgramGroupPage=yes
+DisableDirPage=auto
+PrivilegesRequired=admin
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0.17763
+OutputDir=output
+OutputBaseFilename=LinkCursor-Setup-{#AppVersion}-x64
+Compression=lzma2/max
+SolidCompression=yes
+WizardStyle=modern
+; Closes LinkCursor when it holds files being replaced.
+CloseApplications=force
+RestartApplications=no
+UninstallDisplayIcon={app}\LinkCursor.exe
+UninstallDisplayName=LinkCursor
+SetupLogging=yes
+; Sign setup and uninstaller once there is a certificate, e.g.
+; SignTool=signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f
+
+[Languages]
+Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
+
+[Tasks]
+Name: "elevatedinput"; Description: "被其他设备控制时，也能操作管理员窗口、UAC 弹窗和锁屏（推荐）"; GroupDescription: "被控制时："
+Name: "autostart"; Description: "登录 Windows 时启动 LinkCursor"; GroupDescription: "启动："
+Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
+
+[Files]
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,*.old,*.ilk,*.exp,*.lib,Microsoft.Web.WebView2.*"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{autoprograms}\LinkCursor"; Filename: "{app}\LinkCursor.exe"
+Name: "{autodesktop}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; Tasks: desktopicon
+
+[Registry]
+Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "1"; Tasks: elevatedinput; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "0"; Tasks: not elevatedinput; Flags: uninsdeletekey
+
+[Run]
+; Starting at sign-in is per user: the agent writes it (the value its
+; 开机时启动 switch uses) for the user who started setup, not for the
+; administrator account setup may run as.
+Filename: "{app}\linkcursor-agent.exe"; Parameters: "--launch-at-login on"; Tasks: autostart; Flags: runasoriginaluser runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""LinkCursor"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""LinkCursor"" dir=in action=allow program=""{app}\linkcursor-agent.exe"" enable=yes profile=private,public"; StatusMsg: "正在设置防火墙…"; Flags: runhidden waituntilterminated
+Filename: "{app}\linkcursor-service.exe"; Parameters: "--install"; StatusMsg: "正在安装输入服务…"; Flags: runhidden waituntilterminated
+Filename: "{app}\LinkCursor.exe"; Description: "启动 LinkCursor"; Flags: postinstall nowait skipifsilent runasoriginaluser
+
+[UninstallRun]
+Filename: "{app}\linkcursor-agent.exe"; Parameters: "--launch-at-login off"; RunOnceId: "RemoveAutostart"; Flags: runhidden waituntilterminated
+Filename: "{app}\linkcursor-service.exe"; Parameters: "--uninstall"; RunOnceId: "RemoveService"; Flags: runhidden waituntilterminated
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM LinkCursor.exe"; RunOnceId: "CloseApp"; Flags: runhidden waituntilterminated
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM linkcursor-agent.exe"; RunOnceId: "CloseAgent"; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""LinkCursor"""; RunOnceId: "RemoveFirewallRule"; Flags: runhidden waituntilterminated
+
+[UninstallDelete]
+; Logs of the service and the input helper. Settings, pairings and this
+; PC's identity in each user's %LOCALAPPDATA%\LinkCursor stay.
+Type: filesandordirs; Name: "{commonappdata}\LinkCursor"
+
+[Code]
+// Before files are replaced (an upgrade): the service and its helper hold
+// their executables, and the agent and the app may be running.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  if FileExists(ExpandConstant('{app}\linkcursor-service.exe')) then
+    Exec(ExpandConstant('{app}\linkcursor-service.exe'), '--uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM LinkCursor.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM linkcursor-agent.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;

@@ -1,0 +1,57 @@
+<#
+.SYNOPSIS
+Builds the LinkCursor setup program: the Release build, then Inno Setup.
+
+.DESCRIPTION
+Runs build.ps1 -Configuration Release, then compiles LinkCursor.iss with
+ISCC.exe (Inno Setup 6). The version comes from agent\Cargo.toml. The
+result is installer\output\LinkCursor-Setup-<version>-x64.exe.
+Keep this file ASCII-only: Windows PowerShell 5.1 reads scripts without a
+BOM in the system code page.
+
+.EXAMPLE
+.\installer\build-installer.ps1
+.\installer\build-installer.ps1 -SkipBuild
+#>
+[CmdletBinding()]
+param(
+    # Package what is already in app\x64\Release\LinkCursor.
+    [switch]$SkipBuild
+)
+
+$ErrorActionPreference = 'Stop'
+$root = Split-Path $PSScriptRoot -Parent
+
+$iscc = @(
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $iscc) {
+    throw 'Inno Setup 6 was not found. Install it with: winget install JRSoftware.InnoSetup'
+}
+
+if (-not $SkipBuild) {
+    & (Join-Path $root 'build.ps1') -Configuration Release
+    if ($LASTEXITCODE -ne 0) {
+        throw "The Release build failed ($LASTEXITCODE)."
+    }
+}
+
+$cargo = Get-Content (Join-Path $root 'agent\Cargo.toml') -Raw
+if ($cargo -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
+    throw 'No version in agent\Cargo.toml.'
+}
+$version = $Matches[1]
+$source = Join-Path $root 'app\x64\Release\LinkCursor'
+foreach ($exe in 'LinkCursor.exe', 'linkcursor-agent.exe', 'linkcursor-input.exe', 'linkcursor-service.exe') {
+    if (-not (Test-Path (Join-Path $source $exe))) {
+        throw "$exe is missing from $source."
+    }
+}
+
+& $iscc "/DAppVersion=$version" "/DSourceDir=$source" (Join-Path $PSScriptRoot 'LinkCursor.iss')
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup failed ($LASTEXITCODE)."
+}
+Get-Item (Join-Path $PSScriptRoot "output\LinkCursor-Setup-$version-x64.exe")

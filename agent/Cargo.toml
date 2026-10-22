@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 linkcursor-core = { path = "../../linkcursor-core" }
+linkcursor-input = { path = "../input" }
 png = "0.18.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -42,6 +43,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
+    "Win32_System_Pipes",
     "Win32_System_Power",
     "Win32_System_Registry",
     "Win32_System_Threading",
