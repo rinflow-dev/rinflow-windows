@@ -173,10 +173,20 @@ impl ClipboardHandle {
         let core = Arc::downgrade(&core);
         // Asked on a thread of its own: the core's callback must not wait.
         std::thread::spawn(move || {
-            let text = wide(&format!(
-                "另一台设备复制了 {count} 个文件，共 {:.1} MB。\n\n现在接收到“下载\\LinkCursor”吗？",
-                total as f64 / (1024.0 * 1024.0)
-            ));
+            let size = total as f64 / (1024.0 * 1024.0);
+            let text = wide(&if crate::i18n::chinese() {
+                format!(
+                    "另一台设备复制了 {count} 个文件，共 {size:.1} MB。\n\n现在接收到“下载\\LinkCursor”吗？"
+                )
+            } else if count == 1 {
+                format!(
+                    "Another device copied a file ({size:.1} MB).\n\nReceive it now? It will be saved in Downloads\\LinkCursor."
+                )
+            } else {
+                format!(
+                    "Another device copied {count} files ({size:.1} MB in total).\n\nReceive them now? They will be saved in Downloads\\LinkCursor."
+                )
+            });
             let caption = wide("LinkCursor");
             // SAFETY: a modal message box with valid NUL-terminated strings.
             let answer = unsafe {
@@ -212,7 +222,7 @@ impl ClipboardHandle {
                 }
                 self.post(WM_WRITE_CLIPBOARD);
             }
-            Err(error) => eprintln!("linkcursor-agent: peer clipboard not used: {error}"),
+            Err(error) => log!("peer clipboard not used: {error}"),
         }
     }
 
@@ -369,9 +379,7 @@ impl State {
             return;
         }
         if self.write_attempts == 0 {
-            eprintln!(
-                "linkcursor-agent: the clipboard stayed busy; a peer's clipboard was not written"
-            );
+            log!("the clipboard stayed busy; a peer's clipboard was not written");
             self.write_attempts = RETRY_ATTEMPTS;
             return;
         }

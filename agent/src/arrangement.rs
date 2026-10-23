@@ -10,7 +10,7 @@ use crate::displays::{self, Monitor, PhysicalPortal};
 use crate::identity;
 use crate::state::{DeviceView, LayoutView, SharedState};
 use linkcursor_core::PlacementRecord;
-use linkcursor_core::layout::{self, Display, Offset, Portal};
+use linkcursor_core::layout::{self, Display, Neighbor, Offset, Portal, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -55,7 +55,82 @@ pub struct Arrangement {
 pub struct Target {
     pub peer: Vec<Display>,
     pub offset: Offset,
+    /// Its portals with this PC (none when it sits against another peer only).
     pub portals: Vec<Portal>,
+    /// The other placed peers, which the pointer may move on into where
+    /// they touch this one.
+    pub neighbors: Vec<Neighbor>,
+}
+
+/// This PC and every placed peer, in this PC's space: for moving to the
+/// device on one side by shortcut.
+pub struct World {
+    pub local: Vec<Display>,
+    pub peers: Vec<Neighbor>,
+}
+
+impl World {
+    /// The device next to `from` (`None`: this PC) toward `side`: the
+    /// nearest whose middle lies that way. `Some(None)` is this PC.
+    pub fn toward(&self, from: Option<&str>, side: Side) -> Option<Option<String>> {
+        let bounds_of = |displays: &[Display]| layout::bounds(displays);
+        let current = match from {
+            None => bounds_of(&self.local)?,
+            Some(id) => bounds_of(&self.peers.iter().find(|peer| peer.id == id)?.displays)?,
+        };
+        let middle = |(left, top, right, bottom): (f64, f64, f64, f64)| {
+            ((left + right) / 2.0, (top + bottom) / 2.0)
+        };
+        let (cx, cy) = middle(current);
+        let candidates = std::iter::once((None, bounds_of(&self.local)))
+            .chain(
+                self.peers
+                    .iter()
+                    .map(|peer| (Some(peer.id.clone()), bounds_of(&peer.displays))),
+            )
+            .filter(|(id, _)| id.as_deref() != from);
+        candidates
+            .filter_map(|(id, bounds)| {
+                let (x, y) = middle(bounds?);
+                let (along, across) = match side {
+                    Side::Right => (x - cx, y - cy),
+                    Side::Left => (cx - x, y - cy),
+                    Side::Bottom => (y - cy, x - cx),
+                    Side::Top => (cy - y, x - cx),
+                };
+                // That way, and more that way than sideways.
+                (along > 1.0 && across.abs() <= along * 2.0)
+                    .then_some((along + 2.0 * across.abs(), id))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, id)| id)
+    }
+
+    /// Where the pointer lands when it jumps to `to` (`None`: this PC) from
+    /// `from`: the middle of the display of `to` nearest to `from`.
+    pub fn landing(&self, from: Option<&str>, to: Option<&str>) -> Option<(f64, f64)> {
+        let displays_of = |id: Option<&str>| match id {
+            None => Some(self.local.as_slice()),
+            Some(id) => self
+                .peers
+                .iter()
+                .find(|peer| peer.id == id)
+                .map(|peer| peer.displays.as_slice()),
+        };
+        let (left, top, right, bottom) = layout::bounds(displays_of(from)?)?;
+        let (cx, cy) = ((left + right) / 2.0, (top + bottom) / 2.0);
+        displays_of(to)?
+            .iter()
+            .map(|display| {
+                let (x, y) = (
+                    display.x + display.width / 2.0,
+                    display.y + display.height / 2.0,
+                );
+                ((x - cx).hypot(y - cy), (x, y))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, point)| point)
+    }
 }
 
 struct Inner {
@@ -105,62 +180,52 @@ impl Arrangement {
     }
 
     /// What controlling a placed peer needs: its displays (in its space), its
-    /// offset in this PC's space, and every portal leading to it.
+    /// offset in this PC's space, every portal leading to it, and the other
+    /// placed peers it may lead on to.
     pub fn target(&self, peer_id: &str) -> Option<Target> {
         let inner = self.inner.lock().ok()?;
-        let offset = inner
-            .saved
-            .placements
-            .iter()
-            .find(|record| record.peer_id == peer_id)?
-            .offset?;
-        let known = inner
-            .saved
-            .devices
-            .get(peer_id)
-            .cloned()
-            .unwrap_or_default();
-        let peer = layout::peer_or_default(&known.displays);
+        let offset = inner.offset_of(peer_id)?;
+        let peer = inner.displays_of(peer_id);
         let portals = layout::portals(&displays::logical(&inner.monitors), &peer, offset);
+        let neighbors = inner
+            .placed()
+            .into_iter()
+            .filter(|neighbor| neighbor.id != peer_id)
+            .collect();
         Some(Target {
             peer,
             offset,
             portals,
+            neighbors,
+        })
+    }
+
+    /// This PC and every placed peer, in this PC's space.
+    pub fn world(&self) -> Option<World> {
+        let inner = self.inner.lock().ok()?;
+        Some(World {
+            local: displays::logical(&inner.monitors),
+            peers: inner.placed(),
         })
     }
 
     /// Where a peer dropped at `offset` would land, for showing it while the
     /// user drags: the core's own snapping, with the same displays and the
-    /// other placed peers as obstacles. `None` when there is no room.
+    /// other placed peers (which it may also sit against). `None` when there
+    /// is no room.
     pub fn preview(&self, peer_id: &str, offset: Offset) -> Option<Offset> {
         let inner = self.inner.lock().ok()?;
-        let displays_of = |id: &str| {
-            layout::peer_or_default(
-                inner
-                    .saved
-                    .devices
-                    .get(id)
-                    .map(|device| device.displays.as_slice())
-                    .unwrap_or_default(),
-            )
-        };
-        let obstacles: Vec<Display> = inner
-            .saved
-            .placements
-            .iter()
-            .filter(|record| record.peer_id != peer_id)
-            .filter_map(|record| {
-                record
-                    .offset
-                    .map(|offset| layout::placed(&displays_of(&record.peer_id), offset))
-            })
-            .flatten()
+        let others: Vec<Vec<Display>> = inner
+            .placed()
+            .into_iter()
+            .filter(|other| other.id != peer_id)
+            .map(|other| other.displays)
             .collect();
-        layout::snap(
+        layout::snap_in_arrangement(
             &displays::logical(&inner.monitors),
-            &displays_of(peer_id),
+            &inner.displays_of(peer_id),
             offset,
-            &obstacles,
+            &others,
         )
     }
 
@@ -329,6 +394,45 @@ impl Arrangement {
     }
 }
 
+impl Inner {
+    fn offset_of(&self, peer_id: &str) -> Option<Offset> {
+        self.saved
+            .placements
+            .iter()
+            .find(|record| record.peer_id == peer_id)?
+            .offset
+    }
+
+    /// The peer's displays in its own space (a default until described).
+    fn displays_of(&self, peer_id: &str) -> Vec<Display> {
+        layout::peer_or_default(
+            self.saved
+                .devices
+                .get(peer_id)
+                .map(|device| device.displays.as_slice())
+                .unwrap_or_default(),
+        )
+    }
+
+    /// Every placed peer, as its displays in this PC's space, by ID.
+    fn placed(&self) -> Vec<Neighbor> {
+        let mut placed: Vec<Neighbor> = self
+            .saved
+            .placements
+            .iter()
+            .filter_map(|record| {
+                record.offset.map(|offset| Neighbor {
+                    id: record.peer_id.clone(),
+                    displays: layout::placed(&self.displays_of(&record.peer_id), offset),
+                })
+            })
+            .collect();
+        // The core's order, so both snap alike.
+        placed.sort_by(|a, b| a.id.cmp(&b.id));
+        placed
+    }
+}
+
 /// Takes a peer's name, platform and displays from a `peer` object of the
 /// core's events.
 fn describe(device: &mut KnownDevice, id: &str, peer: &Value) {
@@ -353,9 +457,76 @@ fn save(saved: &Saved) {
     match serde_json::to_string_pretty(saved) {
         Ok(text) => {
             if let Err(error) = identity::write_file(&path(), &text) {
-                eprintln!("linkcursor-agent: cannot save layout: {error}");
+                log!("cannot save layout: {error}");
             }
         }
-        Err(error) => eprintln!("linkcursor-agent: cannot encode layout: {error}"),
+        Err(error) => log!("cannot encode layout: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn screen(x: f64, y: f64, width: f64, height: f64) -> Display {
+        Display {
+            x,
+            y,
+            width,
+            height,
+            scale: 1.0,
+        }
+    }
+
+    /// This PC in the middle, a Mac to its right, a PC right of the Mac,
+    /// and a tablet above this PC.
+    fn world() -> World {
+        World {
+            local: vec![screen(0.0, 0.0, 1920.0, 1080.0)],
+            peers: vec![
+                Neighbor {
+                    id: "mac".into(),
+                    displays: vec![screen(1920.0, 0.0, 1512.0, 982.0)],
+                },
+                Neighbor {
+                    id: "pc".into(),
+                    displays: vec![screen(3432.0, 0.0, 1920.0, 1080.0)],
+                },
+                Neighbor {
+                    id: "tablet".into(),
+                    displays: vec![screen(400.0, -800.0, 1280.0, 800.0)],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn shortcuts_move_to_the_nearest_device_on_that_side() {
+        let world = world();
+        assert_eq!(world.toward(None, Side::Right), Some(Some("mac".into())));
+        assert_eq!(
+            world.toward(Some("mac"), Side::Right),
+            Some(Some("pc".into()))
+        );
+        assert_eq!(world.toward(Some("mac"), Side::Left), Some(None));
+        assert_eq!(world.toward(None, Side::Top), Some(Some("tablet".into())));
+        assert_eq!(world.toward(Some("tablet"), Side::Bottom), Some(None));
+        // Nothing that way.
+        assert_eq!(world.toward(None, Side::Left), None);
+        assert_eq!(world.toward(Some("pc"), Side::Right), None);
+    }
+
+    #[test]
+    fn a_jump_lands_in_the_middle_of_the_nearest_display() {
+        let world = World {
+            local: vec![
+                screen(0.0, 0.0, 1920.0, 1080.0),
+                screen(-1600.0, 0.0, 1600.0, 900.0),
+            ],
+            peers: world().peers,
+        };
+        assert_eq!(world.landing(None, Some("mac")), Some((2676.0, 491.0)));
+        // Back from the Mac: the right-hand monitor of this PC, not the left.
+        assert_eq!(world.landing(Some("mac"), None), Some((960.0, 540.0)));
     }
 }

@@ -47,7 +47,9 @@ namespace
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     std::wstring_view commandLine = GetCommandLineW();
-    std::wstring request = commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray" : L"main";
+    std::wstring request = commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray"
+        : commandLine.find(L"--settings") != std::wstring_view::npos ? L"settings"
+        : L"main";
 
     auto deadline = std::chrono::steady_clock::now() + Patience;
     bool owner = false;

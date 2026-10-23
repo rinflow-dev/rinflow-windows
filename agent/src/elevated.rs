@@ -72,7 +72,7 @@ pub fn start(on_status: impl Fn(Status) + Send + 'static) {
             runtime.block_on(keep_connected(receiver, on_status));
         });
     if let Err(error) = spawned {
-        eprintln!("linkcursor-agent: cannot start the input helper link: {error}");
+        log!("cannot start the input helper link: {error}");
     }
 }
 
@@ -136,7 +136,7 @@ async fn keep_connected(
             if is_helper(&pipe) {
                 serve(pipe, &mut outgoing, &mut report).await;
             } else {
-                eprintln!("linkcursor-agent: {name} is not LinkCursor's input helper");
+                log!("{name} is not LinkCursor's input helper");
             }
         }
         let channel = CHANNEL.get().expect("started");

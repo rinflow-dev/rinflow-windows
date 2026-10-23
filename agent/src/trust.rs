@@ -78,10 +78,10 @@ fn save(peers: &[TrustedPeer]) {
     match serde_json::to_string_pretty(peers) {
         Ok(text) => {
             if let Err(error) = identity::write_file(&path(), &text) {
-                eprintln!("linkcursor-agent: cannot save paired devices: {error}");
+                log!("cannot save paired devices: {error}");
             }
         }
-        Err(error) => eprintln!("linkcursor-agent: cannot encode paired devices: {error}"),
+        Err(error) => log!("cannot encode paired devices: {error}"),
     }
 }
 

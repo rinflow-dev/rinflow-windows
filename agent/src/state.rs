@@ -1,4 +1,5 @@
 use crate::effect::EffectParams;
+use crate::i18n::tr;
 use crate::settings::Settings;
 use linkcursor_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,24 @@ pub struct DeviceView {
     pub last_seen_ms: Option<u64>,
 }
 
+/// Files on their way to or from a peer.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct TransferView {
+    pub transfer: u32,
+    pub peer_id: String,
+    /// The peer's name, or its ID.
+    pub peer_name: String,
+    /// `receiving` or `sending`.
+    pub direction: &'static str,
+    /// The first top-level item, how many top-level items, how many files.
+    pub name: String,
+    pub items: u64,
+    pub count: u64,
+    /// Bytes moved so far, of `total`.
+    pub done: u64,
+    pub total: u64,
+}
+
 /// Which side of the simulated edge the cursor is on in the effect demo.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -132,6 +151,15 @@ pub struct Snapshot {
     /// The user quit LinkCursor (tray 退出): the app quits too instead of
     /// starting the agent again.
     pub quitting: bool,
+    /// The addresses the user added and how each fares: the core's
+    /// `manual_addresses` entries (`address`, `status`, `peer_id`, `name`,
+    /// `error`).
+    pub manual_addresses: Vec<Value>,
+    /// Files on their way, either way.
+    pub transfers: Vec<TransferView>,
+    /// Another program took one or more of the switch shortcuts first: the
+    /// settings page suggests the other combination.
+    pub switch_hotkeys_blocked: bool,
 }
 
 /// Whether input can reach elevated windows, UAC prompts and the lock screen.
@@ -178,7 +206,16 @@ impl SharedState {
             paired_peers: Vec::new(),
             elevated_input: ElevatedInputView::default(),
             quitting: false,
+            manual_addresses: Vec::new(),
+            transfers: Vec::new(),
+            switch_hotkeys_blocked: false,
         })))
+    }
+
+    /// Another program took one or more of the switch shortcuts first.
+    pub fn set_switch_hotkeys_blocked(&self, blocked: bool) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.switch_hotkeys_blocked, blocked));
     }
 
     pub fn set_quitting(&self) {
@@ -423,6 +460,9 @@ impl SharedState {
                 snapshot
                     .sessions
                     .retain(|session| session.peer_id != peer_id);
+                snapshot
+                    .transfers
+                    .retain(|transfer| transfer.peer_id != peer_id);
                 if snapshot
                     .pairing
                     .as_ref()
@@ -432,7 +472,11 @@ impl SharedState {
                 }
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
                 if let Some(message) = disconnect_message(reason) {
-                    snapshot.last_error = Some(format!("{name}：{message}"));
+                    snapshot.last_error = Some(if crate::i18n::chinese() {
+                        format!("{name}：{message}")
+                    } else {
+                        format!("{name}: {message}")
+                    });
                 }
                 true
             }
@@ -440,21 +484,98 @@ impl SharedState {
                 snapshot.last_error = event["message"].as_str().map(str::to_owned);
                 true
             }
-            "files_failed" => {
+            "files_failed" | "files_send_ended" => {
+                let direction = if kind == "files_failed" {
+                    "receiving"
+                } else {
+                    "sending"
+                };
+                let removed = snapshot.remove_transfer(&event, direction);
                 let reason = event["reason"].as_str().unwrap_or("unknown error");
                 let reason = match reason {
-                    // Declined here (or sharing is off), or the peer copied
-                    // something else meanwhile: nothing went wrong.
-                    "cancelled"
+                    // Done, declined here (or sharing is off), or the peer
+                    // copied something else meanwhile: nothing went wrong.
+                    "done"
+                    | "cancelled"
                     | "replaced by a newer copy"
                     | "files are no longer on the clipboard" => {
-                        return false;
+                        return removed;
                     }
-                    "connection lost" => "连接断开了",
+                    "connection lost" => tr("连接断开了", "the connection was lost"),
                     other => other,
                 };
-                snapshot.last_error = Some(format!("接收文件失败：{reason}"));
+                snapshot.last_error = Some(match (direction, crate::i18n::chinese()) {
+                    ("receiving", true) => format!("接收文件失败：{reason}"),
+                    ("receiving", false) => format!("Couldn't receive files: {reason}"),
+                    (_, true) => format!("发送文件失败：{reason}"),
+                    (_, false) => format!("Couldn't send files: {reason}"),
+                });
                 true
+            }
+            "files_received" => snapshot.remove_transfer(&event, "receiving"),
+            "files_receiving" | "files_sending" => {
+                let direction = if kind == "files_receiving" {
+                    "receiving"
+                } else {
+                    "sending"
+                };
+                let (Some(peer_id), Some(transfer)) = (
+                    event["peer_id"].as_str(),
+                    event["transfer"]
+                        .as_u64()
+                        .and_then(|n| u32::try_from(n).ok()),
+                ) else {
+                    return false;
+                };
+                let number = |key: &str| event[key].as_u64().unwrap_or(0);
+                let view = TransferView {
+                    transfer,
+                    peer_id: peer_id.to_owned(),
+                    peer_name: snapshot.peer_name(peer_id),
+                    direction,
+                    name: event["name"].as_str().unwrap_or_default().to_owned(),
+                    items: number("items"),
+                    count: number("count"),
+                    done: number("sent"),
+                    total: if direction == "receiving" {
+                        number("total_size")
+                    } else {
+                        number("total")
+                    },
+                };
+                match snapshot
+                    .transfers
+                    .iter_mut()
+                    .find(|t| t.transfer == transfer && t.direction == direction)
+                {
+                    Some(existing) => replace(existing, view),
+                    None => {
+                        snapshot.transfers.push(view);
+                        true
+                    }
+                }
+            }
+            "files_progress" => {
+                let (Some(transfer), Some(received)) = (
+                    event["transfer"]
+                        .as_u64()
+                        .and_then(|n| u32::try_from(n).ok()),
+                    event["received"].as_u64(),
+                ) else {
+                    return false;
+                };
+                match snapshot
+                    .transfers
+                    .iter_mut()
+                    .find(|t| t.transfer == transfer && t.direction == "receiving")
+                {
+                    Some(existing) => replace(&mut existing.done, received),
+                    None => false,
+                }
+            }
+            "manual_addresses" => {
+                let addresses = event["addresses"].as_array().cloned().unwrap_or_default();
+                replace(&mut snapshot.manual_addresses, addresses)
             }
             _ => false,
         });
@@ -462,6 +583,32 @@ impl SharedState {
 }
 
 impl Snapshot {
+    /// The peer's name as known from its session or discovery.
+    fn peer_name(&self, peer_id: &str) -> String {
+        self.sessions
+            .iter()
+            .find(|session| session.peer_id == peer_id)
+            .map(|session| session.name.clone())
+            .or_else(|| {
+                self.peers
+                    .iter()
+                    .find(|peer| peer.id == peer_id)
+                    .map(|peer| peer.name.clone())
+            })
+            .unwrap_or_else(|| peer_id.to_owned())
+    }
+
+    /// Drops the transfer an event names; true if there was one.
+    fn remove_transfer(&mut self, event: &Value, direction: &str) -> bool {
+        let Some(transfer) = event["transfer"].as_u64() else {
+            return false;
+        };
+        let before = self.transfers.len();
+        self.transfers
+            .retain(|t| !(u64::from(t.transfer) == transfer && t.direction == direction));
+        self.transfers.len() != before
+    }
+
     /// The session with `peer_id`, added as `connecting` if there is none.
     fn session_mut(&mut self, peer_id: &str) -> &mut Session {
         let index = match self.sessions.iter().position(|s| s.peer_id == peer_id) {
@@ -507,25 +654,169 @@ fn disconnect_message(reason: &str) -> Option<String> {
         | "pairing declined" => return None,
         // The peer vanished without closing (slept, lost the network); the
         // core reconnects once it is back.
-        "heartbeat timeout" => {
-            "对方没有响应（可能睡眠了或断网），回来后会自动重新连接。".to_owned()
+        "heartbeat timeout" => tr(
+            "对方没有响应（可能睡眠了或断网），回来后会自动重新连接。",
+            "The other device stopped responding (it may be asleep or offline). LinkCursor reconnects when it's back.",
+        )
+        .to_owned(),
+        "refused by the other device" => tr(
+            "对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。",
+            "The other device refused the connection. It may have removed this PC, or it only allows paired devices. To pair again, select Connect in the device menu.",
+        )
+        .to_owned(),
+        "the device's identity changed" => tr(
+            "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。",
+            "The device's identity certificate changed, so the connection was refused. If it was reinstalled, remove it in the device menu and pair again.",
+        )
+        .to_owned(),
+        "pairing declined on the other device" => {
+            tr("对方拒绝了配对。", "The other device declined pairing.").to_owned()
         }
-        "refused by the other device" => {
-            "对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。"
-                .to_owned()
-        }
-        "the device's identity changed" => {
-            "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。"
-                .to_owned()
-        }
-        "pairing declined on the other device" => "对方拒绝了配对。".to_owned(),
-        "pairing timed out" => "配对超时，没有在两分钟内确认。".to_owned(),
-        "pairing required" => "未配对的设备已断开（已开启“仅允许已配对设备”）。".to_owned(),
-        "unpaired" => "已取消配对。".to_owned(),
+        "pairing timed out" => tr(
+            "配对超时，没有在两分钟内确认。",
+            "Pairing timed out. It wasn't confirmed within two minutes.",
+        )
+        .to_owned(),
+        "pairing required" => tr(
+            "未配对的设备已断开（已开启“仅允许已配对设备”）。",
+            "An unpaired device was disconnected (\"Only paired devices\" is on).",
+        )
+        .to_owned(),
+        "unpaired" => tr("已取消配对。", "Unpaired.").to_owned(),
         other => other.to_owned(),
     })
 }
 
 fn parse_peer(value: &Value) -> Option<Peer> {
     serde_json::from_value(value.clone()).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::effect::EffectParams;
+
+    fn state() -> SharedState {
+        SharedState::new(
+            "this-pc",
+            "This PC",
+            EffectParams::default(),
+            Settings::default(),
+            false,
+            42421,
+        )
+    }
+
+    fn apply(state: &SharedState, event: serde_json::Value) {
+        state.apply_core_event(&event.to_string());
+    }
+
+    #[test]
+    fn transfers_show_while_files_move_either_way() {
+        let state = state();
+        apply(
+            &state,
+            serde_json::json!({"event": "connected", "peer": {"id": "mac", "name": "Mac mini", "address": "10.0.0.2", "port": 42421}, "paired": true}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_receiving", "peer_id": "mac", "transfer": 7, "name": "报告", "items": 2, "count": 4, "total_size": 400}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_progress", "peer_id": "mac", "transfer": 7, "received": 100, "total": 400}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_sending", "peer_id": "mac", "transfer": 9, "name": "photo.jpg", "items": 1, "count": 1, "sent": 50, "total": 80}),
+        );
+        {
+            let snapshot = state.0.borrow();
+            assert_eq!(snapshot.transfers.len(), 2);
+            let receiving = &snapshot.transfers[0];
+            assert_eq!(
+                (
+                    receiving.direction,
+                    receiving.peer_name.as_str(),
+                    receiving.name.as_str()
+                ),
+                ("receiving", "Mac mini", "报告")
+            );
+            assert_eq!(
+                (
+                    receiving.items,
+                    receiving.count,
+                    receiving.done,
+                    receiving.total
+                ),
+                (2, 4, 100, 400)
+            );
+            let sending = &snapshot.transfers[1];
+            assert_eq!(
+                (sending.direction, sending.done, sending.total),
+                ("sending", 50, 80)
+            );
+        }
+        // Done sending, quietly; received, quietly.
+        apply(
+            &state,
+            serde_json::json!({"event": "files_send_ended", "peer_id": "mac", "transfer": 9, "reason": "done"}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_received", "peer_id": "mac", "transfer": 7, "paths": []}),
+        );
+        assert!(state.0.borrow().transfers.is_empty());
+        assert_eq!(state.0.borrow().last_error, None);
+
+        // A transfer that breaks off says so; one stopped on purpose does not.
+        apply(
+            &state,
+            serde_json::json!({"event": "files_receiving", "peer_id": "mac", "transfer": 8, "name": "a", "items": 1, "count": 1, "total_size": 10}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_failed", "peer_id": "mac", "transfer": 8, "reason": "cancelled"}),
+        );
+        assert_eq!(state.0.borrow().last_error, None);
+        apply(
+            &state,
+            serde_json::json!({"event": "files_sending", "peer_id": "mac", "transfer": 10, "name": "b", "items": 1, "count": 1, "sent": 0, "total": 10}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_send_ended", "peer_id": "mac", "transfer": 10, "reason": "disk full"}),
+        );
+        assert!(
+            state
+                .0
+                .borrow()
+                .last_error
+                .as_deref()
+                .is_some_and(|error| error.contains("disk full"))
+        );
+
+        // A peer that goes away takes its transfers with it.
+        apply(
+            &state,
+            serde_json::json!({"event": "files_receiving", "peer_id": "mac", "transfer": 11, "name": "c", "items": 1, "count": 1, "total_size": 10}),
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "disconnected", "peer_id": "mac", "reason": "local request"}),
+        );
+        assert!(state.0.borrow().transfers.is_empty());
+    }
+
+    #[test]
+    fn manual_address_states_pass_through() {
+        let state = state();
+        apply(
+            &state,
+            serde_json::json!({"event": "manual_addresses", "addresses": [{"address": "192.168.1.20", "status": "found", "peer_id": "mac", "name": "Mac mini"}]}),
+        );
+        let snapshot = state.0.borrow();
+        assert_eq!(snapshot.manual_addresses.len(), 1);
+        assert_eq!(snapshot.manual_addresses[0]["status"], "found");
+    }
 }

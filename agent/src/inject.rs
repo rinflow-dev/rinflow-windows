@@ -17,10 +17,15 @@
 //!   event goes to it instead, so it also reaches elevated windows, UAC
 //!   prompts and the lock screen. Motion then goes as pixels: on those
 //!   desktops this process cannot even see where the pointer is.
+//! - A game or a pointer-lock page that hides the cursor and confines it
+//!   (`ClipCursor`) reads raw relative motion: motion is then played as
+//!   relative moves, and the controlling peer is told (`set_pointer_locked`)
+//!   so it stops crossing at the edges meanwhile.
 
 use crate::displays;
 use crate::elevated;
 use crate::keymap::{WinKey, windows_key};
+use linkcursor_core::Core;
 use linkcursor_core::{
     LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
@@ -29,9 +34,10 @@ use linkcursor_core::{
 use linkcursor_input::VirtualDesktop;
 use std::collections::HashSet;
 use std::io;
-use std::sync::mpsc;
+use std::sync::{Weak, mpsc};
 use std::thread::JoinHandle;
-use windows_sys::Win32::Foundation::POINT;
+use std::time::Duration;
+use windows_sys::Win32::Foundation::{POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
 use windows_sys::Win32::System::Power::{
     ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState,
@@ -42,12 +48,13 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC_EX, MOUSEEVENTF_HWHEEL,
     MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
-    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN,
-    MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
+    MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL,
+    MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetSystemMetrics, MKF_AVAILABLE, MKF_MOUSEKEYSON, SM_MOUSEPRESENT,
-    SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
+    CURSOR_SHOWING, CURSORINFO, GetClipCursor, GetCursorInfo, GetCursorPos, GetSystemMetrics,
+    MKF_AVAILABLE, MKF_MOUSEKEYSON, SM_MOUSEPRESENT, SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS,
+    SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
 };
 
 /// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
@@ -68,8 +75,14 @@ enum Job {
         peer_id: String,
         active: bool,
     },
+    /// The core, once it runs: told when a game holds the pointer.
+    Core(Weak<Core>),
     Quit,
 }
+
+/// How often the pointer lock is checked while a peer drives this PC and no
+/// motion comes (a game may let go meanwhile).
+const LOCK_POLL: Duration = Duration::from_millis(250);
 
 /// Cloneable sender used by the core callbacks.
 #[derive(Clone)]
@@ -78,6 +91,11 @@ pub struct InjectorHandle(mpsc::Sender<Job>);
 impl InjectorHandle {
     pub fn play(&self, event: LcInputEvent) {
         let _ = self.0.send(Job::Input(event));
+    }
+
+    /// The core, once it runs.
+    pub fn set_core(&self, core: Weak<Core>) {
+        let _ = self.0.send(Job::Core(core));
     }
 
     /// Picks the remote-control start and end out of the core's event stream.
@@ -112,7 +130,17 @@ impl Injector {
                 let mut player = Player::default();
                 // Jobs arrive in order, so the key-ups the core sends when a
                 // session ends are always played before Quit.
-                while let Ok(job) = receiver.recv() {
+                loop {
+                    let job = match receiver.recv_timeout(LOCK_POLL) {
+                        Ok(job) => job,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            if player.controlled {
+                                player.check_pointer_lock();
+                            }
+                            continue;
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    };
                     match job {
                         Job::Input(event) => player.play(&event),
                         Job::Control { peer_id, active } => {
@@ -123,6 +151,7 @@ impl Injector {
                             }
                             player.set_controlled(!player.controllers.is_empty());
                         }
+                        Job::Core(core) => player.core = Some(core),
                         Job::Quit => break,
                     }
                 }
@@ -165,6 +194,9 @@ struct Player {
     /// before it. Windows applies injected moves a moment later; reading the
     /// old position again then means the move is still on its way.
     last_move: Option<(POINT, POINT)>,
+    /// A game or a pointer-lock page holds the pointer (as last reported).
+    pointer_locked: bool,
+    core: Option<Weak<Core>>,
 }
 
 impl Player {
@@ -206,10 +238,49 @@ impl Player {
         }
         if controlled {
             show_cursor_without_mouse();
+            // A game may hold the pointer already: the new controller hears.
+            self.pointer_locked = false;
+            self.check_pointer_lock();
         }
     }
 
+    /// Whether a game holds the pointer, told to the core when it changes.
+    fn check_pointer_lock(&mut self) -> bool {
+        let locked = pointer_captured();
+        if locked != self.pointer_locked {
+            self.pointer_locked = locked;
+            log!(
+                "the pointer is {} by the program in front",
+                if locked { "held" } else { "no longer held" }
+            );
+            if let Some(core) = self.core.as_ref().and_then(Weak::upgrade) {
+                let _ = core.set_pointer_locked(locked);
+            }
+        }
+        locked
+    }
+
     fn move_by(&mut self, dx: f64, dy: f64) {
+        // A game reads raw relative motion: play it as such. The cursor is
+        // hidden and confined, so where it is does not matter.
+        if self.check_pointer_lock() {
+            let scale = self.last_cursor.map_or(1.0, monitor_scale);
+            let (step_x, rest_x) = scaled_step(dx, scale, self.motion_rest.0);
+            let (step_y, rest_y) = scaled_step(dy, scale, self.motion_rest.1);
+            self.motion_rest = (rest_x, rest_y);
+            self.last_move = None;
+            if step_x != 0 || step_y != 0 {
+                send_mouse(MOUSEINPUT {
+                    dx: step_x,
+                    dy: step_y,
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE,
+                    time: 0,
+                    dwExtraInfo: INJECTED_MARKER,
+                });
+            }
+            return;
+        }
         let mut cursor = POINT { x: 0, y: 0 };
         // SAFETY: writes the cursor position into `cursor`. It fails while
         // another desktop (UAC prompt, lock screen) has input.
@@ -295,6 +366,33 @@ impl Player {
             }
         }
     }
+}
+
+/// A game or a pointer-lock page holds the pointer: the cursor is hidden and
+/// confined to less than the desktop (`ClipCursor`). Either alone happens
+/// in ordinary use (typing hides it; some apps confine it).
+fn pointer_captured() -> bool {
+    // SAFETY: plain queries into properly sized structures.
+    unsafe {
+        let mut info: CURSORINFO = std::mem::zeroed();
+        info.cbSize = size_of::<CURSORINFO>() as u32;
+        if GetCursorInfo(&mut info) == 0 || info.flags & CURSOR_SHOWING != 0 {
+            return false;
+        }
+        let mut clip: RECT = std::mem::zeroed();
+        if GetClipCursor(&mut clip) == 0 {
+            return false;
+        }
+        confined(clip, &VirtualDesktop::current())
+    }
+}
+
+/// The cursor's clip rectangle leaves out part of the virtual desktop.
+fn confined(clip: RECT, desktop: &VirtualDesktop) -> bool {
+    clip.left > desktop.x
+        || clip.top > desktop.y
+        || clip.right < desktop.x + desktop.width
+        || clip.bottom < desktop.y + desktop.height
 }
 
 /// Whole pixels to move now and the fraction to carry over.
@@ -421,10 +519,7 @@ fn send(input: INPUT) {
     // No retry: SendInput fails when another desktop (UAC, lock screen) has
     // input, and retrying would only spin. UIPI blocks silently anyway.
     if sent == 0 && cfg!(debug_assertions) {
-        eprintln!(
-            "linkcursor-agent: SendInput failed: {}",
-            io::Error::last_os_error()
-        );
+        log!("SendInput failed: {}", io::Error::last_os_error());
     }
 }
 
@@ -466,7 +561,34 @@ fn show_cursor_without_mouse() {
 
 #[cfg(test)]
 mod tests {
-    use super::{WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, scaled_step, wheel_step};
+    use super::{
+        WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, confined, scaled_step, wheel_step,
+    };
+    use linkcursor_input::VirtualDesktop;
+    use windows_sys::Win32::Foundation::RECT;
+
+    #[test]
+    fn a_clip_smaller_than_the_desktop_holds_the_pointer() {
+        // Two monitors, the left one at negative coordinates.
+        let desktop = VirtualDesktop {
+            x: -1920,
+            y: 0,
+            width: 1920 + 2880,
+            height: 1920,
+        };
+        let rect = |left, top, right, bottom| RECT {
+            left,
+            top,
+            right,
+            bottom,
+        };
+        // Not confined: Windows reports the whole desktop.
+        assert!(!confined(rect(-1920, 0, 2880, 1920), &desktop));
+        // A game's window on the right monitor.
+        assert!(confined(rect(0, 0, 2880, 1920), &desktop));
+        // Chrome's pointer lock: a tiny rectangle.
+        assert!(confined(rect(1440, 960, 1441, 961), &desktop));
+    }
 
     #[test]
     fn motion_scales_and_keeps_fractions() {

@@ -10,6 +10,7 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #include "DeviceModel.h"
+#include "Strings.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -337,8 +338,8 @@ namespace winrt::LinkCursor::implementation
             auto screen = Screen(L"LocalScreenTemplate", display.width * m_layoutScale, display.height * m_layoutScale,
                 ScreenInsets(m_localDisplays, i), ScreenCorners(m_localDisplays, i),
                 main ? L"\xE7F4" : L"",
-                main ? m_localName : hstring(std::format(L"显示器 {}", number)),
-                main ? L"本机 · " + Pixels(display) : Pixels(display));
+                main ? m_localName : LinkCursorApp::Format(L"DisplayNumber", number),
+                main ? LinkCursorApp::Format(L"ThisPCWith", std::wstring(Pixels(display))) : Pixels(display));
             if (!main) ++number;
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);
@@ -419,8 +420,8 @@ namespace winrt::LinkCursor::implementation
         }
         UnplacedPanel().Visibility(chips.Children().Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
         ArrangementHint().Text(anyPlaced || chips.Children().Size() > 0
-            ? L"拖动以调整屏幕位置"
-            : L"连接设备后，可以在这里把它拖到屏幕旁边");
+            ? LinkCursorApp::Text(L"ArrangementHintDrag")
+            : LinkCursorApp::Text(L"ArrangementHintEmpty"));
     }
 
     FrameworkElement MainWindow::DeviceElement(LayoutDevice const& device, bool ghost)
@@ -445,7 +446,7 @@ namespace winrt::LinkCursor::implementation
             if (main)
             {
                 subtitle = LinkCursorApp::PlatformLabel(device.platform) + L" · " + Pixels(display);
-                if (!connected) subtitle = subtitle + (online ? L" · 未连接" : L" · 离线");
+                if (!connected) subtitle = subtitle + LinkCursorApp::Text(online ? L"SuffixNotConnected" : L"SuffixOffline");
             }
             auto screen = Screen(L"PeerScreenTemplate", display.width * scale, display.height * scale,
                 ScreenInsets(device.displays, i), ScreenCorners(device.displays, i),

@@ -7,6 +7,7 @@
 
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "Strings.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -30,7 +31,7 @@ namespace winrt::LinkCursor::implementation
                 self->m_agent->AcceptPairing(self->m_pairingPeer);
             }
             self->PairingDialog().IsPrimaryButtonEnabled(false);
-            self->PairingStatus().Text(L"等待对方确认…");
+            self->PairingStatus().Text(LinkCursorApp::Text(L"PairingWaiting"));
         });
         PairingDialog().Closed([weak](auto&&, auto&&)
         {
@@ -77,10 +78,10 @@ namespace winrt::LinkCursor::implementation
         {
             code.insert(3, L" ");
         }
-        PairingDialog().Title(box_value(L"配对 " + pairing.GetNamedString(L"name", peerId)));
+        PairingDialog().Title(box_value(LinkCursorApp::Format(L"PairingTitle", std::wstring(pairing.GetNamedString(L"name", peerId)))));
         PairingCode().Text(code);
         PairingDialog().IsPrimaryButtonEnabled(!accepted);
-        PairingStatus().Text(accepted ? L"等待对方确认…" : L"两台设备上都点“配对”后完成。");
+        PairingStatus().Text(LinkCursorApp::Text(accepted ? L"PairingWaiting" : L"PairingInstruction"));
         if (m_pairingOpen)
         {
             m_pairingPeer = peerId;

@@ -10,6 +10,7 @@
 #endif
 #include "PeerItem.h"
 #include "AppShell.h"
+#include "Strings.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -112,6 +113,7 @@ namespace winrt::LinkCursor::implementation
         SetupSettingsPage();
         SetupEffectPage();
         SetupPairing();
+        SetupTransfers();
 
         BackButton().Click([weak](auto&&, auto&&)
         {
@@ -141,7 +143,7 @@ namespace winrt::LinkCursor::implementation
             if (!self) return;
             self->m_closed = true;
             // 关闭窗口时保留在托盘 off: closing the window quits LinkCursor.
-            if (!self->m_keepInTray)
+            if (!self->m_keepInTray && !LinkCursorApp::IsRelaunching())
             {
                 self->m_agent->Quit();
             }
@@ -174,7 +176,7 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self) return;
             bool on = self->SharingToggle().IsOn();
-            self->SharingState().Text(on ? L"开" : L"关");
+            self->SharingState().Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
             if (!self->m_applying)
             {
                 self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(on));
@@ -260,34 +262,36 @@ namespace winrt::LinkCursor::implementation
 
         if (device.connected)
         {
-            add(L"断开连接", L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });
+            add(LinkCursorApp::Text(L"MenuDisconnect"), L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });
         }
         else if (device.online && !device.connecting)
         {
-            add(L"连接", L"\xE8CE", [peerId](MainWindow& self) { self.m_agent->Connect(peerId); });
+            add(LinkCursorApp::Text(L"MenuConnect"), L"\xE8CE", [peerId](MainWindow& self) { self.m_agent->Connect(peerId); });
         }
         if (menu.Items().Size() > 0)
         {
             menu.Items().Append(MenuFlyoutSeparator());
         }
-        add(L"放在左边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"left"); });
-        add(L"放在右边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"right"); });
-        add(L"放在上边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"top"); });
-        add(L"放在下边", nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"bottom"); });
+        add(LinkCursorApp::Text(L"MenuPlaceLeft"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"left"); });
+        add(LinkCursorApp::Text(L"MenuPlaceRight"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"right"); });
+        add(LinkCursorApp::Text(L"MenuPlaceTop"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"top"); });
+        add(LinkCursorApp::Text(L"MenuPlaceBottom"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"bottom"); });
         if (device.placed)
         {
-            add(L"取消放置", nullptr, [peerId](MainWindow& self) { self.m_agent->RemovePlacement(peerId); });
+            add(LinkCursorApp::Text(L"MenuUnplace"), nullptr, [peerId](MainWindow& self) { self.m_agent->RemovePlacement(peerId); });
         }
         menu.Items().Append(MenuFlyoutSeparator());
+        auto deviceName = device.name;
+        add(LinkCursorApp::Text(L"MenuPeerInput"), L"\xE962", [peerId, deviceName](MainWindow& self) { self.EditPeerInput(peerId, deviceName); });
         auto name = device.name;
-        add(L"移除此设备…", L"\xE74D", [peerId, name](MainWindow& self)
+        add(LinkCursorApp::Text(L"MenuForget"), L"\xE74D", [peerId, name](MainWindow& self)
         {
             ContentDialog confirm;
             confirm.XamlRoot(self.Root().XamlRoot());
-            confirm.Title(box_value(L"移除 " + name + L"？"));
-            confirm.Content(box_value(hstring(L"会断开连接，并删除它在排列中的位置。它在线时仍会出现在“添加设备”里。")));
-            confirm.PrimaryButtonText(L"移除");
-            confirm.CloseButtonText(L"取消");
+            confirm.Title(box_value(LinkCursorApp::Format(L"ForgetTitle", std::wstring(name))));
+            confirm.Content(box_value(LinkCursorApp::Text(L"ForgetContent")));
+            confirm.PrimaryButtonText(LinkCursorApp::Text(L"ForgetConfirm"));
+            confirm.CloseButtonText(LinkCursorApp::Text(L"Cancel"));
             confirm.DefaultButton(ContentDialogButton::Close);
             auto weak = self.get_weak();
             try
@@ -344,6 +348,8 @@ namespace winrt::LinkCursor::implementation
         }
         ApplySettings(state);
         ApplyDevices(state);
+        ApplyTransfers(state);
+        ApplyAddresses(state);
         ApplyLayout(state);
         ApplyEffect(state);
         m_lastState = state;
@@ -381,16 +387,16 @@ namespace winrt::LinkCursor::implementation
         // The dot by 添加设备: green while connected; the tooltip says more.
         StatusDotConnected().Visibility(connected > 0 ? Visibility::Visible : Visibility::Collapsed);
         hstring status;
-        if (!controller.empty()) status = L"正在被 " + controller + L" 控制键盘和鼠标";
-        else if (connected == 1) status = L"已连接 1 台设备";
-        else if (connected > 1) status = hstring(std::format(L"已连接 {} 台设备", connected));
-        else if (connecting) status = L"正在连接…";
+        if (!controller.empty()) status = LinkCursorApp::Format(L"StatusControlledBy", std::wstring(controller));
+        else if (connected == 1) status = LinkCursorApp::Text(L"StatusOneConnected");
+        else if (connected > 1) status = LinkCursorApp::Format(L"StatusManyConnected", connected);
+        else if (connecting) status = LinkCursorApp::Text(L"StatusConnecting");
         else
         {
             auto core = state.GetNamedString(L"core", L"starting");
-            status = core == L"running" ? L"未连接 · 正在局域网中查找设备"
-                : core == L"stopped" ? L"核心服务已停止"
-                : L"正在启动…";
+            status = core == L"running" ? LinkCursorApp::Text(L"StatusSearching")
+                : core == L"stopped" ? LinkCursorApp::Text(L"StatusCoreStopped")
+                : LinkCursorApp::Text(L"StatusStarting");
         }
         ToolTipService::SetToolTip(StatusIndicator(), box_value(status));
     }
@@ -418,7 +424,7 @@ namespace winrt::LinkCursor::implementation
     {
         if (!linked)
         {
-            ToolTipService::SetToolTip(StatusIndicator(), box_value(L"正在连接后台服务…"));
+            ToolTipService::SetToolTip(StatusIndicator(), box_value(LinkCursorApp::Text(L"StatusAgentConnecting")));
             StatusDotConnected().Visibility(Visibility::Collapsed);
             m_devices.Clear();
             m_nearby.Clear();
@@ -428,6 +434,10 @@ namespace winrt::LinkCursor::implementation
             m_effectRevision = -1;
             m_layoutSignature.clear();
             m_agentError = L"";
+            m_transferSignature.clear();
+            m_transferRows.clear();
+            TransfersPanel().Children().Clear();
+            TransfersPanel().Visibility(Visibility::Collapsed);
             // A preview asked of the agent that went away is never answered.
             m_previewPending = false;
             m_previewQueued = false;

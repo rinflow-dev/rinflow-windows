@@ -21,4 +21,10 @@ namespace LinkCursorApp
     void TrayPanelClosed();
     // Closes every window and ends the app.
     void QuitApp();
+    // Starts the app afresh on the settings page in `language` (every string
+    // is loaded again), and ends this one. The agent keeps running.
+    void RelaunchApp(winrt::hstring const& language);
+    // RelaunchApp is under way: closing the main window must not quit the
+    // agent even with 关闭窗口时保留在托盘 off.
+    bool IsRelaunching();
 }

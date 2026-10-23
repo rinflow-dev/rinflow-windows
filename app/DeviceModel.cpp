@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "DeviceModel.h"
 #include "PeerItem.h"
+#include "Strings.h"
 
 using namespace winrt;
 using namespace winrt::Windows::Data::Json;
@@ -48,7 +49,7 @@ namespace LinkCursorApp
         if (platform == L"windows") return L"Windows";
         if (platform == L"linux") return L"Linux";
         if (platform == L"android") return L"Android";
-        return L"未知系统";
+        return Text(L"UnknownSystem");
     }
 
     hstring DeviceGlyph(hstring const& platform)
@@ -62,19 +63,19 @@ namespace LinkCursorApp
     {
         if (!unixMs || *unixMs == 0)
         {
-            return L"离线";
+            return Text(L"Offline");
         }
         auto now = NowMs();
         auto minutes = now > *unixMs ? (now - *unixMs) / 60000 : 0;
-        if (minutes < 1) return L"刚刚在线";
-        if (minutes < 60) return hstring(std::format(L"{} 分钟前在线", minutes));
+        if (minutes < 1) return Text(L"OnlineJustNow");
+        if (minutes < 60) return Format(L"OnlineMinutesAgo", minutes);
         auto then = LocalTime(*unixMs);
         auto today = LocalTime(now);
         auto yesterday = LocalTime(now - 86400000ULL);
         auto sameDay = [](std::tm const& a, std::tm const& b) { return a.tm_year == b.tm_year && a.tm_yday == b.tm_yday; };
-        if (sameDay(then, today)) return hstring(std::format(L"今天 {:02}:{:02} 在线", then.tm_hour, then.tm_min));
-        if (sameDay(then, yesterday)) return L"昨天在线";
-        return hstring(std::format(L"{} 月 {} 日在线", then.tm_mon + 1, then.tm_mday));
+        if (sameDay(then, today)) return Format(L"OnlineTodayAt", then.tm_hour, then.tm_min);
+        if (sameDay(then, yesterday)) return Text(L"OnlineYesterday");
+        return Format(L"OnlineOnDate", then.tm_mon + 1, then.tm_mday);
     }
 
     hstring ResolutionOf(JsonArray const& displays)
@@ -233,27 +234,27 @@ namespace LinkCursorApp
         if (device.connected)
         {
             row->IsConnected(true);
-            row->StatusText(device.controlling ? L"正在控制本机" : L"已连接");
+            row->StatusText(Text(device.controlling ? L"StatusControllingThis" : L"StatusConnected"));
             row->Latency(!device.latencyMs ? hstring(L"…")
                 : *device.latencyMs == 0 ? hstring(L"<1 ms")
                 : hstring(std::format(L"{} ms", *device.latencyMs)));
         }
         else if (device.pairing)
         {
-            row->StatusText(L"等待配对确认…");
+            row->StatusText(Text(L"StatusPairing"));
         }
         else if (device.connecting)
         {
-            row->StatusText(L"连接中…");
+            row->StatusText(Text(L"StatusConnecting"));
         }
         else if (device.online)
         {
-            row->StatusText(L"未连接");
+            row->StatusText(Text(L"StatusNotConnected"));
             row->CanConnect(true);
         }
         else
         {
-            row->StatusText(L"离线");
+            row->StatusText(Text(L"Offline"));
             row->Latency(L"—");
             row->IsOffline(true);
         }
@@ -265,15 +266,15 @@ namespace LinkCursorApp
         auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
             device.id, device.name, Detail(device), DeviceGlyph(device.platform));
         row->CanConnect(!device.connecting);
-        row->StatusText(device.pairing ? L"等待配对确认…" : device.connecting ? L"连接中…" : L"");
+        row->StatusText(device.pairing ? Text(L"StatusPairing") : device.connecting ? Text(L"StatusConnecting") : hstring());
         return *row;
     }
 
     winrt::LinkCursor::PeerItem LocalRow(hstring const& name)
     {
         auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
-            L"", name, L"本机", DeviceGlyph(L"windows"));
-        row->StatusText(L"本机");
+            L"", name, Text(L"ThisPC"), DeviceGlyph(L"windows"));
+        row->StatusText(Text(L"ThisPC"));
         return *row;
     }
 }

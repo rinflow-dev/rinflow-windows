@@ -58,10 +58,17 @@ impl Services {
     /// `launch_at_login`), applies them at once and remembers them.
     pub fn update_settings(&self, mut values: Map<String, Value>) -> Result<(), String> {
         if let Some(value) = values.remove("launch_at_login") {
-            let enabled = value
-                .as_bool()
-                .ok_or("launch_at_login 需要 true 或 false")?;
-            autostart::set(enabled).map_err(|error| format!("无法设置开机启动：{error}"))?;
+            let enabled = value.as_bool().ok_or(crate::i18n::tr(
+                "launch_at_login 需要 true 或 false",
+                "launch_at_login must be true or false",
+            ))?;
+            autostart::set(enabled).map_err(|error| {
+                if crate::i18n::chinese() {
+                    format!("无法设置开机启动：{error}")
+                } else {
+                    format!("Couldn't change \"Start when I sign in\": {error}")
+                }
+            })?;
             self.state.set_launch_at_login(autostart::enabled());
         }
         if values.is_empty() {
@@ -82,6 +89,19 @@ impl Services {
             && let Some(core) = self.core.upgrade()
         {
             let _ = core.set_require_pairing(settings.paired_only);
+        }
+        if values.contains_key("language") {
+            crate::i18n::set_language(&settings.language);
+        }
+        if values.contains_key("shortcut_remap")
+            && let Some(core) = self.core.upgrade()
+        {
+            let _ = core.set_shortcut_remap(settings.shortcut_remap);
+        }
+        if values.contains_key("manual_addresses")
+            && let Some(core) = self.core.upgrade()
+        {
+            let _ = core.set_manual_addresses(settings.manual_addresses.clone());
         }
         self.edge.settings_changed();
         // A shortcut that failed to register may work now; the edge thread

@@ -120,7 +120,7 @@ impl EffectStore {
         if let Ok(text) = serde_json::to_string_pretty(&params)
             && let Err(error) = identity::write_file(&path(), &text)
         {
-            eprintln!("linkcursor-agent: cannot save effect settings: {error}");
+            log!("cannot save effect settings: {error}");
         }
         params
     }

@@ -39,12 +39,12 @@
                         <FontIcon
                             x:Name="Icon"
                             Margin="0,0,0,8"
-                            FontSize="22"
+                            FontSize="20"
                             Glyph="&#xE7F4;" />
                         <TextBlock
                             x:Name="Title"
                             HorizontalAlignment="Center"
-                            FontSize="15"
+                            FontSize="14"
                             FontWeight="SemiBold"
                             TextTrimming="CharacterEllipsis" />
                         <TextBlock
@@ -73,12 +73,12 @@
                         <FontIcon
                             x:Name="Icon"
                             Margin="0,0,0,8"
-                            FontSize="22"
+                            FontSize="20"
                             Glyph="&#xE7F4;" />
                         <TextBlock
                             x:Name="Title"
                             HorizontalAlignment="Center"
-                            FontSize="15"
+                            FontSize="14"
                             FontWeight="SemiBold"
                             TextTrimming="CharacterEllipsis" />
                         <TextBlock
@@ -139,7 +139,7 @@
                 x:Name="BackButton"
                 Margin="8,0,0,0"
                 VerticalAlignment="Center"
-                AutomationProperties.Name="返回"
+                x:Uid="BackButton" AutomationProperties.Name="返回"
                 Style="{StaticResource SubtleIconButtonStyle}"
                 ToolTipService.ToolTip="返回"
                 Visibility="Collapsed">
@@ -188,7 +188,7 @@
                  viewport's width (a ScrollViewer would centre a narrower page
                  by its desired width). -->
             <ScrollView x:Name="DevicesPage" ContentOrientation="Vertical">
-                <StackPanel MaxWidth="1040" Padding="40,12,40,40">
+                <StackPanel MaxWidth="1040" Padding="36,12,36,36">
                     <Grid Margin="0,0,0,24" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -197,7 +197,7 @@
                         <TextBlock
                             VerticalAlignment="Center"
                             Style="{StaticResource PageTitleStyle}"
-                            Text="设备" />
+                            x:Uid="DevicesTitle" Text="设备" />
                         <StackPanel
                             Grid.Column="1"
                             VerticalAlignment="Center"
@@ -224,13 +224,11 @@
                             </Grid>
                             <Button
                                 x:Name="AddDeviceButton"
-                                Height="36"
-                                Padding="16,0"
-                                AutomationProperties.Name="添加设备"
+                                x:Uid="AddDeviceButton" AutomationProperties.Name="添加设备"
                                 Style="{StaticResource AccentButtonStyle}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon FontSize="14" Glyph="&#xE710;" />
-                                    <TextBlock Text="添加设备" />
+                                    <TextBlock x:Uid="AddDeviceLabel" Text="添加设备" />
                                 </StackPanel>
                             </Button>
                             <!-- The edge animation's tuning page exists in
@@ -245,7 +243,7 @@
                             </Button>
                             <Button
                                 x:Name="SettingsButton"
-                                AutomationProperties.Name="设置"
+                                x:Uid="SettingsButton" AutomationProperties.Name="设置"
                                 Style="{StaticResource IconButtonStyle}"
                                 ToolTipService.ToolTip="设置">
                                 <FontIcon FontSize="16" Glyph="&#xE713;" />
@@ -264,7 +262,7 @@
                         IsClosable="False"
                         IsOpen="False"
                         Severity="Informational"
-                        Title="已锁定到当前屏幕" />
+                        x:Uid="LockBar" Title="已锁定到当前屏幕" />
 
                     <!-- Sharing on / off -->
                     <Grid Height="68" Style="{StaticResource CardStyle}">
@@ -278,14 +276,21 @@
                         <TextBlock
                             Grid.Column="1"
                             Style="{StaticResource RowTitleStyle}"
-                            Text="共享键盘和鼠标" />
+                            x:Uid="SharingTitle" Text="共享键盘和鼠标" />
                         <TextBlock x:Name="SharingState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch
                             x:Name="SharingToggle"
                             Grid.Column="3"
-                            AutomationProperties.Name="共享键盘和鼠标"
+                            x:Uid="SharingToggle" AutomationProperties.Name="共享键盘和鼠标"
                             Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
+
+                    <!-- Files on their way (built in code, MainWindow.Transfers.cpp). -->
+                    <StackPanel
+                        x:Name="TransfersPanel"
+                        Margin="0,4,0,0"
+                        Spacing="4"
+                        Visibility="Collapsed" />
 
                     <!-- Arrangement -->
                     <Grid
@@ -295,7 +300,7 @@
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="{StaticResource OverlayCornerRadius}">
+                        CornerRadius="{StaticResource ControlCornerRadius}">
                         <Canvas x:Name="DotsCanvas" IsHitTestVisible="False" />
                         <Canvas x:Name="ArrangementCanvas" Background="Transparent" />
                         <StackPanel
@@ -310,7 +315,7 @@
                                 VerticalAlignment="Center"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Style="{StaticResource CaptionTextBlockStyle}"
-                                Text="未放置：" />
+                                x:Uid="UnplacedLabel" Text="未放置：" />
                             <StackPanel x:Name="UnplacedChips" Orientation="Horizontal" Spacing="8" />
                         </StackPanel>
                         <TextBlock
@@ -320,11 +325,11 @@
                             VerticalAlignment="Bottom"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             IsHitTestVisible="False"
-                            Text="拖动以调整屏幕位置" />
+                            x:Uid="ArrangementHint" Text="拖动以调整屏幕位置" />
                     </Grid>
 
                     <!-- The user's devices -->
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="我的设备" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="MyDevicesHeader" Text="我的设备" />
                     <!-- A plain ItemsControl: nothing is selected, and a ListView
                          would nest its own scroller inside the page's. -->
                     <ItemsControl ItemsSource="{x:Bind Devices}">
@@ -346,7 +351,7 @@
                                     </Grid.ColumnDefinitions>
                                     <FontIcon
                                         VerticalAlignment="Center"
-                                        FontSize="22"
+                                        FontSize="20"
                                         Glyph="{x:Bind Glyph}"
                                         Opacity="{x:Bind ContentOpacity}" />
                                     <StackPanel
@@ -354,12 +359,10 @@
                                         VerticalAlignment="Center"
                                         Opacity="{x:Bind ContentOpacity}"
                                         Spacing="2">
-                                        <TextBlock
-                                            FontSize="15"
-                                            Text="{x:Bind Name}"
-                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
                                             Text="{x:Bind Detail}"
                                             TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
@@ -371,6 +374,7 @@
                                         Visibility="{x:Bind LatencyVisibility, Mode=OneWay}" />
                                     <HyperlinkButton
                                         Grid.Column="2"
+                                        x:Uid="RowConnect"
                                         VerticalAlignment="Center"
                                         Click="OnConnectDevice"
                                         Content="连接"
@@ -409,7 +413,7 @@
                                     <Button
                                         Grid.Column="4"
                                         VerticalAlignment="Center"
-                                        AutomationProperties.Name="更多操作"
+                                        x:Uid="RowMore" AutomationProperties.Name="更多操作"
                                         Click="OnDeviceMore"
                                         Style="{StaticResource SubtleIconButtonStyle}"
                                         Tag="{x:Bind Id}"
@@ -423,7 +427,7 @@
                     <TextBlock
                         x:Name="DevicesEmptyText"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。"
+                        x:Uid="DevicesEmpty" Text="还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。"
                         TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollView>
@@ -433,19 +437,19 @@
                 x:Name="SettingsPage"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
-                <StackPanel MaxWidth="1040" Padding="40,12,40,40" Spacing="4">
-                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="设置" />
+                <StackPanel MaxWidth="1040" Padding="36,12,36,36" Spacing="4">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" x:Uid="SettingsTitle" Text="设置" />
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="常规" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="GeneralHeader" Text="常规" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource RowTitleStyle}" Text="开机时启动" />
+                        <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="LaunchTitle" Text="开机时启动" />
                         <TextBlock x:Name="LaunchState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="LaunchToggle" Grid.Column="2" AutomationProperties.Name="开机时启动" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="LaunchToggle" Grid.Column="2" x:Uid="LaunchToggle" AutomationProperties.Name="开机时启动" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -454,31 +458,53 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="关闭窗口时保留在托盘" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TrayTitle" Text="关闭窗口时保留在托盘" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="TrayDescription" Text="关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。" />
                         </StackPanel>
                         <TextBlock x:Name="TrayState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" x:Uid="TrayToggle" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource RowTitleStyle}" Text="主题" />
+                        <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ThemeTitle" Text="主题" />
                         <ComboBox
                             x:Name="ThemeCombo"
                             Grid.Column="1"
                             MinWidth="200"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="主题">
-                            <ComboBoxItem Content="跟随系统" Tag="system" />
-                            <ComboBoxItem Content="浅色" Tag="light" />
-                            <ComboBoxItem Content="深色" Tag="dark" />
+                            x:Uid="ThemeCombo" AutomationProperties.Name="主题">
+                            <ComboBoxItem x:Uid="ThemeSystem" Content="跟随系统" Tag="system" />
+                            <ComboBoxItem x:Uid="ThemeLight" Content="浅色" Tag="light" />
+                            <ComboBoxItem x:Uid="ThemeDark" Content="深色" Tag="dark" />
+                        </ComboBox>
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="LanguageTitle" Style="{StaticResource RowTitleStyle}" Text="语言" />
+                            <TextBlock x:Uid="LanguageDescription" Style="{StaticResource RowDescriptionStyle}" Text="更改后 LinkCursor 窗口会重新打开。" />
+                        </StackPanel>
+                        <!-- Language names stay in their own language. -->
+                        <ComboBox
+                            x:Name="LanguageCombo"
+                            x:Uid="LanguageCombo"
+                            Grid.Column="1"
+                            MinWidth="200"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="语言">
+                            <ComboBoxItem x:Uid="LanguageSystem" Content="跟随系统" Tag="system" />
+                            <ComboBoxItem Content="简体中文" Tag="zh-CN" />
+                            <ComboBoxItem Content="English" Tag="en-US" />
                         </ComboBox>
                     </Grid>
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="屏幕切换" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="SwitchingHeader" Text="屏幕切换" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -486,15 +512,15 @@
                             <ColumnDefinition Width="72" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="切换延迟" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="光标要在屏幕边缘推住这么久才会切换到另一台设备。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="DelayTitle" Text="切换延迟" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="DelayDescription" Text="光标要在屏幕边缘推住这么久才会切换到另一台设备。" />
                         </StackPanel>
                         <Slider
                             x:Name="SwitchDelaySlider"
                             Grid.Column="1"
                             Width="240"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="切换延迟"
+                            x:Uid="DelaySlider" AutomationProperties.Name="切换延迟"
                             Maximum="500"
                             Minimum="0"
                             StepFrequency="10" />
@@ -511,11 +537,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="屏幕角落不触发切换" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="让开始按钮、菜单和触发角保持好用。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="CornerTitle" Text="屏幕角落不触发切换" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="CornerDescription" Text="让开始按钮、菜单和触发角保持好用。" />
                         </StackPanel>
                         <TextBlock x:Name="CornerState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="CornerToggle" Grid.Column="2" AutomationProperties.Name="屏幕角落不触发切换" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="CornerToggle" Grid.Column="2" x:Uid="CornerToggle" AutomationProperties.Name="屏幕角落不触发切换" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -524,11 +550,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="全屏游戏时暂停" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="全屏运行游戏、视频或演示时，光标不会切换到其他设备。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FullscreenTitle" Text="全屏游戏时暂停" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FullscreenDescription" Text="全屏运行游戏、视频或演示时，光标不会切换到其他设备。" />
                         </StackPanel>
                         <TextBlock x:Name="FullscreenState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" AutomationProperties.Name="全屏游戏时暂停" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" x:Uid="FullscreenToggle" AutomationProperties.Name="全屏游戏时暂停" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -537,8 +563,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="锁定到当前屏幕" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="按一次快捷键，光标留在当前屏幕上不再切换；再按一次解除。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="LockTitle" Text="锁定到当前屏幕" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="LockDescription" Text="按一次快捷键，光标留在当前屏幕上不再切换；再按一次解除。" />
                         </StackPanel>
                         <StackPanel
                             x:Name="HotkeyKeys"
@@ -550,14 +576,45 @@
                             x:Name="EditHotkeyButton"
                             Grid.Column="2"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="修改快捷键"
+                            x:Uid="EditHotkeyButton" AutomationProperties.Name="修改快捷键"
                             Style="{StaticResource SubtleIconButtonStyle}"
                             ToolTipService.ToolTip="修改快捷键">
                             <FontIcon FontSize="16" Glyph="&#xE70F;" />
                         </Button>
                     </Grid>
-
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="剪贴板" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="SwitchHotkeysTitle" Style="{StaticResource RowTitleStyle}" Text="用快捷键切换设备" />
+                            <TextBlock x:Uid="SwitchHotkeysDescription" Style="{StaticResource RowDescriptionStyle}" Text="按所选组合键加方向键，光标直接移到那一侧的设备。其他程序就收不到这组快捷键了。" />
+                            <TextBlock
+                                x:Name="SwitchHotkeysWarning"
+                                x:Uid="SwitchHotkeysWarning"
+                                Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                Style="{StaticResource RowDescriptionStyle}"
+                                Text="有的组合已被其他程序占用，那几个方向用不了。换一组试试。"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                        <!-- RegisterHotKey modifier bits: Ctrl 2, Alt 1, Shift 4. -->
+                        <ComboBox
+                            x:Name="SwitchModifiersCombo"
+                            x:Uid="SwitchModifiersCombo"
+                            Grid.Column="1"
+                            MinWidth="200"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="切换设备的组合键">
+                            <ComboBoxItem Content="Ctrl+Alt+Shift+↑↓←→" Tag="7" />
+                            <ComboBoxItem Content="Ctrl+Alt+↑↓←→" Tag="3" />
+                        </ComboBox>
+                        <TextBlock x:Name="SwitchHotkeysState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="SwitchHotkeysToggle" x:Uid="SwitchHotkeysToggle" Grid.Column="3" AutomationProperties.Name="用快捷键切换设备" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -565,21 +622,64 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="同步剪贴板和文件" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
+                            <TextBlock x:Uid="ShortcutRemapTitle" Style="{StaticResource RowTitleStyle}" Text="沿用 Mac 的快捷键" />
+                            <TextBlock x:Uid="ShortcutRemapDescription" Style="{StaticResource RowDescriptionStyle}" Text="Mac 控制这台电脑时，⌘C、⌘V 等按 Ctrl 快捷键执行。关闭后 ⌘ 对应 Windows 键。" />
                         </StackPanel>
-                        <TextBlock x:Name="ClipboardState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
+                        <TextBlock x:Name="ShortcutRemapState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="ShortcutRemapToggle" x:Uid="ShortcutRemapToggle" Grid.Column="2" AutomationProperties.Name="沿用 Mac 的快捷键" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="网络与安全" />
+                    <TextBlock x:Uid="PresenceHeader" Style="{StaticResource SectionHeaderStyle}" Text="锁屏与唤醒" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="KeepAwakeTitle" Style="{StaticResource RowTitleStyle}" Text="在其他设备上工作时保持唤醒" />
+                            <TextBlock x:Uid="KeepAwakeDescription" Style="{StaticResource RowDescriptionStyle}" Text="你在已连接的其他设备上操作时，这台电脑不熄屏，也不会因闲置而锁定。" />
+                        </StackPanel>
+                        <TextBlock x:Name="KeepAwakeState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="KeepAwakeToggle" x:Uid="KeepAwakeToggle" Grid.Column="2" AutomationProperties.Name="在其他设备上工作时保持唤醒" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="LockSyncTitle" Style="{StaticResource RowTitleStyle}" Text="一起锁定" />
+                            <TextBlock x:Uid="LockSyncDescription" Style="{StaticResource RowDescriptionStyle}" Text="锁定这台电脑时，已连接的设备一起锁定；它们锁定时，这台电脑也锁定。两台设备都打开此项才生效。" />
+                        </StackPanel>
+                        <TextBlock x:Name="LockSyncState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="LockSyncToggle" x:Uid="LockSyncToggle" Grid.Column="2" AutomationProperties.Name="一起锁定" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="ClipboardHeader" Text="剪贴板" />
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ClipboardTitle" Text="同步剪贴板和文件" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="ClipboardDescription" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
+                        </StackPanel>
+                        <TextBlock x:Name="ClipboardState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" x:Uid="ClipboardToggle" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="NetworkHeader" Text="网络与安全" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="端口" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="PortTitle" Text="端口" />
                             <TextBlock x:Name="PortHint" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
                         <NumberBox
@@ -587,7 +687,7 @@
                             Grid.Column="1"
                             Width="200"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="端口"
+                            x:Uid="PortBox" AutomationProperties.Name="端口"
                             Maximum="65535"
                             Minimum="1024"
                             SpinButtonPlacementMode="Hidden"
@@ -600,12 +700,12 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="加密传输 (TLS)" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TlsTitle" Text="加密传输 (TLS)" />
                             <TextBlock x:Name="TlsDescription" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
                         <!-- Always on when available: not something to turn off. -->
                         <TextBlock x:Name="TlsState" Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" x:Uid="TlsToggle" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -614,11 +714,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="仅允许已配对设备" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="PairedOnlyTitle" Text="仅允许已配对设备" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="PairedOnlyDescription" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。" />
                         </StackPanel>
                         <TextBlock x:Name="PairedOnlyState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" x:Uid="PairedOnlyToggle" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -627,11 +727,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="被控时可操作管理员窗口、UAC 和锁屏" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ElevatedTitle" Text="被控时可操作管理员窗口、UAC 和锁屏" />
                             <TextBlock x:Name="ElevatedInputDescription" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
                         <TextBlock x:Name="ElevatedInputState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="ElevatedInputToggle" Grid.Column="2" AutomationProperties.Name="被控时可操作管理员窗口、UAC 和锁屏" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="ElevatedInputToggle" Grid.Column="2" x:Uid="ElevatedInputToggle" AutomationProperties.Name="被控时可操作管理员窗口、UAC 和锁屏" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -640,8 +740,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="本机指纹" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" Text="本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FingerprintTitle" Text="本机指纹" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FingerprintDescription" Text="本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。" />
                         </StackPanel>
                         <TextBlock
                             x:Name="DeviceIdText"
@@ -654,14 +754,14 @@
                             x:Name="CopyIdButton"
                             Grid.Column="2"
                             VerticalAlignment="Center"
-                            AutomationProperties.Name="复制本机指纹"
+                            x:Uid="CopyIdButton" AutomationProperties.Name="复制本机指纹"
                             Style="{StaticResource SubtleIconButtonStyle}"
                             ToolTipService.ToolTip="复制">
                             <FontIcon FontSize="16" Glyph="&#xE8C8;" />
                         </Button>
                     </Grid>
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="关于" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="AboutHeader" Text="关于" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -673,9 +773,26 @@
                         </StackPanel>
                         <Button
                             x:Name="CheckUpdateButton"
+                            x:Uid="CheckUpdateButton"
                             Grid.Column="1"
                             VerticalAlignment="Center"
                             Content="检查更新" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="LogsTitle" Style="{StaticResource RowTitleStyle}" Text="诊断日志" />
+                            <TextBlock x:Uid="LogsDescription" Style="{StaticResource RowDescriptionStyle}" Text="记录连接、配对和文件传输的情况，不含剪贴板和键入的内容。反馈问题时附上会很有帮助。" />
+                        </StackPanel>
+                        <Button
+                            x:Name="OpenLogsButton"
+                            x:Uid="OpenLogsButton"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Content="打开日志文件夹" />
                     </Grid>
                 </StackPanel>
             </ScrollView>
@@ -685,7 +802,7 @@
                 x:Name="EffectPage"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
-                <StackPanel MaxWidth="1040" Padding="40,12,40,40" Spacing="12">
+                <StackPanel MaxWidth="1040" Padding="36,12,36,36" Spacing="12">
                     <StackPanel Spacing="4">
                         <TextBlock Style="{StaticResource PageTitleStyle}" Text="动画效果" />
                         <TextBlock
@@ -719,7 +836,7 @@
                     </StackPanel>
 
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="手感" />
-                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
+                    <Grid Padding="16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -777,7 +894,7 @@
                     </Grid>
 
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="动画" />
-                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
+                    <Grid Padding="16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -809,7 +926,7 @@
                     </Grid>
 
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="外观" />
-                    <Grid Padding="20,16" Style="{StaticResource CardStyle}">
+                    <Grid Padding="16" Style="{StaticResource CardStyle}">
                         <StackPanel Spacing="12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -893,13 +1010,13 @@
         <ContentDialog
             x:Name="AddDeviceDialog"
             Grid.RowSpan="2"
-            CloseButtonText="关闭"
+            x:Uid="AddDeviceDialog" CloseButtonText="关闭"
             DefaultButton="Close"
             Title="添加设备">
             <StackPanel MinWidth="420" Spacing="12">
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
+                    x:Uid="AddDeviceHint" Text="同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
                     TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{x:Bind Nearby}">
                     <ItemsControl.ItemsPanel>
@@ -925,6 +1042,7 @@
                                 </StackPanel>
                                 <Button
                                     Grid.Column="2"
+                                    x:Uid="NearbyConnect"
                                     VerticalAlignment="Center"
                                     Click="OnConnectDevice"
                                     Content="连接"
@@ -948,11 +1066,104 @@
                     Spacing="12">
                     <ProgressRing Width="20" Height="20" IsActive="True" />
                     <TextBlock
+                        x:Uid="NearbySearching"
                         VerticalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="正在查找附近的设备…"
                         TextWrapping="Wrap" />
                 </StackPanel>
+
+                <!-- Where multicast does not reach: by address. -->
+                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <StackPanel Spacing="8">
+                    <TextBlock x:Uid="AddressHeader" Style="{StaticResource BodyStrongTextBlockStyle}" Text="通过地址添加" />
+                    <TextBlock
+                        x:Uid="AddressHint"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="找不到设备时（例如在公司或访客网络、不同网段），输入对方的 IP 地址或设备名称。在一台设备上添加即可。"
+                        TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="AddressBox"
+                            x:Uid="AddressBox"
+                            AutomationProperties.Name="设备地址"
+                            PlaceholderText="例如 192.168.1.20" />
+                        <Button
+                            x:Name="AddAddressButton"
+                            x:Uid="AddAddressButton"
+                            Grid.Column="1"
+                            Content="添加" />
+                    </Grid>
+                    <TextBlock
+                        x:Name="AddressError"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                    <StackPanel x:Name="AddressList" Spacing="4" />
+                </StackPanel>
+            </StackPanel>
+        </ContentDialog>
+
+        <!-- How this PC's mouse feels on one peer (the agent's peer_input). -->
+        <ContentDialog
+            x:Name="PeerInputDialog"
+            x:Uid="PeerInputDialog"
+            Grid.RowSpan="2"
+            CloseButtonText="取消"
+            DefaultButton="Primary"
+            PrimaryButtonText="保存"
+            SecondaryButtonText="恢复默认">
+            <StackPanel MinWidth="360" Spacing="16">
+                <TextBlock
+                    x:Uid="PeerInputHint"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="用这台电脑的鼠标操作该设备时生效。"
+                    TextWrapping="Wrap" />
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <TextBlock x:Uid="PointerSpeedLabel" Text="指针速度" />
+                        <TextBlock x:Name="PointerSpeedValue" Style="{StaticResource SliderValueStyle}" />
+                    </Grid>
+                    <Slider
+                        x:Name="PointerSpeedSlider"
+                        x:Uid="PointerSpeedSlider"
+                        AutomationProperties.Name="指针速度"
+                        Maximum="4"
+                        Minimum="0.25"
+                        StepFrequency="0.05" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <TextBlock x:Uid="ScrollSpeedLabel" Text="滚动速度" />
+                        <TextBlock x:Name="ScrollSpeedValue" Style="{StaticResource SliderValueStyle}" />
+                    </Grid>
+                    <Slider
+                        x:Name="ScrollSpeedSlider"
+                        x:Uid="ScrollSpeedSlider"
+                        AutomationProperties.Name="滚动速度"
+                        Maximum="5"
+                        Minimum="0.25"
+                        StepFrequency="0.05" />
+                </StackPanel>
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Uid="InvertScrollLabel" VerticalAlignment="Center" Text="反转滚动方向" />
+                    <ToggleSwitch
+                        x:Name="InvertScrollToggle"
+                        x:Uid="InvertScrollToggle"
+                        Grid.Column="1"
+                        AutomationProperties.Name="反转滚动方向"
+                        Style="{StaticResource BareSwitchStyle}" />
+                </Grid>
             </StackPanel>
         </ContentDialog>
 
@@ -962,19 +1173,18 @@
             Grid.RowSpan="2"
             CloseButtonText="取消"
             DefaultButton="Primary"
-            PrimaryButtonText="配对">
+            x:Uid="PairingDialog" PrimaryButtonText="配对">
             <StackPanel MinWidth="380" Spacing="20">
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="确认对方屏幕显示相同的代码"
+                    x:Uid="PairingHint" Text="确认对方屏幕显示相同的代码"
                     TextWrapping="Wrap" />
                 <TextBlock
                     x:Name="PairingCode"
                     Margin="0,8,0,8"
                     HorizontalAlignment="Center"
                     CharacterSpacing="200"
-                    FontSize="52"
-                    FontWeight="SemiBold" />
+                    Style="{StaticResource TitleLargeTextBlockStyle}" />
                 <TextBlock
                     x:Name="PairingStatus"
                     HorizontalAlignment="Center"
@@ -991,11 +1201,11 @@
             DefaultButton="Primary"
             PrimaryButtonText="保存"
             SecondaryButtonText="恢复默认"
-            Title="锁定快捷键">
+            x:Uid="HotkeyDialog" Title="锁定快捷键">
             <StackPanel MinWidth="360" Spacing="16">
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。"
+                    x:Uid="HotkeyInstructions" Text="按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。"
                     TextWrapping="Wrap" />
                 <StackPanel
                     x:Name="HotkeyPreview"

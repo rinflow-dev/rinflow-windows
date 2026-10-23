@@ -184,7 +184,9 @@ The canvas on the **设备** page draws this PC's monitors (accent outline) and 
 - **Sleep and network changes.** [power.rs](agent/src/power.rs) tells the core when this PC is about to sleep (`PowerRegisterSuspendResumeNotification`, `PBT_APMSUSPEND`): sessions end in order, so a Mac driving this PC gets control back at once. On waking, and when an IPv4 address comes or goes (`NotifyUnicastIpAddressChange`, after 0.8 s without further changes), the core finds and reconnects the devices right away. A device that vanishes without closing (it slept, or lost the network) shows **对方没有响应…** until it is back.
 - **Placing a device.** The user's online devices that are not placed yet wait as **未放置** chips at the top of the canvas. Drag one next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. This PC can be dragged too, once something is placed: that moves every placed peer the other way (each snapped back against this PC, the nearest one first). A press that does not move is not a drag. Screens are drawn to scale but inset by 3 pixels on sides facing another device, so devices that touch show a small gap; the monitors of one computer stay flush against each other, with square corners where they meet, and read as one shape.
 - **Quick placement.** The **⋯** menu puts a device on the left, right, top or bottom, centred on that side, or removes it (**取消放置**, the only way to unplace: a drop outside the canvas still places the device).
-- **Snapping.** While a device is dragged, a dashed outline shows where it will land: the agent answers `preview_placement` with the core's own snapping (`layout::snap`, same displays and obstacles). The drop is then proposed to the core, which snaps it to that spot, and the canvas draws where it actually landed.
+- **Snapping.** While a device is dragged, a dashed outline shows where it will land: the agent answers `preview_placement` with the core's own snapping (`layout::snap_in_arrangement`, same displays and the other placed devices). The drop is then proposed to the core, which snaps it to that spot, and the canvas draws where it actually landed.
+- **Three or more devices.** A device may also be dropped against another placed device instead of this PC (a row of three, whichever has the keyboard). The pointer then crosses from one device straight into the next where they touch. Every placed device must connect to this PC through others; one left floating after a change is moved back against something. Such a chained placement is not synced to the device it does not touch (see the [core README](../README.md#arrangement)).
+- **Adding a device by address.** Where devices do not find each other (company or guest Wi-Fi, access points that keep clients apart, another subnet, a VPN), **添加设备** → **通过地址添加** takes an IP address or a device name. The core then sends its announcement straight there and the other device answers, so it shows up and connects as if it had been found ([manual.rs](../linkcursor-core/src/runtime/manual.rs)); one of the two devices needing the other's address is enough. Each address shows **正在查找…**, **已找到 …**, **没有回应** or why the name could not be looked up. Saved as `manual_addresses`.
 - **Device states.** A peer that is discovered but not connected says **未连接** under its name. A placed device that is offline is dimmed, says **离线** and keeps its place.
 - **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
 - **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
@@ -199,14 +201,15 @@ Core handles everything that is the same on every platform. The agent only trans
 
 | | Where | What |
 | --- | --- | --- |
-| Shortcuts | core (`remap.rs`) | Keys keep their position by default: a Mac's ⌘ is the Windows key, as in Deskflow. With the core's `shortcut_remap` on, ⌘ arrives as Ctrl instead (⌘C copies) and the Mac's Control stays Ctrl. The agent leaves it at the default. |
+| Shortcuts | core (`remap.rs`) | With **沿用 Mac 的快捷键** (`shortcut_remap`, on by default) a Mac's ⌘ arrives as Ctrl (⌘C copies) and its Control stays Ctrl. Off, keys keep their position: ⌘ is the Windows key, as in Deskflow. Changes apply at once; keys held through a change are released first. |
 | Control start/end | core | `remote_control_started` / `remote_control_ended` events. When control ends or the connection drops, core first releases every key and button the peer still holds. |
 | Pointer motion | agent | Played as an absolute move on the virtual desktop: current position + delta × this monitor's scale. Windows does not accelerate it a second time, multi-monitor layouts and negative coordinates work, and sub-pixel movement is carried over. |
 | Arrival | agent | A move flagged `LC_INPUT_FLAG_ABSOLUTE_POSITION` (sent by the Mac when the pointer crosses over) is converted from logical points to pixels through the monitor that contains it, so the cursor appears at the matching point of this PC's edge. |
 | Keys | agent ([keymap.rs](agent/src/keymap.rs)) | Played by scan code. The key position counts, so this PC's layout and IME (for example Chinese Pinyin) decide the character. Pause and NumLock are played by virtual key. A key with no Windows scan code still types its character. |
 | Scroll | agent | Trackpad points × 1.2 wheel units (Windows apps scroll about 100 DIPs per 120 units), and notched-wheel lines (10 points) become one Windows line (40 units). Fractions are carried over; horizontal scroll is supported. |
 | Buttons | agent | Left, right, middle, back, forward. |
-| Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. |
+| Games | agent, core | A game or a pointer-lock web page hides the cursor and confines it (`ClipCursor`), and reads raw relative motion. While that is so, motion is played as relative moves instead, and the controlling device is told (`set_pointer_locked`, the core's `PointerLock` message) so it stops crossing at the edges: the camera keeps turning. When the game lets go, the controlling device puts the cursor back where it tracks it. |
+| Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. See also [Presence](#presence). |
 | No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
 
 Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The capture hooks use it to skip input the agent itself played.
@@ -223,6 +226,10 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Coming back | agent | The cursor reappears there with the effect's emerge animation. For the **连续切换免阻力** time, going back across needs no push. |
 | Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
 | Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
+| Moving on | agent, core | Where the driven device touches another placed device, the pointer moves straight into that one (`RemotePointer::step` reports the neighbour; the capture retargets the core). Modifiers held go along; other held keys are released on the old device. |
+| Switch shortcuts | agent | **用快捷键切换设备** (`switch_hotkeys`, on by default): Ctrl+Alt+Shift+arrow keys (or Ctrl+Alt+arrow keys, `switch_modifiers`) jump to the device on that side of the current one, landing in the middle of its nearest display (`arrangement::World`). Ctrl+Alt+Shift is the default because few programs use it with the arrow keys: Ctrl+Alt alone adds cursors in VS Code and rotates the screen with some graphics drivers. Registered with `RegisterHotKey` while this PC has the pointer; the capture hooks take them while it drives a peer, and holding the modifiers on chains jumps. A combination another program registered first shows as a notice on the settings row (`switch_hotkeys_blocked`). |
+| Speeds per device | agent | **鼠标和滚动…** in a device's **⋯** menu (`peer_input`): pointer speed 0.25–4×, scrolling speed 0.25–5×, reversed scrolling. Applied here while this PC drives that device, before the pointer is tracked, so the two never disagree on where it is. |
+| Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc and the switch shortcuts still work. |
 | Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc, with the emerge animation. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
 
 The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
@@ -275,6 +282,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Privacy | Contents marked with `ExcludeClipboardContentFromMonitorProcessing` or `Clipboard Viewer Ignore`, or `CanIncludeInClipboardHistory` = 0 (password managers), are never shared. |
 | Copied files | Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`, with their names as text. The core sends a manifest, and the peer pulls the files while this PC runs. Files a peer copied land in `Downloads\LinkCursor` (folders kept, names never overwritten). They are then put on the clipboard as `CF_HDROP` with a copy drop effect, so Ctrl+V in Explorer copies them. |
 | Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While sharing is off it is refused. A failed transfer shows as the error bar. |
+| Progress | Files on their way, either way, show as cards on the **设备** page with their progress and a button to stop them (the snapshot's `transfers`, from the core's `files_receiving`, `files_progress`, `files_sending` and `files_send_ended`; `cancel_transfer`). When files arrive, a notification says so; clicking it opens `Downloads\LinkCursor`. |
 | Setting | Off by default. Saved to `%LOCALAPPDATA%\LinkCursor\settings.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
 ## Edge push-through effect
@@ -329,9 +337,17 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 开机时启动 | (registry) | The `LinkCursor` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `settings.json`. |
 | 关闭窗口时保留在托盘 | `keep_in_tray` | Off: closing the main window also quits the agent. |
 | 主题 | `theme` | `system`, `light` or `dark`, for both windows. |
+| 语言 | `language` | `system` (Windows' display language: Simplified Chinese, English for every other one), `zh-CN` or `en-US`. The app reads it from `settings.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (tray menu, notifications, errors) switches at once. See [Languages](#languages). |
 | 切换延迟 | `switch_delay_ms` | 0–500 ms (default 150): how long a push must last before it crosses. Crossing back within the effect's warm time needs no push. |
 | 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
+| 用快捷键切换设备 | `switch_hotkeys`, `switch_modifiers` | On by default with Ctrl+Alt+Shift (`7`); Ctrl+Alt (`3`) is the other choice. The arrow keys with those modifiers move the pointer to the device on that side; see [Controlling another device](#controlling-another-device). |
+| 沿用 Mac 的快捷键 | `shortcut_remap` | On by default. See [Being controlled by another device](#being-controlled-by-another-device). |
+| 在其他设备上工作时保持唤醒 | `keep_awake` | On by default. See [Presence](#presence). |
+| 一起锁定 | `lock_sync` | Off by default. See [Presence](#presence). |
+| 通过地址添加 (添加设备) | `manual_addresses` | Up to 32 host names or IPv4 addresses (optionally `:port`, the discovery port). See [Arranging devices](#arranging-devices). |
+| 鼠标和滚动 (device menu) | `peer_input` | `{"<device ID>": {"pointer_speed", "scroll_speed", "invert_scroll"}}`. See [Controlling another device](#controlling-another-device). |
+| 诊断日志 | (none) | **打开日志文件夹** opens `%LOCALAPPDATA%\LinkCursor\logs`: `agent.log` ([log.rs](agent/src/log.rs)), moved aside to `agent.1.log` past 2 MB. It records connections, pairing, transfers and errors with the local time (never clipboard contents, keys or the pairing code), and panics. The input service and helper log to `%ProgramData%\LinkCursor\logs`. |
 | 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
 | 端口 | `port` | The core's UDP port for connections (`null`: 42421). Applies after LinkCursor restarts; must not be the discovery port 42420. |
@@ -339,6 +355,20 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
 | 被控时可操作管理员窗口、UAC 和锁屏 | (machine-wide) | `HKLM\SOFTWARE\LinkCursor\ElevatedInput`, set by the setup program (on by default). Changing it asks for an administrator. Disabled when the input service is not installed. See [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen). |
+
+## Presence
+
+[presence.rs](agent/src/presence.rs), with the core's presence messages (see the [core README](../README.md#how-it-works)):
+
+| | What |
+| --- | --- |
+| Activity | Every 5 s, if this PC's keyboard or mouse was used in the last 10 s (`GetLastInputInfo`), peers are told (`report_user_activity`; the core sends it at most every 20 s). The nudges below are not counted, so two devices never keep each other awake for ever. |
+| Staying awake (`keep_awake`) | While a peer reports activity (`peer_active`), the display stays on (`SetThreadExecutionState`) and a mouse move of zero pixels every 30 s resets the idle timer that the screen saver and the idle lock go by, as Mouse Without Borders does. A minute after the last report it lets go. Not on a locked desktop. |
+| Locking together (`lock_sync`) | When this PC is locked (`WM_WTSSESSION_CHANGE`), peers are told (`lock_peers`); a peer's `lock_requested` locks this PC (`LockWorkStation`). Each side follows its own setting, and a lock caused by a peer is not passed on again. |
+
+## Languages
+
+The app's text lives in `app\Strings\en-US\Resources.resw` and `app\Strings\zh-CN\Resources.resw`: XAML takes it through `x:Uid`, code through `LinkCursorApp::Text` / `Format` ([Strings.h](app/Strings.h)). English is the default language, so any language without its own file shows English. The agent keeps its few strings side by side in the code (`i18n::tr`, [i18n.rs](agent/src/i18n.rs)). Both follow the `language` setting. The development-only animation page is not translated.
 
 ## Pairing and encryption
 
@@ -360,7 +390,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":11}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":12}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -373,6 +403,7 @@ App → agent:
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
 | `{"type":"reject_pairing","peer_id":"…"}` | The user declined the pairing; the connection closes. |
 | `{"type":"clear_error"}` | The user closed the error bar: `last_error` is cleared. |
+| `{"type":"cancel_transfer","transfer":N}` | Stop files being received or sent (`transfers`). |
 | `{"type":"quit"}` | Quit the agent, as the tray's 退出. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
@@ -383,7 +414,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":11,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":12,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
@@ -398,6 +429,9 @@ A `state` message looks like this:
 - `settings` holds the [Settings](#settings); `launch_at_login`, `control_port` (the port in use now), `locked` (the lock shortcut is on) and `agent_version` sit beside it.
 - `last_error` is omitted when there is none. A session the user or the peer ended normally does not set it, nor do file transfers that were declined or replaced by a newer copy. The app shows it when it changes, and `clear_error` removes it once the user closes it.
 - `quitting` turns true just before the agent exits because the user quit LinkCursor: the app closes too and does not start the agent again.
+- `manual_addresses` lists the addresses the user added, as the core reports them: `{"address", "status"}` with `status` `searching`, `found` (with `peer_id` and `name`), `no_response`, or `unresolved` (with `error`).
+- `switch_hotkeys_blocked` is true when another program took one of the switch shortcuts first.
+- `transfers` lists files on their way: `{"transfer", "peer_id", "peer_name", "direction"` (`receiving` or `sending`), `"name"` (the first top-level item), `"items"`, `"count"` (files), `"done"`, `"total"}` (bytes).
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
 - `demo_side` is `local` or `remote` while the demo runs.
@@ -435,7 +469,7 @@ The agent sends whole snapshots instead of individual events, so the app never h
 2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app uses it with a side menu; it has no drag canvas yet.
 3. **Send input (M2):** done; see [Controlling another device](#controlling-another-device). It still needs a pass with the real Mac for pointer speed and keys.
 4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
-5. **Productize (M4):** the setup program, the self-contained runtime, firewall rules and the input service for elevated windows, UAC prompts and the lock screen are done (see [Setup program](#setup-program)). Remaining: code signing, Ctrl+Alt+Del through the service (`SendSAS`), a log file for the agent, and updates.
+5. **Productize (M4):** the setup program, the self-contained runtime, firewall rules and the input service for elevated windows, UAC prompts and the lock screen are done (see [Setup program](#setup-program)). The agent's log file is done (see [Settings](#settings), 诊断日志). Remaining: code signing, Ctrl+Alt+Del through the service (`SendSAS`), and updates.
 6. **Security:** done; see [Pairing and encryption](#pairing-and-encryption). Next: send pointer motion as QUIC datagrams, so a lost packet never holds up the ones after it.
 
 ## Security

@@ -47,8 +47,7 @@
                 </Grid>
                 <TextBlock
                     VerticalAlignment="Center"
-                    FontSize="15"
-                    FontWeight="SemiBold"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
                     Text="LinkCursor" />
             </StackPanel>
 
@@ -59,11 +58,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE962;" />
-                <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" Text="键鼠共享" />
+                <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" x:Uid="TraySharingTitle" Text="键鼠共享" />
                 <ToggleSwitch
                     x:Name="SharingToggle"
                     Grid.Column="2"
-                    AutomationProperties.Name="键鼠共享"
+                    x:Uid="TraySharingToggle" AutomationProperties.Name="键鼠共享"
                     Style="{StaticResource BareSwitchStyle}" />
             </Grid>
 
@@ -73,7 +72,7 @@
                 Margin="4,0,0,0"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
-                Text="设备" />
+                x:Uid="TrayDevicesHeader" Text="设备" />
             <ItemsControl Margin="0,-6,0,0" ItemsSource="{x:Bind Devices}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="local:PeerItem">
@@ -130,12 +129,12 @@
             <HyperlinkButton
                 x:Name="OpenButton"
                 VerticalAlignment="Center"
-                Content="打开主窗口" />
+                x:Uid="TrayOpenButton" Content="打开主窗口" />
             <Button
                 x:Name="SettingsButton"
                 Grid.Column="1"
                 VerticalAlignment="Center"
-                AutomationProperties.Name="设置"
+                x:Uid="TraySettingsButton" AutomationProperties.Name="设置"
                 Style="{StaticResource SubtleIconButtonStyle}"
                 ToolTipService.ToolTip="设置">
                 <FontIcon FontSize="16" Glyph="&#xE713;" />
@@ -144,7 +143,7 @@
                 x:Name="QuitButton"
                 Grid.Column="2"
                 VerticalAlignment="Center"
-                AutomationProperties.Name="退出 LinkCursor"
+                x:Uid="TrayQuitButton" AutomationProperties.Name="退出 LinkCursor"
                 Style="{StaticResource SubtleIconButtonStyle}"
                 ToolTipService.ToolTip="退出 LinkCursor">
                 <FontIcon FontSize="16" Glyph="&#xE7E8;" />

@@ -87,7 +87,7 @@ impl PowerWatch {
             )
         };
         if result != ERROR_SUCCESS {
-            eprintln!("linkcursor-agent: no sleep and wake notifications ({result})");
+            log!("no sleep and wake notifications ({result})");
             power = 0;
         }
 
@@ -103,7 +103,7 @@ impl PowerWatch {
             )
         };
         if result != ERROR_SUCCESS {
-            eprintln!("linkcursor-agent: no network change notifications ({result})");
+            log!("no network change notifications ({result})");
             addresses = std::ptr::null_mut();
         }
 

@@ -229,7 +229,7 @@ fn run(receiver: mpsc::Receiver<Command>, store: EffectStore, sleeping: Arc<Atom
     let mut renderer = match Renderer::new(store) {
         Ok(renderer) => renderer,
         Err(error) => {
-            eprintln!("linkcursor-agent: overlay unavailable: {error}");
+            log!("overlay unavailable: {error}");
             // Keep draining so senders never block on a dead thread.
             while let Ok(command) = receiver.recv() {
                 if matches!(command, Command::Quit) {
@@ -594,7 +594,7 @@ impl Renderer {
             match Graphics::new(self.window) {
                 Ok(graphics) => self.graphics = Some(graphics),
                 Err(error) => {
-                    eprintln!("linkcursor-agent: overlay graphics failed: {error}");
+                    log!("overlay graphics failed: {error}");
                     self.sites.clear();
                     return;
                 }
@@ -602,7 +602,7 @@ impl Renderer {
         }
         if let Err(error) = self.draw_sites() {
             // Device lost (driver update, adapter change): rebuild next frame.
-            eprintln!("linkcursor-agent: overlay draw failed, recreating: {error}");
+            log!("overlay draw failed, recreating: {error}");
             self.graphics = None;
             for site in &mut self.sites {
                 site.surface = None;

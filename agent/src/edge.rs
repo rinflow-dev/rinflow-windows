@@ -81,7 +81,34 @@ pub const WM_TOGGLE_LOCK: u32 = WM_APP + 5;
 /// screen); a driven peer is given back so this PC's own keyboard and mouse
 /// reach it.
 const WM_RELEASE_CAPTURE: u32 = WM_APP + 6;
+/// Thread message: a game on a peer let go of its pointer; the peer is in
+/// [`POINTER_RELEASED`].
+const WM_POINTER_RELEASED: u32 = WM_APP + 7;
 const HOTKEY_ID: i32 = 1;
+/// The switch shortcuts (arrow keys), registered while no peer is driven (the capture
+/// hooks take them otherwise): ids 2 to 5, in [`SWITCH_SIDES`] order.
+const SWITCH_HOTKEY_BASE: i32 = 2;
+const SWITCH_SIDES: [Side; 4] = [Side::Left, Side::Right, Side::Top, Side::Bottom];
+
+/// Peers whose pointer a game or a pointer-lock page holds (the core's
+/// `peer_pointer_lock`): driving them, motion goes to them whole and their
+/// edges lead nowhere.
+static POINTER_HELD: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Peers whose game let go, for the edge thread.
+static POINTER_RELEASED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+pub fn pointer_held(peer_id: &str) -> bool {
+    POINTER_HELD
+        .lock()
+        .is_ok_and(|held| held.iter().any(|id| id == peer_id))
+}
+
+/// Forgets what a peer said: it says it again when driven anew.
+pub fn clear_pointer_held(peer_id: &str) {
+    if let Ok(mut held) = POINTER_HELD.lock() {
+        held.retain(|id| id != peer_id);
+    }
+}
 
 /// Control this PC lost (`control_revoked`), queued by the core's callback
 /// thread for the edge thread, which owns the capture: the peer, and whether
@@ -146,18 +173,43 @@ impl EdgeHandle {
     /// Picks `control_revoked` out of the core's event stream: the core
     /// took this PC's control of a peer away, so the capture has to end.
     pub fn core_event(&self, json: &str) {
-        if !json.contains("control_revoked") {
+        if !(json.contains("control_revoked")
+            || json.contains("peer_pointer_lock")
+            || json.contains("\"disconnected\""))
+        {
             return;
         }
         let Ok(event) = serde_json::from_str::<serde_json::Value>(json) else {
             return;
         };
-        if event["event"] != "control_revoked" {
-            return;
-        }
         let Some(peer_id) = event["peer_id"].as_str() else {
             return;
         };
+        if event["event"] == "disconnected" {
+            clear_pointer_held(peer_id);
+            return;
+        }
+        if event["event"] == "peer_pointer_lock" {
+            let locked = event["locked"].as_bool().unwrap_or(false);
+            clear_pointer_held(peer_id);
+            if locked {
+                if let Ok(mut held) = POINTER_HELD.lock() {
+                    held.push(peer_id.to_owned());
+                }
+            } else {
+                if let Ok(mut released) = POINTER_RELEASED.lock() {
+                    released.push(peer_id.to_owned());
+                }
+                // SAFETY: posts to the edge thread's message queue.
+                unsafe {
+                    PostThreadMessageW(self.thread_id, WM_POINTER_RELEASED, 0, 0);
+                }
+            }
+            return;
+        }
+        if event["event"] != "control_revoked" {
+            return;
+        }
         // `taken_over`: a peer drives this PC now and places the cursor.
         let stay = event["reason"] == "taken_over";
         if let Ok(mut revoked) = REVOKED.lock() {
@@ -227,6 +279,16 @@ impl EdgeThread {
                             capture::release();
                             continue;
                         }
+                        if message.hwnd.is_null() && message.message == WM_POINTER_RELEASED {
+                            let released = POINTER_RELEASED
+                                .lock()
+                                .map(|mut queue| std::mem::take(&mut *queue))
+                                .unwrap_or_default();
+                            for peer_id in released {
+                                capture::pointer_released(&peer_id);
+                            }
+                            continue;
+                        }
                         if message.hwnd.is_null() && message.message == WM_CONTROL_REVOKED {
                             let revoked = REVOKED
                                 .lock()
@@ -244,6 +306,9 @@ impl EdgeThread {
                     capture::release();
                     capture::finish();
                     UnregisterHotKey(window, HOTKEY_ID);
+                    for id in 0..SWITCH_SIDES.len() as i32 {
+                        UnregisterHotKey(window, SWITCH_HOTKEY_BASE + id);
+                    }
                     remove_input_window(window);
                 }
                 TRACKER.with(|tracker| {
@@ -308,6 +373,8 @@ struct Tracker {
     cooldown_until: Instant,
     /// The lock shortcut last registered (or tried).
     hotkey: Option<Hotkey>,
+    /// The modifiers the switch shortcuts are registered with.
+    switch_hotkeys: Option<u32>,
 }
 
 struct Hit {
@@ -345,6 +412,7 @@ impl Tracker {
             warm_until: None,
             cooldown_until: now,
             hotkey: None,
+            switch_hotkeys: None,
         }
     }
 
@@ -356,6 +424,87 @@ impl Tracker {
             capture::release();
         }
         self.register_hotkey(settings.lock_hotkey);
+        self.register_switch_hotkeys(settings.switch_hotkeys.then_some(settings.switch_modifiers));
+    }
+
+    /// What a capture needs to move on to other devices.
+    fn context(&self) -> capture::Context {
+        capture::Context {
+            arrangement: self.arrangement.clone(),
+            state: self.state.clone(),
+            settings: self.settings.clone(),
+        }
+    }
+
+    /// The switch shortcuts (the arrow keys with `modifiers`, `None` for
+    /// off) while this PC has the pointer; a driven peer's capture hooks see
+    /// them otherwise. A combination another program took first is reported
+    /// to the settings page (`switch_hotkeys_blocked`), the others still work.
+    fn register_switch_hotkeys(&mut self, modifiers: Option<u32>) {
+        if self.switch_hotkeys == modifiers {
+            return;
+        }
+        self.switch_hotkeys = modifiers;
+        let mut blocked = false;
+        for (index, side) in SWITCH_SIDES.iter().enumerate() {
+            let id = SWITCH_HOTKEY_BASE + index as i32;
+            // SAFETY: (un)registers this thread's window for the shortcut.
+            unsafe {
+                UnregisterHotKey(self.window, id);
+                if let Some(modifiers) = modifiers
+                    && RegisterHotKey(
+                        self.window,
+                        id,
+                        (modifiers | MOD_NOREPEAT) as HOT_KEY_MODIFIERS,
+                        capture::side_key(*side),
+                    ) == 0
+                {
+                    blocked = true;
+                    log!(
+                        "switch shortcut {}+{side:?} is taken by another program: {}",
+                        describe_modifiers(modifiers),
+                        io::Error::last_os_error()
+                    );
+                }
+            }
+        }
+        self.state.set_switch_hotkeys_blocked(blocked);
+    }
+
+    /// A switch shortcut: to the device on that side of this PC.
+    fn jump(&mut self, side: Side) {
+        if capture::active() {
+            capture::jump(side);
+            return;
+        }
+        let settings = self.settings.get();
+        if !settings.sharing || !settings.switch_hotkeys || locked() || self.demo {
+            return;
+        }
+        let Some(world) = self.arrangement.world() else {
+            return;
+        };
+        let Some(Some(peer_id)) = world.toward(None, side) else {
+            return;
+        };
+        if !self.state.is_connected(&peer_id) {
+            return;
+        }
+        let (Some(point), Some(target)) = (
+            world.landing(None, Some(&peer_id)),
+            self.arrangement.target(&peer_id),
+        ) else {
+            return;
+        };
+        self.cancel();
+        capture::begin_at(
+            &self.core,
+            &peer_id,
+            target,
+            point,
+            self.window,
+            self.context(),
+        );
     }
 
     fn register_hotkey(&mut self, hotkey: Hotkey) {
@@ -378,10 +527,14 @@ impl Tracker {
             ) != 0
         };
         if !registered {
-            self.state.set_error(format!(
-                "锁定快捷键 {} 已被其他程序占用，请在设置中换一个",
-                describe_hotkey(hotkey)
-            ));
+            let shortcut = describe_hotkey(hotkey);
+            self.state.set_error(if crate::i18n::chinese() {
+                format!("锁定快捷键 {shortcut} 已被其他程序占用，请在设置中换一个")
+            } else {
+                format!(
+                    "Another app is already using the lock shortcut {shortcut}. Choose a different one in settings."
+                )
+            });
         }
     }
 
@@ -592,7 +745,14 @@ impl Tracker {
             if let Some(portal) = portal
                 && let Some(target) = self.arrangement.target(&portal.peer_id)
             {
-                capture::begin(&self.core, target, &portal, cursor_position(), self.window);
+                capture::begin(
+                    &self.core,
+                    target,
+                    &portal,
+                    cursor_position(),
+                    self.window,
+                    self.context(),
+                );
             }
             return;
         }
@@ -676,22 +836,27 @@ fn full_screen_app_running() -> bool {
 
 /// "Ctrl+Alt+L", for messages.
 fn describe_hotkey(hotkey: Hotkey) -> String {
-    let mut parts = Vec::new();
-    for (bit, name) in [
-        (MOD_CONTROL, "Ctrl"),
-        (MOD_ALT, "Alt"),
-        (MOD_SHIFT, "Shift"),
-        (MOD_WIN, "Win"),
-    ] {
-        if hotkey.modifiers & bit != 0 {
-            parts.push(name.to_owned());
-        }
-    }
+    let mut parts = vec![describe_modifiers(hotkey.modifiers)];
     parts.push(match char::from_u32(hotkey.key) {
         Some(key) if key.is_ascii_alphanumeric() => key.to_string(),
         _ => format!("0x{:02X}", hotkey.key),
     });
     parts.join("+")
+}
+
+/// "Ctrl+Alt+Shift", for messages.
+fn describe_modifiers(modifiers: u32) -> String {
+    [
+        (MOD_CONTROL, "Ctrl"),
+        (MOD_ALT, "Alt"),
+        (MOD_SHIFT, "Shift"),
+        (MOD_WIN, "Win"),
+    ]
+    .iter()
+    .filter(|(bit, _)| modifiers & bit != 0)
+    .map(|(_, name)| *name)
+    .collect::<Vec<_>>()
+    .join("+")
 }
 
 fn edge_of(side: Side) -> Edge {
@@ -973,14 +1138,24 @@ unsafe extern "system" fn window_proc(
             with_tracker(Tracker::toggle_lock);
             return 0;
         }
+        WM_HOTKEY
+            if (SWITCH_HOTKEY_BASE as usize..SWITCH_HOTKEY_BASE as usize + SWITCH_SIDES.len())
+                .contains(&wparam) =>
+        {
+            let side = SWITCH_SIDES[wparam - SWITCH_HOTKEY_BASE as usize];
+            with_tracker(|tracker| tracker.jump(side));
+            return 0;
+        }
         WM_TOGGLE_LOCK => {
             with_tracker(Tracker::toggle_lock);
             return 0;
         }
         WM_END_CAPTURE => {
-            // Only a pointer that came back shows the emerge animation.
+            // Only a pointer that came back through a portal shows the
+            // emerge animation.
             if let Some(ended) = capture::finish()
                 && let Some(cursor) = ended.cursor
+                && !ended.jumped
             {
                 with_tracker(|tracker| tracker.returned(&ended.peer_id, cursor));
             }
@@ -1019,8 +1194,11 @@ fn read_relative_motion(lparam: LPARAM) -> Option<(i32, i32)> {
         }
         let mouse = input.data.mouse;
         // Absolute devices (pens, remote desktop, a peer's played input) do
-        // not report pushes.
-        if mouse.usFlags & MOUSE_MOVE_ABSOLUTE != 0 {
+        // not report pushes, nor does what this agent plays itself (a
+        // peer's motion into a game, the nudges that keep the PC awake).
+        if mouse.usFlags & MOUSE_MOVE_ABSOLUTE != 0
+            || mouse.ulExtraInformation as usize == crate::inject::INJECTED_MARKER
+        {
             return None;
         }
         Some((mouse.lLastX, mouse.lLastY))

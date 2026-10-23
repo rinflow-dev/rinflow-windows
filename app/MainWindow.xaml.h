@@ -119,6 +119,25 @@ namespace winrt::LinkCursor::implementation
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_pairingRetry{ nullptr };
         Windows::Data::Json::JsonObject m_lastState{ nullptr };
 
+        // ---- Transfers, addresses, per-device input (MainWindow.Transfers.cpp)
+        void SetupTransfers();
+        void ApplyTransfers(Windows::Data::Json::JsonObject const& state);
+        void ApplyAddresses(Windows::Data::Json::JsonObject const& state);
+        void AddAddress();
+        std::vector<std::wstring> ManualAddresses() const;
+        void SaveAddresses(std::vector<std::wstring> const& addresses);
+        fire_and_forget EditPeerInput(hstring peerId, hstring name);
+        struct TransferRow
+        {
+            Microsoft::UI::Xaml::Controls::ProgressBar bar{ nullptr };
+            Microsoft::UI::Xaml::Controls::TextBlock detail{ nullptr };
+        };
+        // By direction and transfer number.
+        std::map<std::wstring, TransferRow> m_transferRows;
+        std::wstring m_transferSignature;
+        std::wstring m_addressSignature;
+        bool m_peerInputOpen{ false };
+
         // ---- Settings (MainWindow.Settings.cpp) ----------------------------
         void SetupSettingsPage();
         void ApplySettings(Windows::Data::Json::JsonObject const& state);

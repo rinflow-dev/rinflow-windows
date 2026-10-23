@@ -1,6 +1,10 @@
 // Release builds run without a console window; debug builds keep one for logs.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// First: the other modules use its `log!` macro.
+#[macro_use]
+mod log;
+
 mod arrangement;
 mod capture;
 mod clipboard;
@@ -8,12 +12,14 @@ mod displays;
 mod edge;
 mod effect;
 mod elevated;
+mod i18n;
 mod identity;
 mod inject;
 mod ipc;
 mod keymap;
 mod overlay;
 mod power;
+mod presence;
 mod services;
 mod settings;
 mod spring;
@@ -43,14 +49,16 @@ fn main() {
     }
 
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
+        // Not logged: the running instance owns the log file.
         eprintln!("linkcursor-agent: another instance is already running in this session");
         return;
     };
+    log::init();
 
     let identity = match identity::load() {
         Ok(identity) => identity,
         Err(error) => {
-            eprintln!("linkcursor-agent: cannot load device identity: {error}");
+            log!("cannot load device identity: {error}");
             return;
         }
     };
@@ -58,6 +66,8 @@ fn main() {
     let effects = effect::EffectStore::load();
     let settings = Arc::new(settings::SettingsStore::load());
     let preferences = settings.get();
+    // The language of the tray menu, notifications and messages.
+    i18n::set_language(&preferences.language);
     let clipboard_sync = preferences.clipboard;
     let control_port = preferences
         .port
@@ -74,14 +84,14 @@ fn main() {
     let overlay = match overlay::Overlay::spawn(effects.clone()) {
         Ok(overlay) => overlay,
         Err(error) => {
-            eprintln!("linkcursor-agent: cannot start the edge overlay: {error}");
+            log!("cannot start the edge overlay: {error}");
             return;
         }
     };
     let injector = match inject::Injector::spawn() {
         Ok(injector) => injector,
         Err(error) => {
-            eprintln!("linkcursor-agent: cannot start input injection: {error}");
+            log!("cannot start input injection: {error}");
             return;
         }
     };
@@ -121,6 +131,10 @@ fn main() {
         identity_path: Some(trust::identity_path().to_string_lossy().into_owned()),
         trusted_peers: trust.peers(),
         require_pairing: preferences.paired_only,
+        // A Mac's ⌘ shortcuts work here as Ctrl ones (the user's setting).
+        shortcut_remap: preferences.shortcut_remap,
+        // Devices to find by address where multicast does not reach.
+        manual_addresses: preferences.manual_addresses.clone(),
         ..CoreConfig::default()
     };
     let events = state.clone();
@@ -133,10 +147,14 @@ fn main() {
     // so nothing can be revoked either.
     let edge_slot = Arc::new(OnceLock::<edge::EdgeHandle>::new());
     let edge_events = edge_slot.clone();
+    // Started right after the core, like the edge thread.
+    let presence_slot = Arc::new(OnceLock::<presence::PresenceHandle>::new());
+    let presence_events = presence_slot.clone();
     let window_opened = std::sync::Mutex::new(None::<std::time::Instant>);
     let core = match Core::start(
         config,
         move |json| {
+            log::core_event(&json);
             events.apply_core_event(&json);
             if trust_events.core_event(&json) {
                 events.set_paired_peers(paired_ids(&trust_events));
@@ -152,23 +170,49 @@ fn main() {
                 *opened = Some(std::time::Instant::now());
                 std::thread::spawn(|| tray::open_app(&[]));
             }
+            // Files arrived: say so; clicking shows them.
+            if json.contains("\"files_received\"")
+                && let Ok(event) = serde_json::from_str::<serde_json::Value>(&json)
+            {
+                let count = event["paths"].as_array().map_or(0, Vec::len);
+                let title = if i18n::chinese() {
+                    format!("已收到 {count} 项")
+                } else if count == 1 {
+                    "Received 1 item".to_owned()
+                } else {
+                    format!("Received {count} items")
+                };
+                tray::notify_with_folder(
+                    &title,
+                    i18n::tr(
+                        "保存在“下载\\LinkCursor”。点按打开文件夹。",
+                        "Saved in Downloads\\LinkCursor. Click to open the folder.",
+                    ),
+                    clipboard::download_directory(),
+                );
+            }
             layout_events.core_event(&json);
             control.core_event(&json);
             clipboard_events.core_event(&json);
             if let Some(edge) = edge_events.get() {
                 edge.core_event(&json);
             }
+            if let Some(presence) = presence_events.get() {
+                presence.core_event(&json);
+            }
         },
         move |event| input.play(event),
     ) {
         Ok(core) => Arc::new(core),
         Err(error) => {
-            eprintln!("linkcursor-agent: cannot start core: {error}");
+            log!("cannot start core: {error}");
             return;
         }
     };
     // Offered files are decided from the core's first events on.
     clipboard.set_core(Arc::downgrade(&core));
+    // Playing input tells the core when a game here holds the pointer.
+    injector.handle().set_core(Arc::downgrade(&core));
     // Sharing paused in the settings: peers may not drive this PC either.
     if !preferences.sharing {
         let _ = core.set_remote_control_allowed(false);
@@ -177,6 +221,18 @@ fn main() {
     // Sleep, wake and network changes: sessions end in order before sleep
     // and come back right after waking or a network change.
     let power = power::PowerWatch::start(Arc::downgrade(&core));
+
+    // Staying awake while another device is in use, and locking together.
+    let presence = match presence::PresenceWatch::start(Arc::downgrade(&core), settings.clone()) {
+        Ok(presence) => {
+            let _ = presence_slot.set(presence.handle());
+            Some(presence)
+        }
+        Err(error) => {
+            log!("cannot watch presence: {error}");
+            None
+        }
+    };
 
     // Resolution, scaling or monitor changes reach the core (which re-fits
     // placements and tells peers) and the arrangement view.
@@ -188,7 +244,7 @@ fn main() {
         }
         watched_arrangement.set_monitors(monitors);
     }) {
-        eprintln!("linkcursor-agent: cannot watch display changes: {error}");
+        log!("cannot watch display changes: {error}");
     }
 
     // Watches the pointer at the portals: crossing into peers, and the demo.
@@ -202,7 +258,7 @@ fn main() {
     ) {
         Ok(edge) => edge,
         Err(error) => {
-            eprintln!("linkcursor-agent: cannot watch the screen edges: {error}");
+            log!("cannot watch the screen edges: {error}");
             return;
         }
     };
@@ -229,7 +285,7 @@ fn main() {
         match clipboard::ClipboardThread::start(clipboard.clone(), Arc::downgrade(&core)) {
             Ok(thread) => Some(thread),
             Err(error) => {
-                eprintln!("linkcursor-agent: cannot watch the clipboard: {error}");
+                log!("cannot watch the clipboard: {error}");
                 None
             }
         };
@@ -247,7 +303,7 @@ fn main() {
     ipc::spawn(&identity.user_sid, services.clone());
 
     if let Err(error) = tray::run() {
-        eprintln!("linkcursor-agent: tray failed: {error}");
+        log!("tray failed: {error}");
     }
     // An open settings app learns that the user quit, and quits too rather
     // than starting the agent again.
@@ -258,6 +314,7 @@ fn main() {
     // Gives back the keyboard and mouse if a peer is being driven.
     drop(edge);
     drop(clipboard_thread);
+    drop(presence);
     drop(power);
     drop(overlay);
     // The IPC thread only holds a weak reference, so this stops the core and

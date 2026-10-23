@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "AppShell.h"
+#include "Strings.h"
 #include "MainWindow.xaml.h"
 #include "TrayWindow.xaml.h"
 
@@ -12,6 +13,7 @@ namespace
 {
     winrt::LinkCursor::implementation::App* s_app = nullptr;
     wil::unique_mutex s_instanceMutex;
+    bool s_relaunching = false;
 
     // A tray click within this long after the panel closed was the click
     // that closed it: the panel stays closed (a toggle).
@@ -63,6 +65,8 @@ namespace LinkCursorApp
     void ShowMainWindow(bool settings) { if (s_app) s_app->ShowMain(settings); }
     void TrayPanelClosed() { if (s_app) s_app->TrayClosed(); }
     void QuitApp() { if (s_app) s_app->Quit(); }
+    void RelaunchApp(winrt::hstring const& language) { if (s_app) s_app->Relaunch(language); }
+    bool IsRelaunching() { return s_relaunching; }
 }
 
 namespace winrt::LinkCursor::implementation
@@ -90,6 +94,8 @@ namespace winrt::LinkCursor::implementation
         // The app decides when it ends (ExitWhenIdle), not XAML: closing the
         // tray panel must not end it while a request is on its way.
         DispatcherShutdownMode(Microsoft::UI::Xaml::DispatcherShutdownMode::OnExplicitShutdown);
+        // The language the user chose, before any window loads its strings.
+        LinkCursorApp::ApplyLanguageSetting();
 
         WNDCLASSW windowClass{};
         windowClass.lpfnWndProc = ActivationProc;
@@ -108,7 +114,35 @@ namespace winrt::LinkCursor::implementation
         });
 
         std::wstring_view commandLine = GetCommandLineW();
-        Launch(commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray" : L"main");
+        Launch(commandLine.find(L"--tray") != std::wstring_view::npos ? L"tray"
+            : commandLine.find(L"--settings") != std::wstring_view::npos ? L"settings"
+            : L"main");
+    }
+
+    void App::Relaunch(hstring const& language)
+    {
+        if (m_shuttingDown)
+        {
+            return;
+        }
+        s_relaunching = true;
+        m_shuttingDown = true;
+        // Let go of the instance first, so the new app becomes it rather
+        // than handing its request to this one.
+        if (m_activationWindow)
+        {
+            DestroyWindow(m_activationWindow);
+            m_activationWindow = nullptr;
+        }
+        s_instanceMutex.reset();
+        auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
+        std::wstring command = L"\"" + std::wstring(exe.get()) + L"\" --settings --language=" + std::wstring(language);
+        STARTUPINFOW startup{ sizeof(startup) };
+        wil::unique_process_information process;
+        CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process);
+        if (m_tray) m_tray.Close();
+        if (m_main) m_main.Close();
+        Exit();
     }
 
     bool App::AcceptRequest()
@@ -135,7 +169,7 @@ namespace winrt::LinkCursor::implementation
         }
         else
         {
-            ShowMain(false);
+            ShowMain(request == L"settings");
         }
         // The click that closed the panel opens nothing: end as usual.
         ExitWhenIdle();

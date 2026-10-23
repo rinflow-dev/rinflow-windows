@@ -14,7 +14,7 @@
     <ProjectName>LinkCursor</ProjectName>
     <RootNamespace>LinkCursor</RootNamespace>
     <TargetName>$(RootNamespace)</TargetName>
-    <DefaultLanguage>zh-CN</DefaultLanguage>
+    <DefaultLanguage>en-US</DefaultLanguage>
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
     <AppContainerApplication>false</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
@@ -121,6 +121,7 @@
     <ClInclude Include="AgentClient.h" />
     <ClInclude Include="AppShell.h" />
     <ClInclude Include="DeviceModel.h" />
+    <ClInclude Include="Strings.h" />
     <ClInclude Include="App.xaml.h">
       <DependentUpon>App.xaml</DependentUpon>
     </ClInclude>
@@ -137,6 +138,8 @@
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MainWindow.xaml" />
+    <PRIResource Include="Strings\en-US\Resources.resw" />
+    <PRIResource Include="Strings\zh-CN\Resources.resw" />
     <Page Include="TrayWindow.xaml" />
   </ItemGroup>
   <ItemGroup>
@@ -161,6 +164,10 @@
     <ClCompile Include="MainWindow.Effect.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="MainWindow.Transfers.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="Strings.cpp" />
     <ClCompile Include="MainWindow.Pairing.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>

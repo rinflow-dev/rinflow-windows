@@ -1,0 +1,197 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from one table (English, Simplified Chinese); keep the two files in step. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="LanguageTag" xml:space="preserve"><value>en-US</value></data>
+  <data name="On" xml:space="preserve"><value>On</value></data>
+  <data name="Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="UnknownSystem" xml:space="preserve"><value>Unknown system</value></data>
+  <data name="Offline" xml:space="preserve"><value>Offline</value></data>
+  <data name="OnlineJustNow" xml:space="preserve"><value>Online just now</value></data>
+  <data name="OnlineMinutesAgo" xml:space="preserve"><value>Online {0} min ago</value></data>
+  <data name="OnlineTodayAt" xml:space="preserve"><value>Online today at {0:02}:{1:02}</value></data>
+  <data name="OnlineYesterday" xml:space="preserve"><value>Online yesterday</value></data>
+  <data name="OnlineOnDate" xml:space="preserve"><value>Online on {0}/{1}</value></data>
+  <data name="StatusControllingThis" xml:space="preserve"><value>Controlling this PC</value></data>
+  <data name="StatusConnected" xml:space="preserve"><value>Connected</value></data>
+  <data name="StatusPairing" xml:space="preserve"><value>Waiting to pair…</value></data>
+  <data name="StatusConnecting" xml:space="preserve"><value>Connecting…</value></data>
+  <data name="StatusNotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="ThisPC" xml:space="preserve"><value>This PC</value></data>
+  <data name="DisplayNumber" xml:space="preserve"><value>Display {0}</value></data>
+  <data name="ThisPCWith" xml:space="preserve"><value>This PC · {0}</value></data>
+  <data name="ArrangementHintDrag" xml:space="preserve"><value>Drag to arrange your screens</value></data>
+  <data name="ArrangementHintEmpty" xml:space="preserve"><value>Connect a device, then drag it next to your screen here</value></data>
+  <data name="SuffixNotConnected" xml:space="preserve"><value> · Not connected</value></data>
+  <data name="SuffixOffline" xml:space="preserve"><value> · Offline</value></data>
+  <data name="PairingWaiting" xml:space="preserve"><value>Waiting for the other device…</value></data>
+  <data name="PairingTitle" xml:space="preserve"><value>Pair {0}</value></data>
+  <data name="PairingInstruction" xml:space="preserve"><value>Done once Pair is selected on both devices.</value></data>
+  <data name="TlsOn" xml:space="preserve"><value>Every connection is encrypted with TLS 1.3, and the other device&apos;s certificate is checked.</value></data>
+  <data name="TlsOff" xml:space="preserve"><value>LinkCursor isn&apos;t running: this PC&apos;s certificate or port can&apos;t be used, so it can&apos;t connect to other devices for now.</value></data>
+  <data name="LockBarMessage" xml:space="preserve"><value>The pointer won&apos;t move to other devices. Press {0} to unlock.</value></data>
+  <data name="PortPending" xml:space="preserve"><value>LinkCursor uses {0} after it restarts; {1} for now.</value></data>
+  <data name="PortHint" xml:space="preserve"><value>Other devices connect to this PC on this port. A change applies after LinkCursor restarts.</value></data>
+  <data name="ElevatedOn" xml:space="preserve"><value>While another device controls this PC, it can also use apps running as administrator, UAC prompts and the lock screen. Changing this needs administrator approval.</value></data>
+  <data name="ElevatedOff" xml:space="preserve"><value>Needs LinkCursor installed with its setup program, which adds the input service.</value></data>
+  <data name="Version" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="HotkeyNeedsModifier" xml:space="preserve"><value>Include Ctrl, Alt or Win</value></data>
+  <data name="MenuDisconnect" xml:space="preserve"><value>Disconnect</value></data>
+  <data name="MenuConnect" xml:space="preserve"><value>Connect</value></data>
+  <data name="MenuPlaceLeft" xml:space="preserve"><value>Place on the left</value></data>
+  <data name="MenuPlaceRight" xml:space="preserve"><value>Place on the right</value></data>
+  <data name="MenuPlaceTop" xml:space="preserve"><value>Place above</value></data>
+  <data name="MenuPlaceBottom" xml:space="preserve"><value>Place below</value></data>
+  <data name="MenuUnplace" xml:space="preserve"><value>Remove from arrangement</value></data>
+  <data name="MenuPeerInput" xml:space="preserve"><value>Mouse and scrolling…</value></data>
+  <data name="MenuForget" xml:space="preserve"><value>Remove this device…</value></data>
+  <data name="ForgetTitle" xml:space="preserve"><value>Remove {0}?</value></data>
+  <data name="ForgetContent" xml:space="preserve"><value>It disconnects and leaves the arrangement. While it&apos;s online it still shows up under Add device.</value></data>
+  <data name="ForgetConfirm" xml:space="preserve"><value>Remove</value></data>
+  <data name="StatusControlledBy" xml:space="preserve"><value>{0} is using this PC&apos;s keyboard and mouse</value></data>
+  <data name="StatusOneConnected" xml:space="preserve"><value>1 device connected</value></data>
+  <data name="StatusManyConnected" xml:space="preserve"><value>{0} devices connected</value></data>
+  <data name="StatusSearching" xml:space="preserve"><value>Not connected · Looking for devices on the network</value></data>
+  <data name="StatusCoreStopped" xml:space="preserve"><value>The LinkCursor service stopped</value></data>
+  <data name="StatusStarting" xml:space="preserve"><value>Starting…</value></data>
+  <data name="StatusAgentConnecting" xml:space="preserve"><value>Connecting to the background service…</value></data>
+  <data name="TransferOneItem" xml:space="preserve"><value>&quot;{0}&quot;</value></data>
+  <data name="TransferManyItems" xml:space="preserve"><value>&quot;{0}&quot; and {1} items in all</value></data>
+  <data name="TransferReceiving" xml:space="preserve"><value>Receiving {1} from {0}</value></data>
+  <data name="TransferSending" xml:space="preserve"><value>Sending {1} to {0}</value></data>
+  <data name="TransferCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="AddressInvalid" xml:space="preserve"><value>Enter an IP address or a device name.</value></data>
+  <data name="AddressDuplicate" xml:space="preserve"><value>This address is already in the list.</value></data>
+  <data name="AddressTooMany" xml:space="preserve"><value>You can add up to 32 addresses.</value></data>
+  <data name="AddressFound" xml:space="preserve"><value>Found {0}</value></data>
+  <data name="AddressNoResponse" xml:space="preserve"><value>No response. Check that LinkCursor runs there and the firewall lets it through.</value></data>
+  <data name="AddressUnresolved" xml:space="preserve"><value>Can&apos;t find this name ({0}).</value></data>
+  <data name="AddressSearching" xml:space="preserve"><value>Looking…</value></data>
+  <data name="AddressRemove" xml:space="preserve"><value>Remove</value></data>
+  <data name="PeerInputTitle" xml:space="preserve"><value>Mouse on {0}</value></data>
+  <data name="BackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back</value></data>
+  <data name="BackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
+  <data name="DevicesTitle.Text" xml:space="preserve"><value>Devices</value></data>
+  <data name="AddDeviceButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Add device</value></data>
+  <data name="AddDeviceLabel.Text" xml:space="preserve"><value>Add device</value></data>
+  <data name="SettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Settings</value></data>
+  <data name="SettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
+  <data name="LockBar.Title" xml:space="preserve"><value>Locked to this screen</value></data>
+  <data name="SharingTitle.Text" xml:space="preserve"><value>Share keyboard and mouse</value></data>
+  <data name="SharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Share keyboard and mouse</value></data>
+  <data name="UnplacedLabel.Text" xml:space="preserve"><value>Not placed:</value></data>
+  <data name="ArrangementHint.Text" xml:space="preserve"><value>Drag to arrange your screens</value></data>
+  <data name="MyDevicesHeader.Text" xml:space="preserve"><value>My devices</value></data>
+  <data name="RowConnect.Content" xml:space="preserve"><value>Connect</value></data>
+  <data name="RowMore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>More options</value></data>
+  <data name="RowMore.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>More options</value></data>
+  <data name="DevicesEmpty.Text" xml:space="preserve"><value>No devices yet. Select Add device to connect a computer running LinkCursor on the same network. Devices that connect to this PC show up here too.</value></data>
+  <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
+  <data name="GeneralHeader.Text" xml:space="preserve"><value>General</value></data>
+  <data name="LaunchTitle.Text" xml:space="preserve"><value>Start when I sign in</value></data>
+  <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Start when I sign in</value></data>
+  <data name="TrayTitle.Text" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
+  <data name="TrayDescription.Text" xml:space="preserve"><value>When off, closing the window quits LinkCursor, and keyboard and mouse sharing stops.</value></data>
+  <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
+  <data name="ThemeTitle.Text" xml:space="preserve"><value>Theme</value></data>
+  <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Theme</value></data>
+  <data name="ThemeSystem.Content" xml:space="preserve"><value>Use system setting</value></data>
+  <data name="ThemeLight.Content" xml:space="preserve"><value>Light</value></data>
+  <data name="ThemeDark.Content" xml:space="preserve"><value>Dark</value></data>
+  <data name="LanguageTitle.Text" xml:space="preserve"><value>Language</value></data>
+  <data name="LanguageDescription.Text" xml:space="preserve"><value>LinkCursor&apos;s windows reopen after a change.</value></data>
+  <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Language</value></data>
+  <data name="LanguageSystem.Content" xml:space="preserve"><value>Use system setting</value></data>
+  <data name="SwitchingHeader.Text" xml:space="preserve"><value>Moving between screens</value></data>
+  <data name="DelayTitle.Text" xml:space="preserve"><value>Switch delay</value></data>
+  <data name="DelayDescription.Text" xml:space="preserve"><value>How long the pointer has to push against a screen edge before it moves to the other device.</value></data>
+  <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Switch delay</value></data>
+  <data name="CornerTitle.Text" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
+  <data name="CornerDescription.Text" xml:space="preserve"><value>Keeps the Start button, menus and hot corners easy to use.</value></data>
+  <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
+  <data name="FullscreenTitle.Text" xml:space="preserve"><value>Pause during full-screen games</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>While a game, video or presentation runs full screen, the pointer doesn&apos;t move to other devices.</value></data>
+  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Pause during full-screen games</value></data>
+  <data name="LockTitle.Text" xml:space="preserve"><value>Lock to the current screen</value></data>
+  <data name="LockDescription.Text" xml:space="preserve"><value>Press the shortcut once and the pointer stays on the current screen; press it again to unlock.</value></data>
+  <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Change shortcut</value></data>
+  <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Change shortcut</value></data>
+  <data name="SwitchHotkeysTitle.Text" xml:space="preserve"><value>Switch devices with shortcuts</value></data>
+  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>Press the chosen keys with an arrow key to move the pointer straight to the device on that side. Other apps no longer get those shortcuts.</value></data>
+  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>Some of these are taken by another app, so those directions don&apos;t work. Try the other combination.</value></data>
+  <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keys for switching devices</value></data>
+  <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Switch devices with shortcuts</value></data>
+  <data name="ShortcutRemapTitle.Text" xml:space="preserve"><value>Keep Mac shortcuts</value></data>
+  <data name="ShortcutRemapDescription.Text" xml:space="preserve"><value>When a Mac controls this PC, ⌘C, ⌘V and the like work as Ctrl shortcuts. When off, ⌘ is the Windows key.</value></data>
+  <data name="ShortcutRemapToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep Mac shortcuts</value></data>
+  <data name="PresenceHeader.Text" xml:space="preserve"><value>Lock and sleep</value></data>
+  <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
+  <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>While you use another connected device, this PC keeps its screen on and doesn&apos;t lock for being idle.</value></data>
+  <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
+  <data name="LockSyncTitle.Text" xml:space="preserve"><value>Lock together</value></data>
+  <data name="LockSyncDescription.Text" xml:space="preserve"><value>Locking this PC locks the connected devices too, and when they lock, so does this PC. Turn it on on both devices.</value></data>
+  <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lock together</value></data>
+  <data name="ClipboardHeader.Text" xml:space="preserve"><value>Clipboard</value></data>
+  <data name="ClipboardTitle.Text" xml:space="preserve"><value>Sync clipboard and files</value></data>
+  <data name="ClipboardDescription.Text" xml:space="preserve"><value>The clipboard follows the pointer to the other device: text, web formatting, images (up to 8 MB) and copied files. Received files go to Downloads\LinkCursor, and you&apos;re asked first above 512 MB. Content a password manager marks as private is never synced.</value></data>
+  <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sync clipboard and files</value></data>
+  <data name="NetworkHeader.Text" xml:space="preserve"><value>Network and security</value></data>
+  <data name="PortTitle.Text" xml:space="preserve"><value>Port</value></data>
+  <data name="PortBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Port</value></data>
+  <data name="TlsTitle.Text" xml:space="preserve"><value>Encrypted connections (TLS)</value></data>
+  <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Encrypted connections</value></data>
+  <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>Only paired devices</value></data>
+  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>When a new device connects for the first time, both devices show the same 6-digit code, and they can control each other only after both confirm it.</value></data>
+  <data name="PairedOnlyToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Only paired devices</value></data>
+  <data name="ElevatedTitle.Text" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
+  <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
+  <data name="FingerprintTitle.Text" xml:space="preserve"><value>This PC&apos;s fingerprint</value></data>
+  <data name="FingerprintDescription.Text" xml:space="preserve"><value>The SHA-256 fingerprint of this PC&apos;s certificate, which other devices recognize it by.</value></data>
+  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy fingerprint</value></data>
+  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Copy</value></data>
+  <data name="AboutHeader.Text" xml:space="preserve"><value>About</value></data>
+  <data name="CheckUpdateButton.Content" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="LogsTitle.Text" xml:space="preserve"><value>Diagnostic logs</value></data>
+  <data name="LogsDescription.Text" xml:space="preserve"><value>Records connections, pairing and file transfers, never clipboard contents or what you type. Attach them when you report a problem.</value></data>
+  <data name="OpenLogsButton.Content" xml:space="preserve"><value>Open logs folder</value></data>
+  <data name="AddDeviceDialog.Title" xml:space="preserve"><value>Add device</value></data>
+  <data name="AddDeviceDialog.CloseButtonText" xml:space="preserve"><value>Close</value></data>
+  <data name="AddDeviceHint.Text" xml:space="preserve"><value>Devices on the same network that run LinkCursor show up below. Once connected, a device joins My devices; then drag it next to your screen.</value></data>
+  <data name="NearbyConnect.Content" xml:space="preserve"><value>Connect</value></data>
+  <data name="NearbySearching.Text" xml:space="preserve"><value>Looking for nearby devices…</value></data>
+  <data name="AddressHeader.Text" xml:space="preserve"><value>Add by address</value></data>
+  <data name="AddressHint.Text" xml:space="preserve"><value>If a device doesn&apos;t show up (on a company or guest network, or another subnet), enter its IP address or name. Adding it on one of the two devices is enough.</value></data>
+  <data name="AddressBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Device address</value></data>
+  <data name="AddressBox.PlaceholderText" xml:space="preserve"><value>For example 192.168.1.20</value></data>
+  <data name="AddAddressButton.Content" xml:space="preserve"><value>Add</value></data>
+  <data name="PeerInputDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="PeerInputDialog.PrimaryButtonText" xml:space="preserve"><value>Save</value></data>
+  <data name="PeerInputDialog.SecondaryButtonText" xml:space="preserve"><value>Reset</value></data>
+  <data name="PeerInputHint.Text" xml:space="preserve"><value>Applies when this PC&apos;s mouse controls that device.</value></data>
+  <data name="PointerSpeedLabel.Text" xml:space="preserve"><value>Pointer speed</value></data>
+  <data name="PointerSpeedSlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Pointer speed</value></data>
+  <data name="ScrollSpeedLabel.Text" xml:space="preserve"><value>Scrolling speed</value></data>
+  <data name="ScrollSpeedSlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Scrolling speed</value></data>
+  <data name="InvertScrollLabel.Text" xml:space="preserve"><value>Reverse scrolling direction</value></data>
+  <data name="InvertScrollToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Reverse scrolling direction</value></data>
+  <data name="PairingDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="PairingDialog.PrimaryButtonText" xml:space="preserve"><value>Pair</value></data>
+  <data name="PairingHint.Text" xml:space="preserve"><value>Check that the other device shows the same code</value></data>
+  <data name="HotkeyDialog.Title" xml:space="preserve"><value>Lock shortcut</value></data>
+  <data name="HotkeyDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="HotkeyDialog.PrimaryButtonText" xml:space="preserve"><value>Save</value></data>
+  <data name="HotkeyDialog.SecondaryButtonText" xml:space="preserve"><value>Reset</value></data>
+  <data name="HotkeyInstructions.Text" xml:space="preserve"><value>Press the new combination: at least one of Ctrl, Alt or Win, plus a regular key.</value></data>
+  <data name="TraySharingTitle.Text" xml:space="preserve"><value>Keyboard and mouse sharing</value></data>
+  <data name="TraySharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keyboard and mouse sharing</value></data>
+  <data name="TrayDevicesHeader.Text" xml:space="preserve"><value>Devices</value></data>
+  <data name="TrayOpenButton.Content" xml:space="preserve"><value>Open LinkCursor</value></data>
+  <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Settings</value></data>
+  <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Quit LinkCursor</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Quit LinkCursor</value></data>
+</root>

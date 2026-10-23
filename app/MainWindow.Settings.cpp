@@ -3,6 +3,8 @@
 
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "Strings.h"
+#include "AppShell.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -84,7 +86,7 @@ namespace
         {
             toggle.IsOn(on);
         }
-        state.Text(on ? L"开" : L"关");
+        state.Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
     }
 
     // "3fa27c…" (64 hex digits) as "3F:A2:7C:…", the way certificate
@@ -121,7 +123,7 @@ namespace winrt::LinkCursor::implementation
             {
                 auto self = weak.get();
                 if (!self) return;
-                state.Text(toggle.IsOn() ? L"开" : L"关");
+                state.Text(LinkCursorApp::Text(toggle.IsOn() ? L"On" : L"Off"));
                 if (!self->m_applying)
                 {
                     self->m_agent->UpdateSetting(key, JsonValue::CreateBooleanValue(toggle.IsOn()));
@@ -134,6 +136,49 @@ namespace winrt::LinkCursor::implementation
         wire(FullscreenToggle(), FullscreenState(), L"pause_in_fullscreen");
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
         wire(PairedOnlyToggle(), PairedOnlyState(), L"paired_only");
+        wire(SwitchHotkeysToggle(), SwitchHotkeysState(), L"switch_hotkeys");
+        wire(ShortcutRemapToggle(), ShortcutRemapState(), L"shortcut_remap");
+        wire(KeepAwakeToggle(), KeepAwakeState(), L"keep_awake");
+        wire(LockSyncToggle(), LockSyncState(), L"lock_sync");
+
+        // The agent's log folder (agent/src/log.rs).
+        OpenLogsButton().Click([](auto&&, auto&&)
+        {
+            auto folder = wil::TryGetEnvironmentVariableW(L"LOCALAPPDATA");
+            if (!folder) return;
+            std::wstring path = std::wstring(folder.get()) + L"\\LinkCursor\\logs";
+            CreateDirectoryW(path.c_str(), nullptr);
+            ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        });
+
+        SwitchModifiersCombo().SelectionChanged([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self || self->m_applying) return;
+            if (auto item = self->SwitchModifiersCombo().SelectedItem().try_as<ComboBoxItem>())
+            {
+                auto modifiers = std::stod(std::wstring(unbox_value_or<hstring>(item.Tag(), L"7")));
+                self->m_agent->UpdateSetting(L"switch_modifiers", JsonValue::CreateNumberValue(modifiers));
+            }
+        });
+
+        // Every string is loaded again in the new language: the app starts
+        // afresh on this page (the agent applies it at once).
+        LanguageCombo().SelectionChanged([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self || self->m_applying) return;
+            auto item = self->LanguageCombo().SelectedItem().try_as<ComboBoxItem>();
+            if (!item) return;
+            auto language = unbox_value_or<hstring>(item.Tag(), L"system");
+            self->m_agent->UpdateSetting(L"language", JsonValue::CreateStringValue(language));
+            // Out of this event: the window closes. The new app is told the
+            // language, as the agent may not have saved it yet.
+            self->DispatcherQueue().TryEnqueue([language]
+            {
+                LinkCursorApp::RelaunchApp(language);
+            });
+        });
 
         ThemeCombo().SelectionChanged([weak](auto&&, auto&&)
         {
@@ -200,7 +245,7 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self || self->m_applying || self->m_elevatedPending) return;
             bool on = self->ElevatedInputToggle().IsOn();
-            self->ElevatedInputState().Text(on ? L"开" : L"关");
+            self->ElevatedInputState().Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
             self->ElevatedInputToggle().IsEnabled(false);
             // Snapshots leave the switch alone until this is over: it would
             // flip back while UAC asks.
@@ -280,6 +325,20 @@ namespace winrt::LinkCursor::implementation
         SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"pause_in_fullscreen", false));
         SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", false));
         SetSwitch(PairedOnlyToggle(), PairedOnlyState(), settings.GetNamedBoolean(L"paired_only", true));
+        bool switchHotkeys = settings.GetNamedBoolean(L"switch_hotkeys", true);
+        SetSwitch(SwitchHotkeysToggle(), SwitchHotkeysState(), switchHotkeys);
+        int modifiersIndex = settings.GetNamedNumber(L"switch_modifiers", 7) == 3 ? 1 : 0;
+        if (SwitchModifiersCombo().SelectedIndex() != modifiersIndex)
+        {
+            SwitchModifiersCombo().SelectedIndex(modifiersIndex);
+        }
+        SwitchModifiersCombo().IsEnabled(switchHotkeys);
+        // A combination another program registered first.
+        SwitchHotkeysWarning().Visibility(switchHotkeys && state.GetNamedBoolean(L"switch_hotkeys_blocked", false)
+            ? Visibility::Visible : Visibility::Collapsed);
+        SetSwitch(ShortcutRemapToggle(), ShortcutRemapState(), settings.GetNamedBoolean(L"shortcut_remap", true));
+        SetSwitch(KeepAwakeToggle(), KeepAwakeState(), settings.GetNamedBoolean(L"keep_awake", true));
+        SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
 
         // Encryption is not a choice: every connection is encrypted. Without
         // a fingerprint the core is not running (no certificate or port).
@@ -287,14 +346,20 @@ namespace winrt::LinkCursor::implementation
         bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
         SetSwitch(TlsToggle(), TlsState(), encrypted);
         TlsDescription().Text(encrypted
-            ? L"所有连接都用 TLS 1.3 加密，并核对对方的证书。"
-            : L"LinkCursor 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。");
+            ? LinkCursorApp::Text(L"TlsOn")
+            : LinkCursorApp::Text(L"TlsOff"));
 
         auto theme = settings.GetNamedString(L"theme", L"system");
         int themeIndex = theme == L"light" ? 1 : theme == L"dark" ? 2 : 0;
         if (ThemeCombo().SelectedIndex() != themeIndex)
         {
             ThemeCombo().SelectedIndex(themeIndex);
+        }
+        auto language = settings.GetNamedString(L"language", L"system");
+        int languageIndex = language == L"zh-CN" ? 1 : language == L"en-US" ? 2 : 0;
+        if (LanguageCombo().SelectedIndex() != languageIndex)
+        {
+            LanguageCombo().SelectedIndex(languageIndex);
         }
         ApplyTheme(theme);
 
@@ -317,7 +382,7 @@ namespace winrt::LinkCursor::implementation
             hotkeyText += (hotkeyText.empty() ? L"" : L"+") + std::wstring(part);
         }
         bool locked = state.GetNamedBoolean(L"locked", false);
-        LockBar().Message(hstring(L"光标不会切换到其他设备。按 " + hotkeyText + L" 解除。"));
+        LockBar().Message(LinkCursorApp::Format(L"LockBarMessage", hotkeyText));
         LockBar().IsOpen(locked);
 
         auto running = static_cast<uint32_t>(state.GetNamedNumber(L"control_port", 0));
@@ -330,8 +395,8 @@ namespace winrt::LinkCursor::implementation
             PortBox().Value(configured);
         }
         PortHint().Text(configured != running
-            ? hstring(std::format(L"重新启动 LinkCursor 后改用 {}；现在使用 {}。", configured, running))
-            : hstring(L"其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。"));
+            ? LinkCursorApp::Format(L"PortPending", configured, running)
+            : LinkCursorApp::Text(L"PortHint"));
 
         // The input service: present only when installed.
         auto elevated = state.GetNamedObject(L"elevated_input", JsonObject{});
@@ -342,8 +407,8 @@ namespace winrt::LinkCursor::implementation
             ElevatedInputToggle().IsEnabled(elevatedAvailable);
         }
         ElevatedInputDescription().Text(elevatedAvailable
-            ? L"其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。"
-            : L"需要用安装包安装 LinkCursor：由随附的输入服务完成。");
+            ? LinkCursorApp::Text(L"ElevatedOn")
+            : LinkCursorApp::Text(L"ElevatedOff"));
 
         // The first four and last three bytes; the tooltip and 复制 give all 32.
         m_fingerprint = encrypted ? hstring(ColonHex(fingerprint.GetString())) : hstring();
@@ -353,7 +418,7 @@ namespace winrt::LinkCursor::implementation
             : hstring(full.empty() ? L"—" : full));
         ToolTipService::SetToolTip(DeviceIdText(), full.empty() ? nullptr : box_value(m_fingerprint));
         CopyIdButton().IsEnabled(!full.empty());
-        VersionText().Text(L"版本 " + state.GetNamedString(L"agent_version", L"—"));
+        VersionText().Text(LinkCursorApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
 
         m_applying = false;
     }
@@ -407,7 +472,7 @@ namespace winrt::LinkCursor::implementation
             self->ShowHotkeyKeys(self->HotkeyPreview(), modifiers, key);
             bool valid = IsValidHotkey(modifiers, key);
             self->HotkeyDialog().IsPrimaryButtonEnabled(valid);
-            self->HotkeyHint().Text(valid || key == 0 ? L"" : L"需要包含 Ctrl、Alt 或 Win");
+            self->HotkeyHint().Text(valid || key == 0 ? hstring() : LinkCursorApp::Text(L"HotkeyNeedsModifier"));
         });
 
         auto result = ContentDialogResult::None;

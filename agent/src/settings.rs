@@ -2,9 +2,11 @@
 //! `%LOCALAPPDATA%\LinkCursor\settings.json`. Starting at login is not kept
 //! here: the `Run` registry value is the truth (see [`autostart`]).
 
+use crate::i18n::{self, tr};
 use crate::identity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 /// `RegisterHotKey` modifier bits.
@@ -45,7 +47,73 @@ pub struct Settings {
     /// Only paired devices may connect: others pair first (both users check
     /// a code).
     pub paired_only: bool,
+    /// A Mac driving this PC uses its own shortcuts: Command plays as Ctrl
+    /// (⌘C copies), instead of keeping its position as the Windows key.
+    pub shortcut_remap: bool,
+    /// The arrow keys with [`Settings::switch_modifiers`] move the pointer
+    /// to the device on that side.
+    pub switch_hotkeys: bool,
+    /// The modifiers of the switch shortcuts: one of [`SWITCH_MODIFIER_CHOICES`].
+    /// Ctrl+Alt+Shift by default, which few programs use with the arrow keys
+    /// (Ctrl+Alt alone adds cursors in VS Code and rotates the screen with
+    /// some graphics drivers); a combination taken by another program shows
+    /// in the settings (`switch_hotkeys_blocked`).
+    pub switch_modifiers: u32,
+    /// While one of the other devices is in use, this PC's screen stays on
+    /// and does not lock for being idle.
+    pub keep_awake: bool,
+    /// Locking this PC locks the other devices too, and theirs lock it.
+    pub lock_sync: bool,
+    /// Where to look for devices besides the local network's multicast:
+    /// host names or IPv4 addresses (see the core's `manual_addresses`).
+    pub manual_addresses: Vec<String>,
+    /// How this PC's mouse feels on each peer it drives, by device ID.
+    pub peer_input: BTreeMap<String, PeerInput>,
+    /// The language of LinkCursor's own text: `system` (Windows' display
+    /// language: Simplified Chinese, or English for every other one),
+    /// `zh-CN` or `en-US`. The settings app reads it at start-up too.
+    pub language: String,
 }
+
+/// The values of [`Settings::language`].
+pub const LANGUAGES: [&str; 3] = ["system", "zh-CN", "en-US"];
+
+/// Pointer and scrolling on one peer, applied by this PC as it drives it
+/// (it tracks the pointer there, so the peer must not change the motion).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PeerInput {
+    /// Multiplies pointer motion: 0.25 to 4.
+    pub pointer_speed: f64,
+    /// Multiplies scrolling: 0.25 to 5.
+    pub scroll_speed: f64,
+    /// Scrolls the other way (natural scrolling on one side only).
+    pub invert_scroll: bool,
+}
+
+impl Default for PeerInput {
+    fn default() -> Self {
+        Self {
+            pointer_speed: 1.0,
+            scroll_speed: 1.0,
+            invert_scroll: false,
+        }
+    }
+}
+
+impl PeerInput {
+    fn is_valid(&self) -> bool {
+        (0.25..=4.0).contains(&self.pointer_speed) && (0.25..=5.0).contains(&self.scroll_speed)
+    }
+}
+
+/// The modifier combinations the switch shortcuts offer: Ctrl+Alt+Shift,
+/// Ctrl+Alt.
+pub const SWITCH_MODIFIER_CHOICES: [u32; 2] =
+    [MOD_CONTROL | MOD_ALT | MOD_SHIFT, MOD_CONTROL | MOD_ALT];
+
+/// Addresses the user may add, at most (the core's limit).
+pub const MAX_MANUAL_ADDRESSES: usize = 32;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -60,6 +128,14 @@ impl Default for Settings {
             lock_hotkey: Hotkey::default(),
             port: None,
             paired_only: true,
+            shortcut_remap: true,
+            switch_hotkeys: true,
+            switch_modifiers: MOD_CONTROL | MOD_ALT | MOD_SHIFT,
+            keep_awake: true,
+            lock_sync: false,
+            manual_addresses: Vec::new(),
+            peer_input: BTreeMap::new(),
+            language: "system".to_owned(),
         }
     }
 }
@@ -101,33 +177,111 @@ impl Settings {
     pub fn merged(&self, values: &Map<String, Value>) -> Result<Self, String> {
         let mut object = match serde_json::to_value(self) {
             Ok(Value::Object(object)) => object,
-            _ => return Err("设置无法读取".to_owned()),
+            _ => return Err(tr("设置无法读取", "Settings couldn't be read").to_owned()),
         };
         for (key, value) in values {
             if !object.contains_key(key) {
-                return Err(format!("未知的设置项：{key}"));
+                return Err(if i18n::chinese() {
+                    format!("未知的设置项：{key}")
+                } else {
+                    format!("Unknown setting: {key}")
+                });
             }
             object.insert(key.clone(), value.clone());
         }
-        let merged: Self = serde_json::from_value(Value::Object(object))
-            .map_err(|error| format!("设置的值无效：{error}"))?;
+        let merged: Self = serde_json::from_value(Value::Object(object)).map_err(|error| {
+            if i18n::chinese() {
+                format!("设置的值无效：{error}")
+            } else {
+                format!("Invalid setting value: {error}")
+            }
+        })?;
         if !matches!(merged.theme.as_str(), "system" | "light" | "dark") {
-            return Err("主题只能是跟随系统、浅色或深色".to_owned());
+            return Err(tr(
+                "主题只能是跟随系统、浅色或深色",
+                "Theme must be system, light, or dark",
+            )
+            .to_owned());
+        }
+        if !SWITCH_MODIFIER_CHOICES.contains(&merged.switch_modifiers) {
+            return Err(tr(
+                "切换设备的快捷键只能是 Ctrl+Alt+Shift 或 Ctrl+Alt 加方向键",
+                "Switch shortcuts must be Ctrl+Alt+Shift or Ctrl+Alt with the arrow keys",
+            )
+            .to_owned());
+        }
+        if merged.lock_hotkey.modifiers == merged.switch_modifiers
+            && (0x25..=0x28).contains(&merged.lock_hotkey.key)
+        {
+            return Err(tr(
+                "锁定快捷键与切换设备的快捷键重复了",
+                "The lock shortcut is the same as a switch shortcut",
+            )
+            .to_owned());
+        }
+        if !LANGUAGES.contains(&merged.language.as_str()) {
+            return Err(tr(
+                "语言只能是跟随系统、简体中文或英语",
+                "Language must be system, Simplified Chinese, or English",
+            )
+            .to_owned());
         }
         if merged.switch_delay_ms > 1000 {
-            return Err("切换延迟最长 1000 毫秒".to_owned());
+            return Err(tr(
+                "切换延迟最长 1000 毫秒",
+                "Switch delay can be at most 1000 ms",
+            )
+            .to_owned());
         }
         if !merged.lock_hotkey.is_valid() {
-            return Err("快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键".to_owned());
+            return Err(tr(
+                "快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键",
+                "Shortcuts must include Ctrl, Alt, or Win, plus a regular key",
+            )
+            .to_owned());
         }
         if let Some(port) = merged.port
             && (port < 1024 || port == DISCOVERY_PORT)
         {
-            return Err(format!(
-                "端口需在 1024–65535 之间，且不能是发现端口 {DISCOVERY_PORT}"
-            ));
+            return Err(if i18n::chinese() {
+                format!("端口需在 1024–65535 之间，且不能是发现端口 {DISCOVERY_PORT}")
+            } else {
+                format!(
+                    "Ports must be between 1024 and 65535 and not the discovery port {DISCOVERY_PORT}"
+                )
+            });
+        }
+        if merged.manual_addresses.len() > MAX_MANUAL_ADDRESSES {
+            return Err(if i18n::chinese() {
+                format!("最多添加 {MAX_MANUAL_ADDRESSES} 个地址")
+            } else {
+                format!("You can add up to {MAX_MANUAL_ADDRESSES} addresses")
+            });
+        }
+        if let Some(bad) = merged
+            .manual_addresses
+            .iter()
+            .find(|address| linkcursor_core::parse_address(address, DISCOVERY_PORT).is_err())
+        {
+            return Err(if i18n::chinese() {
+                format!("“{bad}”不是有效的地址：请输入 IP 地址或设备名称")
+            } else {
+                format!("“{bad}” isn't a valid address. Enter an IP address or a device name.")
+            });
+        }
+        if merged.peer_input.values().any(|input| !input.is_valid()) {
+            return Err(tr(
+                "指针速度需在 0.25–4 倍之间，滚动速度在 0.25–5 倍之间",
+                "Pointer speed must be between 0.25× and 4×, and scroll speed between 0.25× and 5×",
+            )
+            .to_owned());
         }
         Ok(merged)
+    }
+
+    /// How this PC's mouse feels on `peer_id`.
+    pub fn input_for(&self, peer_id: &str) -> PeerInput {
+        self.peer_input.get(peer_id).copied().unwrap_or_default()
     }
 }
 
@@ -160,7 +314,7 @@ impl SettingsStore {
         if let Ok(text) = serde_json::to_string_pretty(&*settings)
             && let Err(error) = identity::write_file(&path(), &text)
         {
-            eprintln!("linkcursor-agent: cannot save settings: {error}");
+            log!("cannot save settings: {error}");
         }
         settings.clone()
     }
@@ -302,5 +456,46 @@ mod tests {
             merged.merged(&values(json!({"port": null}))).unwrap().port,
             None
         );
+    }
+
+    #[test]
+    fn addresses_and_per_device_input_are_checked() {
+        let settings = Settings::default();
+        assert!(settings.shortcut_remap && settings.keep_awake);
+        assert!(settings.switch_hotkeys);
+        assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT | MOD_SHIFT);
+        assert!(
+            settings
+                .merged(&values(json!({"switch_modifiers": MOD_CONTROL | MOD_ALT})))
+                .is_ok()
+        );
+        for bad in [
+            json!({"switch_modifiers": MOD_WIN}),
+            json!({"switch_modifiers": 3, "lock_hotkey": {"modifiers": 3, "key": 0x25}}),
+        ] {
+            assert!(settings.merged(&values(bad.clone())).is_err(), "{bad}");
+        }
+        assert!(!settings.lock_sync);
+        let merged = settings
+            .merged(&values(json!({
+                "manual_addresses": ["192.168.1.20", "mac-mini.local:42420"],
+                "peer_input": {"mac": {"pointer_speed": 1.5, "invert_scroll": true}}
+            })))
+            .unwrap();
+        assert_eq!(merged.manual_addresses.len(), 2);
+        let mac = merged.input_for("mac");
+        assert_eq!(
+            (mac.pointer_speed, mac.scroll_speed, mac.invert_scroll),
+            (1.5, 1.0, true)
+        );
+        assert_eq!(merged.input_for("other"), PeerInput::default());
+        for bad in [
+            json!({"manual_addresses": ["not an address"]}),
+            json!({"manual_addresses": vec!["10.0.0.1"; 33]}),
+            json!({"peer_input": {"mac": {"pointer_speed": 9.0}}}),
+            json!({"peer_input": {"mac": {"scroll_speed": 0.1}}}),
+        ] {
+            assert!(settings.merged(&values(bad.clone())).is_err(), "{bad}");
+        }
     }
 }

@@ -28,7 +28,10 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// 9: sessions lose `encrypted`: every connection is encrypted now.
 /// 10: the snapshot gains `elevated_input`.
 /// 11: `clear_error`; the snapshot gains `quitting`.
-pub const PROTOCOL_VERSION: u32 = 11;
+/// 12: `cancel_transfer`; the snapshot gains `manual_addresses` and
+/// `transfers`; settings `shortcut_remap`, `switch_hotkeys`, `keep_awake`,
+/// `lock_sync`, `manual_addresses` and `peer_input`.
+pub const PROTOCOL_VERSION: u32 = 12;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -99,6 +102,10 @@ enum Request {
     },
     /// The user dismissed `last_error`.
     ClearError,
+    /// Stops files being received or sent (`transfers`).
+    CancelTransfer {
+        transfer: u32,
+    },
     /// Quits the agent as the tray's 退出 does.
     Quit,
 }
@@ -139,12 +146,12 @@ pub fn spawn(user_sid: &str, services: Arc<Services>) {
                 }
             };
             if let Err(error) = runtime.block_on(serve(&user_sid, services)) {
-                eprintln!("linkcursor-agent: IPC stopped: {error}");
+                log!("IPC stopped: {error}");
                 state.set_error(format!("IPC stopped: {error}"));
             }
         });
     if let Err(error) = result {
-        eprintln!("linkcursor-agent: cannot start IPC thread: {error}");
+        log!("cannot start IPC thread: {error}");
     }
 }
 
@@ -164,7 +171,7 @@ async fn serve(user_sid: &str, services: Arc<Services>) -> io::Result<()> {
             match create_instance(&name, &mut security, false) {
                 Ok(next) => break next,
                 Err(error) => {
-                    eprintln!("linkcursor-agent: cannot open another IPC pipe: {error}");
+                    log!("cannot open another IPC pipe: {error}");
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
             }
@@ -174,7 +181,7 @@ async fn serve(user_sid: &str, services: Arc<Services>) -> io::Result<()> {
             Ok(()) => {
                 tokio::spawn(handle_client(current, services.clone()));
             }
-            Err(error) => eprintln!("linkcursor-agent: IPC client failed to connect: {error}"),
+            Err(error) => log!("IPC client failed to connect: {error}"),
         }
     }
 }
@@ -304,6 +311,7 @@ fn handle_request(
         Request::ForgetDevice { peer_id } => services.forget_device(&peer_id),
         Request::AcceptPairing { peer_id } => services.accept_pairing(&peer_id),
         Request::RejectPairing { peer_id } => services.reject_pairing(&peer_id),
+        Request::CancelTransfer { transfer } => core()?.cancel_files(transfer),
         Request::ClearError => {
             services.state.clear_error();
             Ok(())

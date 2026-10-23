@@ -16,16 +16,16 @@ use windows_sys::Win32::System::Console::{CTRL_CLOSE_EVENT, SetConsoleCtrlHandle
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY,
-    NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIN_BALLOONUSERCLICK, NOTIFYICONDATAW, Shell_NotifyIconW, ShellExecuteW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreateIconIndirect, CreatePopupMenu,
     CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
     GetMessageW, GetSystemMetrics, HICON, ICONINFO, IDI_APPLICATION, KillTimer, LoadIconW,
     MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SM_CXSMICON, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
-    WM_LBUTTONUP, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+    RegisterWindowMessageW, SM_CXSMICON, SW_SHOWNORMAL, SetForegroundWindow, SetTimer,
+    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP,
+    WM_CLOSE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -54,9 +54,27 @@ pub fn quit() -> bool {
     unsafe { PostMessageW(window as HWND, WM_CLOSE, 0, 0) != 0 }
 }
 
+/// A folder that clicking the notification shown last opens.
+static BALLOON_FOLDER: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
 /// Shows a notification from the tray icon, at most once per
 /// [`NOTIFY_INTERVAL`] for the same `title`. Any thread.
 pub fn notify(title: &str, text: &str) {
+    if let Ok(mut folder) = BALLOON_FOLDER.lock() {
+        *folder = None;
+    }
+    show_balloon(title, text);
+}
+
+/// Like [`notify`]; clicking the notification opens `folder`.
+pub fn notify_with_folder(title: &str, text: &str, folder: PathBuf) {
+    if let Ok(mut slot) = BALLOON_FOLDER.lock() {
+        *slot = Some(folder);
+    }
+    show_balloon(title, text);
+}
+
+fn show_balloon(title: &str, text: &str) {
     static LAST: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
         std::sync::Mutex::new(Vec::new());
     let window = WINDOW.load(Ordering::Acquire);
@@ -147,8 +165,8 @@ pub fn run() -> io::Result<()> {
         // Explorer may not take the icon yet (busy at sign-in, restarting):
         // keep trying instead of giving up on LinkCursor altogether.
         if !add_icon(window) {
-            eprintln!(
-                "linkcursor-agent: no tray icon yet ({}); trying again",
+            log!(
+                "no tray icon yet ({}); trying again",
                 io::Error::last_os_error()
             );
             SetTimer(window, ICON_RETRY_TIMER, 2000, None);
@@ -176,6 +194,12 @@ unsafe extern "system" fn window_proc(
             match lparam as u32 {
                 WM_LBUTTONUP => open_app(&["--tray"]),
                 WM_RBUTTONUP => show_menu(window),
+                NIN_BALLOONUSERCLICK => {
+                    let folder = BALLOON_FOLDER.lock().ok().and_then(|mut slot| slot.take());
+                    if let Some(folder) = folder {
+                        open_folder(&folder);
+                    }
+                }
                 _ => {}
             }
             0
@@ -229,8 +253,8 @@ fn add_icon(window: HWND) -> bool {
 }
 
 fn show_menu(window: HWND) {
-    let open = wide("打开主窗口");
-    let quit = wide("退出");
+    let open = wide(crate::i18n::tr("打开主窗口", "Open LinkCursor"));
+    let quit = wide(crate::i18n::tr("退出", "Quit"));
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
         let menu = CreatePopupMenu();
@@ -266,6 +290,24 @@ fn show_menu(window: HWND) {
     }
 }
 
+/// Shows a folder in Explorer, in front (the click allowed that).
+pub fn open_folder(folder: &std::path::Path) {
+    let path = wide(&folder.to_string_lossy());
+    let verb = wide("open");
+    // SAFETY: valid NUL-terminated strings; the shell opens the folder.
+    unsafe {
+        AllowSetForegroundWindow(ASFW_ANY);
+        ShellExecuteW(
+            null_mut(),
+            verb.as_ptr(),
+            path.as_ptr(),
+            null(),
+            null(),
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
 /// Launches the settings app: `LINKCURSOR_APP_PATH`, or `LinkCursor.exe`
 /// next to the agent (the layout produced by the app's build). A running app
 /// takes the request over (it is single-instance) and shows the main window,
@@ -286,7 +328,7 @@ pub fn open_app(arguments: &[&str]) {
         AllowSetForegroundWindow(ASFW_ANY);
     }
     if let Err(error) = std::process::Command::new(&path).args(arguments).spawn() {
-        eprintln!("linkcursor-agent: cannot open {}: {error}", path.display());
+        log!("cannot open {}: {error}", path.display());
     }
 }
 

@@ -23,6 +23,7 @@ namespace winrt::LinkCursor::implementation
         void ShowTray();
         void TrayClosed();
         void Quit();
+        void Relaunch(hstring const& language);
 
     private:
         void MainClosed();

@@ -1,0 +1,197 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from one table (English, Simplified Chinese); keep the two files in step. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="LanguageTag" xml:space="preserve"><value>zh-CN</value></data>
+  <data name="On" xml:space="preserve"><value>开</value></data>
+  <data name="Off" xml:space="preserve"><value>关</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="UnknownSystem" xml:space="preserve"><value>未知系统</value></data>
+  <data name="Offline" xml:space="preserve"><value>离线</value></data>
+  <data name="OnlineJustNow" xml:space="preserve"><value>刚刚在线</value></data>
+  <data name="OnlineMinutesAgo" xml:space="preserve"><value>{0} 分钟前在线</value></data>
+  <data name="OnlineTodayAt" xml:space="preserve"><value>今天 {0:02}:{1:02} 在线</value></data>
+  <data name="OnlineYesterday" xml:space="preserve"><value>昨天在线</value></data>
+  <data name="OnlineOnDate" xml:space="preserve"><value>{0} 月 {1} 日在线</value></data>
+  <data name="StatusControllingThis" xml:space="preserve"><value>正在控制本机</value></data>
+  <data name="StatusConnected" xml:space="preserve"><value>已连接</value></data>
+  <data name="StatusPairing" xml:space="preserve"><value>等待配对确认…</value></data>
+  <data name="StatusConnecting" xml:space="preserve"><value>连接中…</value></data>
+  <data name="StatusNotConnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="ThisPC" xml:space="preserve"><value>本机</value></data>
+  <data name="DisplayNumber" xml:space="preserve"><value>显示器 {0}</value></data>
+  <data name="ThisPCWith" xml:space="preserve"><value>本机 · {0}</value></data>
+  <data name="ArrangementHintDrag" xml:space="preserve"><value>拖动以调整屏幕位置</value></data>
+  <data name="ArrangementHintEmpty" xml:space="preserve"><value>连接设备后，可以在这里把它拖到屏幕旁边</value></data>
+  <data name="SuffixNotConnected" xml:space="preserve"><value> · 未连接</value></data>
+  <data name="SuffixOffline" xml:space="preserve"><value> · 离线</value></data>
+  <data name="PairingWaiting" xml:space="preserve"><value>等待对方确认…</value></data>
+  <data name="PairingTitle" xml:space="preserve"><value>配对 {0}</value></data>
+  <data name="PairingInstruction" xml:space="preserve"><value>两台设备上都点“配对”后完成。</value></data>
+  <data name="TlsOn" xml:space="preserve"><value>所有连接都用 TLS 1.3 加密，并核对对方的证书。</value></data>
+  <data name="TlsOff" xml:space="preserve"><value>LinkCursor 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。</value></data>
+  <data name="LockBarMessage" xml:space="preserve"><value>光标不会切换到其他设备。按 {0} 解除。</value></data>
+  <data name="PortPending" xml:space="preserve"><value>重新启动 LinkCursor 后改用 {0}；现在使用 {1}。</value></data>
+  <data name="PortHint" xml:space="preserve"><value>其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。</value></data>
+  <data name="ElevatedOn" xml:space="preserve"><value>其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。</value></data>
+  <data name="ElevatedOff" xml:space="preserve"><value>需要用安装包安装 LinkCursor：由随附的输入服务完成。</value></data>
+  <data name="Version" xml:space="preserve"><value>版本 {0}</value></data>
+  <data name="HotkeyNeedsModifier" xml:space="preserve"><value>需要包含 Ctrl、Alt 或 Win</value></data>
+  <data name="MenuDisconnect" xml:space="preserve"><value>断开连接</value></data>
+  <data name="MenuConnect" xml:space="preserve"><value>连接</value></data>
+  <data name="MenuPlaceLeft" xml:space="preserve"><value>放在左边</value></data>
+  <data name="MenuPlaceRight" xml:space="preserve"><value>放在右边</value></data>
+  <data name="MenuPlaceTop" xml:space="preserve"><value>放在上边</value></data>
+  <data name="MenuPlaceBottom" xml:space="preserve"><value>放在下边</value></data>
+  <data name="MenuUnplace" xml:space="preserve"><value>取消放置</value></data>
+  <data name="MenuPeerInput" xml:space="preserve"><value>鼠标和滚动…</value></data>
+  <data name="MenuForget" xml:space="preserve"><value>移除此设备…</value></data>
+  <data name="ForgetTitle" xml:space="preserve"><value>移除 {0}？</value></data>
+  <data name="ForgetContent" xml:space="preserve"><value>会断开连接，并删除它在排列中的位置。它在线时仍会出现在“添加设备”里。</value></data>
+  <data name="ForgetConfirm" xml:space="preserve"><value>移除</value></data>
+  <data name="StatusControlledBy" xml:space="preserve"><value>正在被 {0} 控制键盘和鼠标</value></data>
+  <data name="StatusOneConnected" xml:space="preserve"><value>已连接 1 台设备</value></data>
+  <data name="StatusManyConnected" xml:space="preserve"><value>已连接 {0} 台设备</value></data>
+  <data name="StatusSearching" xml:space="preserve"><value>未连接 · 正在局域网中查找设备</value></data>
+  <data name="StatusCoreStopped" xml:space="preserve"><value>核心服务已停止</value></data>
+  <data name="StatusStarting" xml:space="preserve"><value>正在启动…</value></data>
+  <data name="StatusAgentConnecting" xml:space="preserve"><value>正在连接后台服务…</value></data>
+  <data name="TransferOneItem" xml:space="preserve"><value>“{0}”</value></data>
+  <data name="TransferManyItems" xml:space="preserve"><value>“{0}”等 {1} 项</value></data>
+  <data name="TransferReceiving" xml:space="preserve"><value>正在从 {0} 接收{1}</value></data>
+  <data name="TransferSending" xml:space="preserve"><value>正在向 {0} 发送{1}</value></data>
+  <data name="TransferCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="AddressInvalid" xml:space="preserve"><value>请输入 IP 地址或设备名称。</value></data>
+  <data name="AddressDuplicate" xml:space="preserve"><value>已经添加过这个地址。</value></data>
+  <data name="AddressTooMany" xml:space="preserve"><value>最多添加 32 个地址。</value></data>
+  <data name="AddressFound" xml:space="preserve"><value>已找到 {0}</value></data>
+  <data name="AddressNoResponse" xml:space="preserve"><value>没有回应：请确认对方运行着 LinkCursor，并且防火墙允许它通信。</value></data>
+  <data name="AddressUnresolved" xml:space="preserve"><value>找不到这个名称（{0}）。</value></data>
+  <data name="AddressSearching" xml:space="preserve"><value>正在查找…</value></data>
+  <data name="AddressRemove" xml:space="preserve"><value>移除</value></data>
+  <data name="PeerInputTitle" xml:space="preserve"><value>{0} 上的鼠标</value></data>
+  <data name="BackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>返回</value></data>
+  <data name="BackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>返回</value></data>
+  <data name="DevicesTitle.Text" xml:space="preserve"><value>设备</value></data>
+  <data name="AddDeviceButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>添加设备</value></data>
+  <data name="AddDeviceLabel.Text" xml:space="preserve"><value>添加设备</value></data>
+  <data name="SettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设置</value></data>
+  <data name="SettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>设置</value></data>
+  <data name="LockBar.Title" xml:space="preserve"><value>已锁定到当前屏幕</value></data>
+  <data name="SharingTitle.Text" xml:space="preserve"><value>共享键盘和鼠标</value></data>
+  <data name="SharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>共享键盘和鼠标</value></data>
+  <data name="UnplacedLabel.Text" xml:space="preserve"><value>未放置：</value></data>
+  <data name="ArrangementHint.Text" xml:space="preserve"><value>拖动以调整屏幕位置</value></data>
+  <data name="MyDevicesHeader.Text" xml:space="preserve"><value>我的设备</value></data>
+  <data name="RowConnect.Content" xml:space="preserve"><value>连接</value></data>
+  <data name="RowMore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>更多操作</value></data>
+  <data name="RowMore.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>更多操作</value></data>
+  <data name="DevicesEmpty.Text" xml:space="preserve"><value>还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。</value></data>
+  <data name="SettingsTitle.Text" xml:space="preserve"><value>设置</value></data>
+  <data name="GeneralHeader.Text" xml:space="preserve"><value>常规</value></data>
+  <data name="LaunchTitle.Text" xml:space="preserve"><value>开机时启动</value></data>
+  <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>开机时启动</value></data>
+  <data name="TrayTitle.Text" xml:space="preserve"><value>关闭窗口时保留在托盘</value></data>
+  <data name="TrayDescription.Text" xml:space="preserve"><value>关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。</value></data>
+  <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>关闭窗口时保留在托盘</value></data>
+  <data name="ThemeTitle.Text" xml:space="preserve"><value>主题</value></data>
+  <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>主题</value></data>
+  <data name="ThemeSystem.Content" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="ThemeLight.Content" xml:space="preserve"><value>浅色</value></data>
+  <data name="ThemeDark.Content" xml:space="preserve"><value>深色</value></data>
+  <data name="LanguageTitle.Text" xml:space="preserve"><value>语言</value></data>
+  <data name="LanguageDescription.Text" xml:space="preserve"><value>更改后 LinkCursor 窗口会重新打开。</value></data>
+  <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>语言</value></data>
+  <data name="LanguageSystem.Content" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="SwitchingHeader.Text" xml:space="preserve"><value>屏幕切换</value></data>
+  <data name="DelayTitle.Text" xml:space="preserve"><value>切换延迟</value></data>
+  <data name="DelayDescription.Text" xml:space="preserve"><value>光标要在屏幕边缘推住这么久才会切换到另一台设备。</value></data>
+  <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切换延迟</value></data>
+  <data name="CornerTitle.Text" xml:space="preserve"><value>屏幕角落不触发切换</value></data>
+  <data name="CornerDescription.Text" xml:space="preserve"><value>让开始按钮、菜单和触发角保持好用。</value></data>
+  <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>屏幕角落不触发切换</value></data>
+  <data name="FullscreenTitle.Text" xml:space="preserve"><value>全屏游戏时暂停</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>全屏运行游戏、视频或演示时，光标不会切换到其他设备。</value></data>
+  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全屏游戏时暂停</value></data>
+  <data name="LockTitle.Text" xml:space="preserve"><value>锁定到当前屏幕</value></data>
+  <data name="LockDescription.Text" xml:space="preserve"><value>按一次快捷键，光标留在当前屏幕上不再切换；再按一次解除。</value></data>
+  <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>修改快捷键</value></data>
+  <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>修改快捷键</value></data>
+  <data name="SwitchHotkeysTitle.Text" xml:space="preserve"><value>用快捷键切换设备</value></data>
+  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>按所选组合键加方向键，光标直接移到那一侧的设备。其他程序就收不到这组快捷键了。</value></data>
+  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>有的组合已被其他程序占用，那几个方向用不了。换一组试试。</value></data>
+  <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切换设备的组合键</value></data>
+  <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>用快捷键切换设备</value></data>
+  <data name="ShortcutRemapTitle.Text" xml:space="preserve"><value>沿用 Mac 的快捷键</value></data>
+  <data name="ShortcutRemapDescription.Text" xml:space="preserve"><value>Mac 控制这台电脑时，⌘C、⌘V 等按 Ctrl 快捷键执行。关闭后 ⌘ 对应 Windows 键。</value></data>
+  <data name="ShortcutRemapToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>沿用 Mac 的快捷键</value></data>
+  <data name="PresenceHeader.Text" xml:space="preserve"><value>锁屏与唤醒</value></data>
+  <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>
+  <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>你在已连接的其他设备上操作时，这台电脑不熄屏，也不会因闲置而锁定。</value></data>
+  <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>
+  <data name="LockSyncTitle.Text" xml:space="preserve"><value>一起锁定</value></data>
+  <data name="LockSyncDescription.Text" xml:space="preserve"><value>锁定这台电脑时，已连接的设备一起锁定；它们锁定时，这台电脑也锁定。两台设备都打开此项才生效。</value></data>
+  <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>一起锁定</value></data>
+  <data name="ClipboardHeader.Text" xml:space="preserve"><value>剪贴板</value></data>
+  <data name="ClipboardTitle.Text" xml:space="preserve"><value>同步剪贴板和文件</value></data>
+  <data name="ClipboardDescription.Text" xml:space="preserve"><value>控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。</value></data>
+  <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>同步剪贴板和文件</value></data>
+  <data name="NetworkHeader.Text" xml:space="preserve"><value>网络与安全</value></data>
+  <data name="PortTitle.Text" xml:space="preserve"><value>端口</value></data>
+  <data name="PortBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>端口</value></data>
+  <data name="TlsTitle.Text" xml:space="preserve"><value>加密传输 (TLS)</value></data>
+  <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>加密传输</value></data>
+  <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>仅允许已配对设备</value></data>
+  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。</value></data>
+  <data name="PairedOnlyToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>仅允许已配对设备</value></data>
+  <data name="ElevatedTitle.Text" xml:space="preserve"><value>被控时可操作管理员窗口、UAC 和锁屏</value></data>
+  <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>被控时可操作管理员窗口、UAC 和锁屏</value></data>
+  <data name="FingerprintTitle.Text" xml:space="preserve"><value>本机指纹</value></data>
+  <data name="FingerprintDescription.Text" xml:space="preserve"><value>本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。</value></data>
+  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>复制本机指纹</value></data>
+  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>复制</value></data>
+  <data name="AboutHeader.Text" xml:space="preserve"><value>关于</value></data>
+  <data name="CheckUpdateButton.Content" xml:space="preserve"><value>检查更新</value></data>
+  <data name="LogsTitle.Text" xml:space="preserve"><value>诊断日志</value></data>
+  <data name="LogsDescription.Text" xml:space="preserve"><value>记录连接、配对和文件传输的情况，不含剪贴板和键入的内容。反馈问题时附上会很有帮助。</value></data>
+  <data name="OpenLogsButton.Content" xml:space="preserve"><value>打开日志文件夹</value></data>
+  <data name="AddDeviceDialog.Title" xml:space="preserve"><value>添加设备</value></data>
+  <data name="AddDeviceDialog.CloseButtonText" xml:space="preserve"><value>关闭</value></data>
+  <data name="AddDeviceHint.Text" xml:space="preserve"><value>同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。</value></data>
+  <data name="NearbyConnect.Content" xml:space="preserve"><value>连接</value></data>
+  <data name="NearbySearching.Text" xml:space="preserve"><value>正在查找附近的设备…</value></data>
+  <data name="AddressHeader.Text" xml:space="preserve"><value>通过地址添加</value></data>
+  <data name="AddressHint.Text" xml:space="preserve"><value>找不到设备时（例如在公司或访客网络、不同网段），输入对方的 IP 地址或设备名称。在一台设备上添加即可。</value></data>
+  <data name="AddressBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设备地址</value></data>
+  <data name="AddressBox.PlaceholderText" xml:space="preserve"><value>例如 192.168.1.20</value></data>
+  <data name="AddAddressButton.Content" xml:space="preserve"><value>添加</value></data>
+  <data name="PeerInputDialog.CloseButtonText" xml:space="preserve"><value>取消</value></data>
+  <data name="PeerInputDialog.PrimaryButtonText" xml:space="preserve"><value>保存</value></data>
+  <data name="PeerInputDialog.SecondaryButtonText" xml:space="preserve"><value>恢复默认</value></data>
+  <data name="PeerInputHint.Text" xml:space="preserve"><value>用这台电脑的鼠标操作该设备时生效。</value></data>
+  <data name="PointerSpeedLabel.Text" xml:space="preserve"><value>指针速度</value></data>
+  <data name="PointerSpeedSlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>指针速度</value></data>
+  <data name="ScrollSpeedLabel.Text" xml:space="preserve"><value>滚动速度</value></data>
+  <data name="ScrollSpeedSlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>滚动速度</value></data>
+  <data name="InvertScrollLabel.Text" xml:space="preserve"><value>反转滚动方向</value></data>
+  <data name="InvertScrollToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>反转滚动方向</value></data>
+  <data name="PairingDialog.CloseButtonText" xml:space="preserve"><value>取消</value></data>
+  <data name="PairingDialog.PrimaryButtonText" xml:space="preserve"><value>配对</value></data>
+  <data name="PairingHint.Text" xml:space="preserve"><value>确认对方屏幕显示相同的代码</value></data>
+  <data name="HotkeyDialog.Title" xml:space="preserve"><value>锁定快捷键</value></data>
+  <data name="HotkeyDialog.CloseButtonText" xml:space="preserve"><value>取消</value></data>
+  <data name="HotkeyDialog.PrimaryButtonText" xml:space="preserve"><value>保存</value></data>
+  <data name="HotkeyDialog.SecondaryButtonText" xml:space="preserve"><value>恢复默认</value></data>
+  <data name="HotkeyInstructions.Text" xml:space="preserve"><value>按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。</value></data>
+  <data name="TraySharingTitle.Text" xml:space="preserve"><value>键鼠共享</value></data>
+  <data name="TraySharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>键鼠共享</value></data>
+  <data name="TrayDevicesHeader.Text" xml:space="preserve"><value>设备</value></data>
+  <data name="TrayOpenButton.Content" xml:space="preserve"><value>打开主窗口</value></data>
+  <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设置</value></data>
+  <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>设置</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>退出 LinkCursor</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>退出 LinkCursor</value></data>
+</root>

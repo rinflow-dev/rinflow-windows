@@ -52,8 +52,8 @@ pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Opti
         Err(error) => {
             let mut aside = path.as_os_str().to_owned();
             aside.push(".corrupt");
-            eprintln!(
-                "linkcursor-agent: {} is unreadable ({error}); kept as {} and using defaults",
+            log!(
+                "{} is unreadable ({error}); kept as {} and using defaults",
                 path.display(),
                 std::path::Path::new(&aside).display()
             );

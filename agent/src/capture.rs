@@ -9,15 +9,26 @@
 //! follows the pointer on the peer. Moving it back out through a portal, the
 //! release key (Ctrl+Alt+Esc) or losing the session ends the capture. While
 //! the lock shortcut holds the pointer on the peer, portals lead nowhere.
+//!
+//! - Where the peer touches another placed peer, the pointer moves straight
+//!   on into that one (three devices in a row), and the switch shortcuts
+//!   (Ctrl+Alt+Shift+arrow keys by default) jump
+//!   to the device on that side (see `arrangement::World`).
+//! - Motion and scrolling are scaled per peer (the `peer_input` setting) here,
+//!   where the pointer is tracked, so the two never disagree on where it is.
+//! - While a game or a pointer-lock page on the peer holds its pointer (the
+//!   core's `peer_pointer_lock`), all motion goes to it and edges lead
+//!   nowhere; the shortcuts still work.
 
-use crate::arrangement::Target;
+use crate::arrangement::{Arrangement, Target};
 use crate::displays::{self, PhysicalPortal};
 use crate::edge;
 use crate::inject::INJECTED_MARKER;
 use crate::keymap;
-use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN};
+use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, PeerInput, SettingsStore};
+use crate::state::SharedState;
 use crate::win::wide;
-use linkcursor_core::layout::RemotePointer;
+use linkcursor_core::layout::{Motion, RemotePointer, Side};
 use linkcursor_core::{
     Core, LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_KEY_REPEAT, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
@@ -54,6 +65,39 @@ const USAGE_CONTROL: [u32; 2] = [0xE0, 0xE4];
 const USAGE_SHIFT: [u32; 2] = [0xE1, 0xE5];
 const USAGE_ALT: [u32; 2] = [0xE2, 0xE6];
 const USAGE_GUI: [u32; 2] = [0xE3, 0xE7];
+const VK_LEFT: u32 = 0x25;
+const VK_UP: u32 = 0x26;
+const VK_RIGHT: u32 = 0x27;
+const VK_DOWN: u32 = 0x28;
+
+/// The side an arrow key points to.
+pub fn arrow_side(vk: u32) -> Option<Side> {
+    match vk {
+        VK_LEFT => Some(Side::Left),
+        VK_RIGHT => Some(Side::Right),
+        VK_UP => Some(Side::Top),
+        VK_DOWN => Some(Side::Bottom),
+        _ => None,
+    }
+}
+
+/// The arrow key for a side.
+pub fn side_key(side: Side) -> u32 {
+    match side {
+        Side::Left => VK_LEFT,
+        Side::Right => VK_RIGHT,
+        Side::Top => VK_UP,
+        Side::Bottom => VK_DOWN,
+    }
+}
+
+/// What a capture needs to move on to other devices.
+#[derive(Clone)]
+pub struct Context {
+    pub arrangement: Arc<Arrangement>,
+    pub state: SharedState,
+    pub settings: Arc<SettingsStore>,
+}
 
 /// How long keys still held when a capture ended are kept from this PC, at
 /// most (their release may never come, e.g. after the secure desktop).
@@ -99,6 +143,14 @@ struct Capture {
     ending: Option<Exit>,
     /// The lock shortcut's key is down (its auto-repeat toggles nothing).
     hotkey_down: bool,
+    /// The arrow key of a switch shortcut that is down (likewise).
+    switch_key_down: Option<u32>,
+    /// Keys (HID usages) the previous peer saw pressed when the pointer
+    /// moved on: their repeats and releases belong to nobody.
+    stale_keys: HashSet<u32>,
+    /// How motion and scrolling feel on this peer.
+    input: PeerInput,
+    context: Context,
 }
 
 /// Where the cursor goes when a capture ends.
@@ -106,15 +158,19 @@ struct Capture {
 enum Exit {
     /// Back on this PC, at this local point (logical points).
     Return(f64, f64),
+    /// Back on this PC by shortcut, at this local point.
+    Jump(f64, f64),
     /// Nowhere: a peer now drives this PC and places the cursor itself.
     Stay,
 }
 
 /// How a capture ended: the peer it drove, and where the cursor reappeared
-/// if it came back to this PC.
+/// if it came back to this PC (through a portal unless it jumped by
+/// shortcut).
 pub struct Ended {
     pub peer_id: String,
     pub cursor: Option<POINT>,
+    pub jumped: bool,
 }
 
 pub fn active() -> bool {
@@ -130,23 +186,11 @@ pub fn begin(
     portal: &PhysicalPortal,
     cursor: POINT,
     notify: HWND,
+    context: Context,
 ) -> bool {
-    if active() {
+    if active() || !can_take_keyboard() {
         return false;
     }
-    // Windows keeps keyboard input meant for an elevated window from this
-    // process's hook: typing "on the peer" would go into that window here
-    // (an administrator's terminal, say). Not across, then, and say why.
-    if crate::win::foreground_is_elevated() {
-        crate::tray::notify(
-            "键盘和鼠标没有切换",
-            "当前窗口以管理员身份运行，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
-        );
-        return false;
-    }
-    let Some(core) = core.upgrade() else {
-        return false;
-    };
     let monitors = displays::monitors();
     let Some((x, y)) = displays::to_logical(&monitors, cursor.x, cursor.y) else {
         return false;
@@ -165,11 +209,90 @@ pub fn begin(
         edge,
         left_at.0,
         left_at.1,
+    )
+    .with_neighbors(target.neighbors);
+    log!(
+        "driving {} through its {:?} portal from ({:.1}, {:.1})",
+        portal.peer_id,
+        edge.side,
+        left_at.0,
+        left_at.1
     );
-    let (arrival_x, arrival_y) = pointer.position();
-    if core.set_input_target(Some(&portal.peer_id)).is_err() {
+    start(
+        core,
+        &portal.peer_id,
+        pointer,
+        left_at,
+        cursor,
+        notify,
+        context,
+    )
+}
+
+/// Jumps to `peer_id` by shortcut, the pointer arriving at the local point
+/// `(x, y)` (inside one of its displays). Giving control back without
+/// crossing returns the cursor to where it is now.
+pub fn begin_at(
+    core: &Weak<Core>,
+    peer_id: &str,
+    target: Target,
+    (x, y): (f64, f64),
+    notify: HWND,
+    context: Context,
+) -> bool {
+    if active() || !can_take_keyboard() {
         return false;
     }
+    let mut cursor = POINT { x: 0, y: 0 };
+    // SAFETY: writes the cursor position into `cursor`.
+    unsafe { GetCursorPos(&mut cursor) };
+    let Some(left_at) = displays::to_logical(&displays::monitors(), cursor.x, cursor.y) else {
+        return false;
+    };
+    let pointer = RemotePointer::enter_at(&target.peer, &target.portals, target.offset, x, y, None)
+        .with_neighbors(target.neighbors);
+    log!("driving {peer_id} by shortcut");
+    start(core, peer_id, pointer, left_at, cursor, notify, context)
+}
+
+/// Windows keeps keyboard input meant for an elevated window from this
+/// process's hook: typing "on the peer" would go into that window here (an
+/// administrator's terminal, say). Not across, then, and say why.
+fn can_take_keyboard() -> bool {
+    if crate::win::foreground_is_elevated() {
+        crate::tray::notify(
+            crate::i18n::tr("键盘和鼠标没有切换", "Keyboard and mouse didn't switch"),
+            crate::i18n::tr(
+                "当前窗口以管理员身份运行，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
+                "The window in front runs as administrator, so LinkCursor can't take its keyboard input. Click another window first, then move to the other device.",
+            ),
+        );
+        return false;
+    }
+    true
+}
+
+/// Starts driving `peer_id` with `pointer`: the peer's cursor is placed,
+/// this PC's is parked and hidden, and the hooks take the keyboard and mouse.
+fn start(
+    core: &Weak<Core>,
+    peer_id: &str,
+    pointer: RemotePointer,
+    left_at: (f64, f64),
+    cursor: POINT,
+    notify: HWND,
+    context: Context,
+) -> bool {
+    let Some(core) = core.upgrade() else {
+        return false;
+    };
+    let monitors = displays::monitors();
+    let (arrival_x, arrival_y) = pointer.position();
+    if core.set_input_target(Some(peer_id)).is_err() {
+        return false;
+    }
+    // Whether a game holds its pointer, the peer says afresh.
+    edge::clear_pointer_held(peer_id);
     // Where the pointer appears on the peer; the peer starts its cursor there.
     let _ = core.send_input(LcInputEvent {
         kind: LC_INPUT_MOUSE_MOVE,
@@ -214,9 +337,10 @@ pub fn begin(
     // After the hooks: whatever is pressed from now on reaches them, so
     // nothing falls between this snapshot and the capture.
     let (local_keys, local_buttons) = held_on_this_pc();
+    let input = context.settings.get().input_for(peer_id);
     let capture = Capture {
         core,
-        peer_id: portal.peer_id.clone(),
+        peer_id: peer_id.to_owned(),
         pointer,
         park,
         scale,
@@ -231,15 +355,16 @@ pub fn begin(
         notify,
         ending: None,
         hotkey_down: false,
+        switch_key_down: None,
+        stale_keys: HashSet::new(),
+        input,
+        context,
     };
     let hooked = !mouse_hook.is_null() && !keyboard_hook.is_null();
-    eprintln!(
-        "linkcursor-agent: driving {} through its {:?} portal from ({:.1}, {:.1}), arriving at ({arrival_x:.1}, {arrival_y:.1})",
-        portal.peer_id, edge.side, left_at.0, left_at.1
-    );
+    log!("arriving at ({arrival_x:.1}, {arrival_y:.1}) on {peer_id}");
     CAPTURE.with(|slot| *slot.borrow_mut() = Some(capture));
     if !hooked {
-        eprintln!("linkcursor-agent: cannot install input hooks");
+        log!("cannot install input hooks");
         // Undoes everything above and gives the pointer back.
         finish();
         return false;
@@ -324,23 +449,21 @@ pub fn finish() -> Option<Ended> {
         }
         DestroyWindow(capture.cursor_window);
     }
-    let cursor = match capture.ending.unwrap_or_else(|| capture.home()) {
-        Exit::Return(x, y) => {
+    let exit = capture.ending.unwrap_or_else(|| capture.home());
+    let cursor = match exit {
+        Exit::Return(x, y) | Exit::Jump(x, y) => {
             let cursor = displays::to_physical(&displays::monitors(), x, y)
                 .map_or(capture.park, |(x, y)| POINT { x, y });
             // SAFETY: moves the cursor to a point on the desktop.
             unsafe {
                 SetCursorPos(cursor.x, cursor.y);
             }
-            eprintln!(
-                "linkcursor-agent: back from {} at ({x:.1}, {y:.1})",
-                capture.peer_id
-            );
+            log!("back from {} at ({x:.1}, {y:.1})", capture.peer_id);
             Some(cursor)
         }
         Exit::Stay => {
-            eprintln!(
-                "linkcursor-agent: control of {} taken over; the new controller places the cursor",
+            log!(
+                "control of {} taken over; the new controller places the cursor",
                 capture.peer_id
             );
             None
@@ -352,10 +475,111 @@ pub fn finish() -> Option<Ended> {
     Some(Ended {
         peer_id: capture.peer_id,
         cursor,
+        jumped: matches!(exit, Exit::Jump(..)),
     })
 }
 
+/// A game or a pointer-lock page on `peer_id` let go of its pointer: the
+/// peer's cursor is put back where this PC tracks it, so the edges are
+/// where they seem again.
+pub fn pointer_released(peer_id: &str) {
+    with_capture(|capture| {
+        if capture.peer_id == peer_id && capture.ending.is_none() {
+            let (x, y) = capture.pointer.position();
+            capture.send(LcInputEvent {
+                kind: LC_INPUT_MOUSE_MOVE,
+                flags: LC_INPUT_FLAG_ABSOLUTE_POSITION,
+                x,
+                y,
+                ..LcInputEvent::default()
+            });
+        }
+    });
+}
+
+/// The switch shortcut toward `side`, pressed while a peer is driven.
+pub fn jump(side: Side) {
+    with_capture(|capture| capture.jump(side));
+}
+
 impl Capture {
+    /// Moves on to the placed peer `peer_id` (into a neighbour, or by
+    /// shortcut), the pointer arriving at the local point `(x, y)`. False
+    /// when that peer is not connected: then the pointer stays.
+    fn move_on(&mut self, peer_id: &str, x: f64, y: f64) -> bool {
+        if !self.context.state.is_connected(peer_id) {
+            return false;
+        }
+        let Some(target) = self.context.arrangement.target(peer_id) else {
+            return false;
+        };
+        let pointer = RemotePointer::enter_at(
+            &target.peer,
+            &target.portals,
+            target.offset,
+            x,
+            y,
+            self.pointer.entry(),
+        )
+        .with_neighbors(target.neighbors);
+        // The old peer gets a reset: it releases what it holds.
+        if self.core.set_input_target(Some(peer_id)).is_err() {
+            return false;
+        }
+        let (arrival_x, arrival_y) = pointer.position();
+        self.send(LcInputEvent {
+            kind: LC_INPUT_MOUSE_MOVE,
+            flags: LC_INPUT_FLAG_ABSOLUTE_POSITION,
+            x: arrival_x,
+            y: arrival_y,
+            ..LcInputEvent::default()
+        });
+        // Modifiers held go on to the new peer (Shift through a drag across);
+        // other keys were for the old one, so their releases go nowhere.
+        let held: Vec<u32> = self.keys.drain().collect();
+        self.buttons = 0;
+        self.peer_id = peer_id.to_owned();
+        self.pointer = pointer;
+        self.input = self.context.settings.get().input_for(peer_id);
+        edge::clear_pointer_held(peer_id);
+        for usage in held {
+            if (0xE0..=0xE7).contains(&usage) {
+                self.keys.insert(usage);
+                self.send(LcInputEvent {
+                    kind: LC_INPUT_KEY_DOWN,
+                    code: usage,
+                    modifiers: self.modifiers(),
+                    ..LcInputEvent::default()
+                });
+            } else {
+                self.stale_keys.insert(usage);
+            }
+        }
+        log!("moved on to {peer_id}, arriving at ({arrival_x:.1}, {arrival_y:.1})");
+        true
+    }
+
+    /// A switch shortcut: on to the device on that side of this peer.
+    fn jump(&mut self, side: Side) {
+        if self.ending.is_some() || edge::locked() {
+            return;
+        }
+        let Some(world) = self.context.arrangement.world() else {
+            return;
+        };
+        let Some(to) = world.toward(Some(&self.peer_id), side) else {
+            return;
+        };
+        let Some((x, y)) = world.landing(Some(&self.peer_id), to.as_deref()) else {
+            return;
+        };
+        match to {
+            None => self.request_end(Exit::Jump(x, y)),
+            Some(peer_id) => {
+                let _ = self.move_on(&peer_id, x, y);
+            }
+        }
+    }
     /// Back on this PC, just inside the edge the pointer left through.
     fn home(&self) -> Exit {
         let (x, y) = self.pointer.return_point(self.left_at.0, self.left_at.1);
@@ -397,25 +621,47 @@ impl Capture {
                         SetCursorPos(self.park.x, self.park.y);
                     }
                 }
-                let dx = f64::from(info.pt.x - current.x) / self.scale;
-                let dy = f64::from(info.pt.y - current.y) / self.scale;
+                // The pointer speed set for this peer.
+                let speed = self.input.pointer_speed / self.scale;
+                let dx = f64::from(info.pt.x - current.x) * speed;
+                let dy = f64::from(info.pt.y - current.y) * speed;
                 if dx == 0.0 && dy == 0.0 {
+                    return true;
+                }
+                // A game there holds its pointer: every bit of motion goes
+                // to it (it turns the camera), and no edge leads anywhere.
+                if edge::pointer_held(&self.peer_id) {
+                    self.send(LcInputEvent {
+                        kind: LC_INPUT_MOUSE_MOVE,
+                        delta_x: dx,
+                        delta_y: dy,
+                        buttons: self.buttons,
+                        ..LcInputEvent::default()
+                    });
                     return true;
                 }
                 let before = self.pointer.position();
                 let (mut dx, mut dy) = (dx, dy);
-                if let Some((x, y)) = self.pointer.move_by(dx, dy) {
-                    if !edge::locked() {
+                match self.pointer.step(dx, dy) {
+                    Motion::Stay => {}
+                    Motion::Home(x, y) if !edge::locked() => {
                         self.request_end(Exit::Return(x, y));
                         return true;
                     }
-                    // Locked to the peer: slide along the edge instead.
-                    let _ = self.pointer.move_by(dx, 0.0);
-                    let _ = self.pointer.move_by(0.0, dy);
-                    let after = self.pointer.position();
-                    (dx, dy) = (after.0 - before.0, after.1 - before.1);
-                    if dx == 0.0 && dy == 0.0 {
+                    Motion::Neighbor { id, x, y } if !edge::locked() && self.move_on(&id, x, y) => {
                         return true;
+                    }
+                    // A neighbour not connected (or locked): an edge.
+                    Motion::Neighbor { .. } => {}
+                    Motion::Home(..) => {
+                        // Locked to the peer: slide along the edge instead.
+                        let _ = self.pointer.move_by(dx, 0.0);
+                        let _ = self.pointer.move_by(0.0, dy);
+                        let after = self.pointer.position();
+                        (dx, dy) = (after.0 - before.0, after.1 - before.1);
+                        if dx == 0.0 && dy == 0.0 {
+                            return true;
+                        }
                     }
                 }
                 self.send(LcInputEvent {
@@ -461,6 +707,10 @@ impl Capture {
             // Pressed again: its earlier release went unseen, and this press
             // belongs to the peer.
             self.local_buttons &= !bit;
+        } else if self.buttons & bit == 0 {
+            // Pressed on a peer the pointer moved on from, which was reset:
+            // this peer never saw it go down.
+            return true;
         }
         if down {
             self.buttons |= bit;
@@ -482,10 +732,12 @@ impl Capture {
     }
 
     fn scroll(&self, x: f64, y: f64) {
+        // The scrolling speed and direction set for this peer.
+        let factor = self.input.scroll_speed * if self.input.invert_scroll { -1.0 } else { 1.0 };
         self.send(LcInputEvent {
             kind: LC_INPUT_SCROLL,
-            scroll_x: x,
-            scroll_y: y,
+            scroll_x: x * factor,
+            scroll_y: y * factor,
             buttons: self.buttons,
             modifiers: self.modifiers(),
             ..LcInputEvent::default()
@@ -511,8 +763,32 @@ impl Capture {
         let Some(usage) = keymap::hid_usage(info.scanCode, extended, info.vkCode) else {
             return true;
         };
+        if self.stale_keys.contains(&usage) {
+            // Pressed on the peer the pointer moved on from.
+            if !down {
+                self.stale_keys.remove(&usage);
+            }
+            return true;
+        }
         if down && usage == USAGE_ESCAPE && self.held(&USAGE_CONTROL) && self.held(&USAGE_ALT) {
             self.request_end(self.home());
+            return true;
+        }
+        // The switch shortcuts (Ctrl+Alt+Shift+arrow keys by default): on to
+        // the device on that side. The peer saw the modifiers, never the
+        // arrow.
+        if Some(info.vkCode) == self.switch_key_down {
+            if !down {
+                self.switch_key_down = None;
+            }
+            return true;
+        }
+        if down
+            && let Some(side) = arrow_side(info.vkCode)
+            && self.is_switch_shortcut()
+        {
+            self.switch_key_down = Some(info.vkCode);
+            self.jump(side);
             return true;
         }
         // The lock shortcut toggles the lock here too; the peer never sees
@@ -564,6 +840,32 @@ impl Capture {
 
     fn held(&self, usages: &[u32]) -> bool {
         usages.iter().any(|usage| self.keys.contains(usage))
+    }
+
+    /// Exactly the switch shortcuts' modifiers are held (with an arrow key
+    /// going down), and the shortcuts are on.
+    fn is_switch_shortcut(&self) -> bool {
+        let settings = self.context.settings.get();
+        settings.switch_hotkeys
+            && self.modifier_bits() | self.local_modifier_bits() == settings.switch_modifiers
+    }
+
+    /// The modifier bits of keys held since before the capture began (the
+    /// modifiers of the switch shortcut that started it): held on, with
+    /// another arrow key, they jump on.
+    fn local_modifier_bits(&self) -> u32 {
+        let mut bits = 0;
+        for (keys, bit) in [
+            ([0xA2, 0xA3], MOD_CONTROL),
+            ([0xA0, 0xA1], MOD_SHIFT),
+            ([0xA4, 0xA5], MOD_ALT),
+            ([0x5B, 0x5C], MOD_WIN),
+        ] {
+            if keys.iter().any(|key| self.local_keys.contains(key)) {
+                bits |= bit;
+            }
+        }
+        bits
     }
 
     /// The `RegisterHotKey` modifier bits for the keys held down.
