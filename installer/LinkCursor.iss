@@ -52,13 +52,39 @@ SetupLogging=yes
 ; Sign setup and uninstaller once there is a certificate, e.g.
 ; SignTool=signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f
 
+; English or Chinese, from the Windows display language like the app
+; (Chinese for any zh-*); setup asks only when neither matches.
+ShowLanguageDialog=auto
+LanguageDetectionMethod=uilanguage
+
 [Languages]
+Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
 
+[CustomMessages]
+en.GroupControlled=While another device controls this PC:
+en.TaskElevatedInput=Allow it to operate administrator windows, UAC prompts and the lock screen (recommended)
+en.GroupStartup=Startup:
+en.TaskAutostart=Start LinkCursor when you sign in to Windows
+en.GroupShortcuts=Shortcuts:
+en.TaskDesktopIcon=Create a desktop shortcut
+en.StatusFirewall=Setting up the firewall…
+en.StatusService=Installing the input service…
+en.RunApp=Start LinkCursor
+chinesesimp.GroupControlled=被控制时：
+chinesesimp.TaskElevatedInput=被其他设备控制时，也能操作管理员窗口、UAC 弹窗和锁屏（推荐）
+chinesesimp.GroupStartup=启动：
+chinesesimp.TaskAutostart=登录 Windows 时启动 LinkCursor
+chinesesimp.GroupShortcuts=快捷方式：
+chinesesimp.TaskDesktopIcon=创建桌面快捷方式
+chinesesimp.StatusFirewall=正在设置防火墙…
+chinesesimp.StatusService=正在安装输入服务…
+chinesesimp.RunApp=启动 LinkCursor
+
 [Tasks]
-Name: "elevatedinput"; Description: "被其他设备控制时，也能操作管理员窗口、UAC 弹窗和锁屏（推荐）"; GroupDescription: "被控制时："
-Name: "autostart"; Description: "登录 Windows 时启动 LinkCursor"; GroupDescription: "启动："
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
+Name: "elevatedinput"; Description: "{cm:TaskElevatedInput}"; GroupDescription: "{cm:GroupControlled}"
+Name: "autostart"; Description: "{cm:TaskAutostart}"; GroupDescription: "{cm:GroupStartup}"
+Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:GroupShortcuts}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,*.old,*.ilk,*.exp,*.lib,Microsoft.Web.WebView2.*"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -77,9 +103,9 @@ Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "Eleva
 ; administrator account setup may run as.
 Filename: "{app}\linkcursor-agent.exe"; Parameters: "--launch-at-login on"; Tasks: autostart; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""LinkCursor"""; Flags: runhidden waituntilterminated
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""LinkCursor"" dir=in action=allow program=""{app}\linkcursor-agent.exe"" enable=yes profile=private,public"; StatusMsg: "正在设置防火墙…"; Flags: runhidden waituntilterminated
-Filename: "{app}\linkcursor-service.exe"; Parameters: "--install"; StatusMsg: "正在安装输入服务…"; Flags: runhidden waituntilterminated
-Filename: "{app}\LinkCursor.exe"; Description: "启动 LinkCursor"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""LinkCursor"" dir=in action=allow program=""{app}\linkcursor-agent.exe"" enable=yes profile=private,public"; StatusMsg: "{cm:StatusFirewall}"; Flags: runhidden waituntilterminated
+Filename: "{app}\linkcursor-service.exe"; Parameters: "--install"; StatusMsg: "{cm:StatusService}"; Flags: runhidden waituntilterminated
+Filename: "{app}\LinkCursor.exe"; Description: "{cm:RunApp}"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 Filename: "{app}\linkcursor-agent.exe"; Parameters: "--launch-at-login off"; RunOnceId: "RemoveAutostart"; Flags: runhidden waituntilterminated

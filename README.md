@@ -34,7 +34,9 @@ Status:
 build.cmd, build.ps1         one-command build from any terminal
 agent/
   Cargo.toml                 depends on ../../linkcursor-core
-  build.rs                   embeds linkcursor-agent.manifest (PerMonitorV2 DPI, asInvoker)
+  build.rs                   embeds linkcursor-agent.manifest (PerMonitorV2 DPI, asInvoker) and a
+                             version resource (FileDescription "LinkCursor": the name on its
+                             notifications, in Task Manager and in the firewall prompt)
   src/main.rs                single instance, core start-up, shutdown
   src/state.rs               folds core events into the snapshot the app renders
   src/ipc.rs                 named-pipe server
@@ -145,7 +147,7 @@ A Release x64 build is about 64 MB of files, most of it the Windows App Runtime 
 .\installer\build-installer.ps1 -SkipBuild  # package the existing Release build
 ```
 
-[build-installer.ps1](installer/build-installer.ps1) runs the Release build and compiles [LinkCursor.iss](installer/LinkCursor.iss) with Inno Setup into `installer\output\LinkCursor-Setup-<version>-x64.exe` (the version comes from [agent/Cargo.toml](agent/Cargo.toml)). The setup program, in Chinese ([ChineseSimplified.isl](installer/ChineseSimplified.isl), MIT, from [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation)), needs an administrator and:
+[build-installer.ps1](installer/build-installer.ps1) runs the Release build and compiles [LinkCursor.iss](installer/LinkCursor.iss) with Inno Setup into `installer\output\LinkCursor-Setup-<version>-x64.exe` (the version comes from [agent/Cargo.toml](agent/Cargo.toml)). The setup program speaks English or Simplified Chinese ([ChineseSimplified.isl](installer/ChineseSimplified.isl), MIT, from [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation)), picked from the Windows display language; for any other language it asks which one. Its own texts are `[CustomMessages]` in the script. It needs an administrator and:
 
 - installs into `Program Files\LinkCursor`, where only administrators can change files (the input helper and the agent rely on that when they check each other);
 - adds a firewall rule for the agent on private **and public** networks (Windows often marks a new Wi-Fi network public, and nothing would be found without saying why);
