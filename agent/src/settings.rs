@@ -290,7 +290,16 @@ impl Settings {
     }
 }
 
-pub struct SettingsStore(Mutex<Settings>);
+/// The settings and their file. Reading never waits for the disk: the input
+/// hooks read settings, and Windows silently removes a hook that takes too
+/// long. So the file is written outside the lock, and only ever with the
+/// newest settings.
+pub struct SettingsStore {
+    /// The settings, and how many changes they have had.
+    current: Mutex<(Settings, u64)>,
+    /// Taken while saving: the change count of the settings last saved.
+    saved: Mutex<u64>,
+}
 
 impl SettingsStore {
     pub fn load() -> Self {
@@ -300,28 +309,41 @@ impl SettingsStore {
             clipboard: settings.clipboard,
             ..Settings::default()
         });
-        Self(Mutex::new(settings))
+        Self {
+            current: Mutex::new((settings, 0)),
+            saved: Mutex::new(0),
+        }
     }
 
     pub fn get(&self) -> Settings {
-        self.0
+        self.current
             .lock()
-            .map(|settings| settings.clone())
+            .map(|current| current.0.clone())
             .unwrap_or_default()
     }
 
     pub fn update(&self, change: impl FnOnce(&mut Settings)) -> Settings {
-        let Ok(mut settings) = self.0.lock() else {
-            return Settings::default();
+        let (settings, changes) = {
+            let Ok(mut current) = self.current.lock() else {
+                return Settings::default();
+            };
+            change(&mut current.0);
+            current.1 += 1;
+            (current.0.clone(), current.1)
         };
-        change(&mut settings);
-        // Saved while holding the lock, so saves cannot interleave.
-        if let Ok(text) = serde_json::to_string_pretty(&*settings)
-            && let Err(error) = identity::write_file(&path(), &text)
+        // Saves take turns. One that comes after a save of newer settings
+        // has nothing to add, and must not put older ones back.
+        if let Ok(mut saved) = self.saved.lock()
+            && *saved < changes
         {
-            log!("cannot save settings: {error}");
+            if let Ok(text) = serde_json::to_string_pretty(&settings)
+                && let Err(error) = identity::write_file(&path(), &text)
+            {
+                log!("cannot save settings: {error}");
+            }
+            *saved = changes;
         }
-        settings.clone()
+        settings
     }
 }
 

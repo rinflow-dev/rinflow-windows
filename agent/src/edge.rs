@@ -48,7 +48,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows_sys::Win32::UI::Input::{
     GetRawInputData, MOUSE_MOVE_ABSOLUTE, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RID_INPUT,
-    RIDEV_INPUTSINK, RIDEV_REMOVE, RIM_TYPEMOUSE, RegisterRawInputDevices,
+    RIDEV_INPUTSINK, RIDEV_REMOVE, RIM_TYPEKEYBOARD, RIM_TYPEMOUSE, RegisterRawInputDevices,
 };
 use windows_sys::Win32::UI::Shell::{
     QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN, SHQueryUserNotificationState,
@@ -1128,11 +1128,17 @@ unsafe extern "system" fn window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match message {
-        WM_INPUT => {
-            if let Some((dx, dy)) = read_relative_motion(lparam) {
+        WM_INPUT => match read_raw_input(lparam) {
+            Some(RawInput::Mouse { dx, dy, real }) => {
+                if real {
+                    capture::raw_input(capture::Device::Mouse);
+                }
                 with_tracker(|tracker| tracker.on_motion(dx, dy));
             }
-        }
+            // Registered only while a peer is driven (see `capture`).
+            Some(RawInput::Keyboard) => capture::raw_input(capture::Device::Keyboard),
+            None => {}
+        },
         WM_TIMER if wparam == RELEASE_TIMER => with_tracker(Tracker::on_timer),
         WM_HOTKEY if wparam == HOTKEY_ID as usize => {
             with_tracker(Tracker::toggle_lock);
@@ -1177,8 +1183,18 @@ fn with_tracker(action: impl FnOnce(&mut Tracker)) {
     });
 }
 
-fn read_relative_motion(lparam: LPARAM) -> Option<(i32, i32)> {
-    // SAFETY: RAWINPUT is large enough for mouse data; size is checked.
+/// What raw input reported.
+enum RawInput {
+    /// Relative motion (or none, with buttons or a wheel). `real`: from a
+    /// device, and something happened, so the mouse hook sees it too.
+    Mouse { dx: i32, dy: i32, real: bool },
+    /// A key from a keyboard device.
+    Keyboard,
+}
+
+fn read_raw_input(lparam: LPARAM) -> Option<RawInput> {
+    // SAFETY: RAWINPUT is large enough for mouse and keyboard data; size is
+    // checked.
     unsafe {
         let mut input: RAWINPUT = std::mem::zeroed();
         let mut size = size_of::<RAWINPUT>() as u32;
@@ -1189,18 +1205,37 @@ fn read_relative_motion(lparam: LPARAM) -> Option<(i32, i32)> {
             &mut size,
             size_of::<RAWINPUTHEADER>() as u32,
         );
-        if read == u32::MAX || input.header.dwType != RIM_TYPEMOUSE {
+        if read == u32::MAX {
             return None;
         }
-        let mouse = input.data.mouse;
-        // Absolute devices (pens, remote desktop, a peer's played input) do
-        // not report pushes, nor does what this agent plays itself (a
-        // peer's motion into a game, the nudges that keep the PC awake).
-        if mouse.usFlags & MOUSE_MOVE_ABSOLUTE != 0
-            || mouse.ulExtraInformation as usize == crate::inject::INJECTED_MARKER
-        {
-            return None;
+        // Played input (SendInput, by this agent or anyone) has no device.
+        let device = !input.header.hDevice.is_null();
+        match input.header.dwType {
+            RIM_TYPEMOUSE => {
+                let mouse = input.data.mouse;
+                // Absolute devices (pens, remote desktop, a peer's played
+                // input) do not report pushes, nor does what this agent plays
+                // itself (a peer's motion into a game, the nudges that keep
+                // the PC awake).
+                if mouse.usFlags & MOUSE_MOVE_ABSOLUTE != 0
+                    || mouse.ulExtraInformation as usize == crate::inject::INJECTED_MARKER
+                {
+                    return None;
+                }
+                let (dx, dy) = (mouse.lLastX, mouse.lLastY);
+                let buttons = mouse.Anonymous.ulButtons & 0xFFFF != 0;
+                Some(RawInput::Mouse {
+                    dx,
+                    dy,
+                    real: device && (dx != 0 || dy != 0 || buttons),
+                })
+            }
+            RIM_TYPEKEYBOARD if device => {
+                let keyboard = input.data.keyboard;
+                (keyboard.ExtraInformation as usize != crate::inject::INJECTED_MARKER)
+                    .then_some(RawInput::Keyboard)
+            }
+            _ => None,
         }
-        Some((mouse.lLastX, mouse.lLastY))
     }
 }

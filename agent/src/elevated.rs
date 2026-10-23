@@ -76,6 +76,14 @@ pub fn start(on_status: impl Fn(Status) + Send + 'static) {
     }
 }
 
+/// Connected to the helper (installed, service running), whether or not the
+/// machine-wide setting lets it play.
+pub fn available() -> bool {
+    CHANNEL
+        .get()
+        .is_some_and(|channel| channel.connected.load(Ordering::SeqCst))
+}
+
 /// Input goes through the helper now.
 pub fn active() -> bool {
     CHANNEL.get().is_some_and(|channel| {

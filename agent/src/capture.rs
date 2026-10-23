@@ -19,6 +19,13 @@
 //! - While a game or a pointer-lock page on the peer holds its pointer (the
 //!   core's `peer_pointer_lock`), all motion goes to it and edges lead
 //!   nowhere; the shortcuts still work.
+//!
+//! The keyboard and mouse come back to this PC, with a notification, when
+//! the hooks can no longer take them: Windows keeps an elevated window's
+//! input from them (watched with a WinEvent hook and the timer), and
+//! silently removes a hook that took too long to answer. Raw input, which
+//! keeps arriving either way, shows the second: input a hook should have
+//! seen but did not (see `silent_hook`).
 
 use crate::arrangement::{Arrangement, Target};
 use crate::displays::{self, PhysicalPortal};
@@ -41,18 +48,23 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ptr::{null, null_mut};
 use std::sync::{Arc, Weak};
+use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+use windows_sys::Win32::UI::Input::{
+    RAWINPUTDEVICE, RIDEV_INPUTSINK, RIDEV_REMOVE, RegisterRawInputDevices,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, GetCursorPos, HC_ACTION, HHOOK,
-    KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_UP, LWA_ALPHA, MSLLHOOKSTRUCT, PostMessageW,
-    RegisterClassW, SW_SHOWNOACTIVATE, SetCursor, SetCursorPos, SetLayeredWindowAttributes,
-    SetWindowsHookExW, ShowCursor, ShowWindow, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL,
-    WM_APP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
-    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR, WM_XBUTTONDOWN,
-    WM_XBUTTONUP, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_POPUP,
+    CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND,
+    GetCursorPos, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_UP, LWA_ALPHA,
+    MSLLHOOKSTRUCT, PostMessageW, RegisterClassW, SW_SHOWNOACTIVATE, SetCursor, SetCursorPos,
+    SetLayeredWindowAttributes, SetWindowsHookExW, ShowCursor, ShowWindow, UnhookWindowsHookEx,
+    WH_KEYBOARD_LL, WH_MOUSE_LL, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
+    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE,
+    WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 /// Posted to the edge thread's window when a hook decided to end the
@@ -102,7 +114,90 @@ pub struct Context {
 
 /// How long keys still held when a capture ended are kept from this PC, at
 /// most (their release may never come, e.g. after the secure desktop).
-const DRAIN_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
+const DRAIN_LIMIT: Duration = Duration::from_secs(3);
+/// Raw input a hook has not seen within this long means the hook is gone
+/// (Windows waits at most a second for a hook before it removes it).
+const HOOK_SILENCE: Duration = Duration::from_millis(500);
+/// A hook that ran this shortly before raw input reported the same event
+/// saw it already: the two arrive in either order.
+const HOOK_ORDER_SLACK: Duration = Duration::from_millis(50);
+
+/// Input devices, for telling whether the hooks still see what they get.
+#[derive(Clone, Copy, Debug)]
+pub enum Device {
+    Mouse,
+    Keyboard,
+}
+
+/// Whether a hook still sees the input of its device: raw input reports the
+/// same input, before or after the hook runs, and keeps reporting it once
+/// Windows removed the hook.
+#[derive(Clone, Copy, Debug)]
+struct HookWatch {
+    /// When the hook last ran.
+    ran_at: Instant,
+    /// Since when raw input has reported input the hook has not seen.
+    unseen: Option<Instant>,
+}
+
+impl HookWatch {
+    fn new(now: Instant) -> Self {
+        Self {
+            ran_at: now,
+            unseen: None,
+        }
+    }
+
+    fn hook_ran(&mut self, now: Instant) {
+        (self.ran_at, self.unseen) = (now, None);
+    }
+
+    fn raw_input(&mut self, now: Instant) {
+        // Just after the hook ran, this is what it saw.
+        if self.unseen.is_none() && now.saturating_duration_since(self.ran_at) > HOOK_ORDER_SLACK {
+            self.unseen = Some(now);
+        }
+    }
+
+    fn silent(&self, now: Instant) -> bool {
+        self.unseen
+            .is_some_and(|since| now.saturating_duration_since(since) > HOOK_SILENCE)
+    }
+}
+
+/// Why the keyboard and mouse came back to this PC by themselves.
+enum GiveBack {
+    /// An elevated window came to the front: the hooks cannot take its input.
+    Elevated,
+    /// Windows removed a hook.
+    HookLost(Device),
+}
+
+impl GiveBack {
+    fn tell(&self) {
+        let title = crate::i18n::tr(
+            "键盘和鼠标已回到这台电脑",
+            "Keyboard and mouse are back on this PC",
+        );
+        let text = match self {
+            GiveBack::Elevated => {
+                log!("an elevated window came to the front; capture ended");
+                crate::i18n::tr(
+                    "以管理员身份运行的窗口到了前台，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
+                    "A window running as administrator came to the front, so LinkCursor can't take its keyboard input. Click another window first, then move to the other device.",
+                )
+            }
+            GiveBack::HookLost(device) => {
+                log!("the {device:?} hook stopped seeing input; capture ended");
+                crate::i18n::tr(
+                    "Windows 暂停了 LinkCursor 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。",
+                    "Windows stopped LinkCursor from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.",
+                )
+            }
+        };
+        crate::tray::notify(title, text);
+    }
+}
 
 thread_local! {
     static CAPTURE: RefCell<Option<Capture>> = const { RefCell::new(None) };
@@ -137,6 +232,11 @@ struct Capture {
     local_buttons: u32,
     mouse_hook: HHOOK,
     keyboard_hook: HHOOK,
+    /// Tells the moment an elevated window comes to the front.
+    foreground_hook: HWINEVENTHOOK,
+    /// Whether the hooks still see the input (see `silent_hook`).
+    mouse_watch: HookWatch,
+    keyboard_watch: HookWatch,
     cursor_window: HWND,
     /// The edge thread's window, for `WM_END_CAPTURE`.
     notify: HWND,
@@ -341,10 +441,30 @@ fn start(
             SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), module, 0),
         )
     };
+    // An elevated window coming to the front ends the capture at once,
+    // before more keys reach it; the timer checks too, in case this fails.
+    // SAFETY: an out-of-context hook, called on this thread's message loop.
+    let foreground_hook = unsafe {
+        SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            null_mut(),
+            Some(foreground_proc),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        )
+    };
+    // Raw keyboard input while capturing, to tell whether the keyboard hook
+    // still sees the keys (the mouse's raw input is always on).
+    if !watch_raw_keyboard(Some(notify)) {
+        log!("cannot watch raw keyboard input; a removed keyboard hook goes unnoticed");
+    }
     // After the hooks: whatever is pressed from now on reaches them, so
     // nothing falls between this snapshot and the capture.
     let (local_keys, local_buttons) = held_on_this_pc();
     let input = context.settings.get().input_for(peer_id);
+    let now = Instant::now();
     let capture = Capture {
         core,
         peer_id: peer_id.to_owned(),
@@ -358,6 +478,9 @@ fn start(
         local_buttons,
         mouse_hook,
         keyboard_hook,
+        foreground_hook,
+        mouse_watch: HookWatch::new(now),
+        keyboard_watch: HookWatch::new(now),
         cursor_window,
         notify,
         ending: None,
@@ -382,16 +505,33 @@ fn start(
 /// Ends the capture when its peer is no longer connected, or when another
 /// desktop takes input (the lock screen after Win+L, a UAC prompt, the
 /// Ctrl+Alt+Del screen): this PC's keyboard is needed here then, and the
-/// hooks would never see the releases of keys held on the peer. Called from
-/// the edge thread's timer.
+/// hooks would never see the releases of keys held on the peer. Also when
+/// the hooks cannot take the input any more: an elevated window is in front,
+/// or Windows removed a hook. Called from the edge thread's timer.
 pub fn check(connected: impl Fn(&str) -> bool) {
     if active() {
         let elsewhere = !crate::win::input_desktop_is_default();
-        with_capture(|capture| {
-            if elsewhere || !connected(&capture.peer_id) {
-                capture.request_end(capture.home());
+        // On another desktop no window of this one is in front.
+        let elevated = !elsewhere && crate::win::foreground_is_elevated();
+        let given_back = with_capture(|capture| {
+            if capture.ending.is_some() {
+                return None;
             }
-        });
+            let reason = if elsewhere || !connected(&capture.peer_id) {
+                None
+            } else if elevated {
+                Some(GiveBack::Elevated)
+            } else {
+                // Nothing to end otherwise.
+                Some(GiveBack::HookLost(capture.silent_hook()?))
+            };
+            capture.request_end(capture.home());
+            reason
+        })
+        .flatten();
+        if let Some(reason) = given_back {
+            reason.tell();
+        }
     }
     // Drained keys whose release never came are let go.
     let done = DRAIN.with(|drain| {
@@ -418,6 +558,11 @@ pub fn release() {
     with_capture(|capture| capture.request_end(capture.home()));
 }
 
+/// Raw input reported real input of `device` (the edge thread's window).
+pub fn raw_input(device: Device) {
+    with_capture(|capture| capture.raw_input(device));
+}
+
 /// The core took this PC's control of `peer_id` away (`control_revoked`).
 /// With `stay`, a peer now drives this PC and places the cursor itself;
 /// otherwise the cursor comes back as after a release.
@@ -435,8 +580,12 @@ pub fn revoked(peer_id: &str, stay: bool) {
 /// the hooks.
 pub fn finish() -> Option<Ended> {
     let capture = CAPTURE.with(|slot| slot.borrow_mut().take())?;
+    watch_raw_keyboard(None);
     // SAFETY: removes this thread's hooks and its cursor window.
     unsafe {
+        if !capture.foreground_hook.is_null() {
+            UnhookWinEvent(capture.foreground_hook);
+        }
         if !capture.mouse_hook.is_null() {
             UnhookWindowsHookEx(capture.mouse_hook);
         }
@@ -610,8 +759,39 @@ impl Capture {
         let _ = self.core.send_input(event);
     }
 
+    fn watch(&mut self, device: Device) -> &mut HookWatch {
+        match device {
+            Device::Mouse => &mut self.mouse_watch,
+            Device::Keyboard => &mut self.keyboard_watch,
+        }
+    }
+
+    /// A hook ran: it sees what its device does.
+    fn hook_ran(&mut self, device: Device) {
+        self.watch(device).hook_ran(Instant::now());
+    }
+
+    /// Raw input reported real input of `device`.
+    fn raw_input(&mut self, device: Device) {
+        self.watch(device).raw_input(Instant::now());
+    }
+
+    /// A device whose input its hook has not seen for a while: Windows
+    /// removed the hook, and that input now reaches this PC.
+    fn silent_hook(&self) -> Option<Device> {
+        let now = Instant::now();
+        if self.mouse_watch.silent(now) {
+            Some(Device::Mouse)
+        } else if self.keyboard_watch.silent(now) {
+            Some(Device::Keyboard)
+        } else {
+            None
+        }
+    }
+
     /// Handles one mouse event; true swallows it.
     fn mouse(&mut self, message: u32, info: &MSLLHOOKSTRUCT) -> bool {
+        self.hook_ran(Device::Mouse);
         if self.ending.is_some() {
             return true;
         }
@@ -755,6 +935,7 @@ impl Capture {
 
     /// Handles one key event; true swallows it.
     fn key(&mut self, info: &KBDLLHOOKSTRUCT) -> bool {
+        self.hook_ran(Device::Keyboard);
         if self.ending.is_some() {
             return true;
         }
@@ -979,6 +1160,47 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     unsafe { CallNextHookEx(null_mut(), code, wparam, lparam) }
 }
 
+/// The foreground window changed. An elevated one ends the capture before
+/// more keys go to it: Windows keeps them from the keyboard hook.
+unsafe extern "system" fn foreground_proc(
+    _hook: HWINEVENTHOOK,
+    _event: u32,
+    _window: HWND,
+    _object: i32,
+    _child: i32,
+    _thread: u32,
+    _time: u32,
+) {
+    if !active() || !crate::win::foreground_is_elevated() {
+        return;
+    }
+    let given_back = with_capture(|capture| {
+        let first = capture.ending.is_none();
+        capture.request_end(capture.home());
+        first
+    });
+    if given_back == Some(true) {
+        GiveBack::Elevated.tell();
+    }
+}
+
+/// Registers raw keyboard input for `window` (in the background too), or
+/// with `None` removes it. False if Windows refused.
+fn watch_raw_keyboard(window: Option<HWND>) -> bool {
+    let device = RAWINPUTDEVICE {
+        usUsagePage: 0x01, // generic desktop
+        usUsage: 0x06,     // keyboard
+        dwFlags: if window.is_some() {
+            RIDEV_INPUTSINK
+        } else {
+            RIDEV_REMOVE
+        },
+        hwndTarget: window.unwrap_or(null_mut()),
+    };
+    // SAFETY: one valid RAWINPUTDEVICE of the size given.
+    unsafe { RegisterRawInputDevices(&device, 1, size_of::<RAWINPUTDEVICE>() as u32) != 0 }
+}
+
 /// Swallows a key event of a key still held from the capture; its release
 /// ends that.
 fn drained(info: &KBDLLHOOKSTRUCT) -> bool {
@@ -1057,4 +1279,45 @@ unsafe extern "system" fn cursor_window_proc(
     }
     // SAFETY: default handling for everything else.
     unsafe { DefWindowProcW(window, message, wparam, lparam) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ms(value: u64) -> Duration {
+        Duration::from_millis(value)
+    }
+
+    #[test]
+    fn a_hook_that_sees_the_input_in_either_order_is_alive() {
+        let start = Instant::now();
+        let mut watch = HookWatch::new(start);
+        // Raw input first, the hook a moment later.
+        watch.raw_input(start + ms(1000));
+        watch.hook_ran(start + ms(1003));
+        assert!(!watch.silent(start + ms(2000)));
+        // The hook first, raw input a moment later.
+        watch.hook_ran(start + ms(3000));
+        watch.raw_input(start + ms(3002));
+        assert!(!watch.silent(start + ms(4000)));
+        // A slow hook still counts, as long as it comes.
+        watch.raw_input(start + ms(5000));
+        assert!(!watch.silent(start + ms(5400)));
+        watch.hook_ran(start + ms(5450));
+        assert!(!watch.silent(start + ms(6000)));
+    }
+
+    #[test]
+    fn input_the_hook_never_sees_means_it_is_gone() {
+        let start = Instant::now();
+        let mut watch = HookWatch::new(start);
+        // Windows removed the hook; input keeps coming, the hook never runs.
+        watch.raw_input(start + ms(2000));
+        watch.raw_input(start + ms(2200));
+        assert!(!watch.silent(start + ms(2400)));
+        // Counted from the first input it missed, not the latest.
+        watch.raw_input(start + ms(2450));
+        assert!(watch.silent(start + ms(2600)));
+    }
 }

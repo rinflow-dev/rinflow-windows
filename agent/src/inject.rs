@@ -16,7 +16,10 @@
 //! - When the LocalSystem input helper is in use (see `elevated.rs`), every
 //!   event goes to it instead, so it also reaches elevated windows, UAC
 //!   prompts and the lock screen. Motion then goes as pixels: on those
-//!   desktops this process cannot even see where the pointer is.
+//!   desktops this process cannot even see where the pointer is. Without it
+//!   (a build from the source tree, or its setting off) Windows refuses
+//!   input meant for a UAC prompt or the lock screen; the agent says why
+//!   once (log and notification) until input goes through again.
 //! - A game or a pointer-lock page that hides the cursor and confines it
 //!   (`ClipCursor`) reads raw relative motion: motion is then played as
 //!   relative moves, and the controlling peer is told (`set_pointer_locked`)
@@ -34,6 +37,7 @@ use linkcursor_core::{
 use linkcursor_input::VirtualDesktop;
 use std::collections::HashSet;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Weak, mpsc};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -510,17 +514,63 @@ fn send_key(ki: KEYBDINPUT) {
     });
 }
 
+/// Input was refused on a UAC prompt or the lock screen and the user was
+/// told why; cleared when input goes through again.
+static REFUSED_TOLD: AtomicBool = AtomicBool::new(false);
+
 fn send(input: INPUT) {
     if elevated::forward(&input) {
         return;
     }
     // SAFETY: one fully initialised INPUT with its exact size.
     let sent = unsafe { SendInput(1, &input, size_of::<INPUT>() as i32) };
+    if sent != 0 {
+        REFUSED_TOLD.store(false, Ordering::Relaxed);
+        return;
+    }
+    let error = io::Error::last_os_error();
     // No retry: SendInput fails when another desktop (UAC, lock screen) has
     // input, and retrying would only spin. UIPI blocks silently anyway.
-    if sent == 0 && cfg!(debug_assertions) {
-        log!("SendInput failed: {}", io::Error::last_os_error());
+    if !crate::win::input_desktop_is_default() {
+        if !REFUSED_TOLD.swap(true, Ordering::Relaxed) {
+            tell_refused();
+        }
+    } else if cfg!(debug_assertions) {
+        log!("SendInput failed: {error}");
     }
+}
+
+/// Says once why a peer's keys and clicks do nothing on a UAC prompt or
+/// the lock screen, and what makes them work.
+fn tell_refused() {
+    use crate::i18n::tr;
+    let installed = elevated::available();
+    log!(
+        "a UAC prompt or the lock screen has input: Windows refuses this process's input there; {}",
+        if installed {
+            "the input service is installed but its setting is off"
+        } else {
+            "it needs the input service that the setup program installs"
+        }
+    );
+    let text = if installed {
+        tr(
+            "在 LinkCursor 设置里打开“被控时可操作管理员窗口、UAC 和锁屏”后，其他设备就能在锁屏和 UAC 窗口里输入。",
+            "Turn on \"Admin windows, UAC and the lock screen while controlled\" in LinkCursor's settings to let other devices type there.",
+        )
+    } else {
+        tr(
+            "要在锁屏和 UAC 窗口里用其他设备的键盘鼠标，请用安装包安装 LinkCursor，它会装上所需的输入服务。",
+            "To use another device's keyboard and mouse on the lock screen and in UAC prompts, install LinkCursor with its setup program, which adds the input service this needs.",
+        )
+    };
+    crate::tray::notify(
+        tr(
+            "锁屏或 UAC 窗口收不到其他设备的输入",
+            "The lock screen or UAC prompt didn't get the input",
+        ),
+        text,
+    );
 }
 
 /// Windows hides the cursor on a PC with no mouse attached, even while input
