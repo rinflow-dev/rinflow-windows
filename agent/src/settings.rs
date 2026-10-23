@@ -50,6 +50,10 @@ pub struct Settings {
     /// A Mac driving this PC uses its own shortcuts: Command plays as Ctrl
     /// (⌘C copies), instead of keeping its position as the Windows key.
     pub shortcut_remap: bool,
+    /// When a peer that drove this PC moves its pointer away, this PC's
+    /// cursor is hidden where it was left, until this PC's own mouse moves
+    /// or a peer drives it again (see `hider.rs`).
+    pub hide_cursor_on_leave: bool,
     /// The arrow keys with [`Settings::switch_modifiers`] move the pointer
     /// to the device on that side.
     pub switch_hotkeys: bool,
@@ -129,6 +133,7 @@ impl Default for Settings {
             port: None,
             paired_only: true,
             shortcut_remap: true,
+            hide_cursor_on_leave: true,
             switch_hotkeys: true,
             switch_modifiers: MOD_CONTROL | MOD_ALT | MOD_SHIFT,
             keep_awake: true,
@@ -461,7 +466,7 @@ mod tests {
     #[test]
     fn addresses_and_per_device_input_are_checked() {
         let settings = Settings::default();
-        assert!(settings.shortcut_remap && settings.keep_awake);
+        assert!(settings.shortcut_remap && settings.keep_awake && settings.hide_cursor_on_leave);
         assert!(settings.switch_hotkeys);
         assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT | MOD_SHIFT);
         assert!(

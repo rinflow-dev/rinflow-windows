@@ -139,6 +139,7 @@ namespace winrt::LinkCursor::implementation
         wire(SwitchHotkeysToggle(), SwitchHotkeysState(), L"switch_hotkeys");
         wire(ShortcutRemapToggle(), ShortcutRemapState(), L"shortcut_remap");
         wire(KeepAwakeToggle(), KeepAwakeState(), L"keep_awake");
+        wire(HideCursorToggle(), HideCursorState(), L"hide_cursor_on_leave");
         wire(LockSyncToggle(), LockSyncState(), L"lock_sync");
 
         // The agent's log folder (agent/src/log.rs).
@@ -338,6 +339,7 @@ namespace winrt::LinkCursor::implementation
             ? Visibility::Visible : Visibility::Collapsed);
         SetSwitch(ShortcutRemapToggle(), ShortcutRemapState(), settings.GetNamedBoolean(L"shortcut_remap", true));
         SetSwitch(KeepAwakeToggle(), KeepAwakeState(), settings.GetNamedBoolean(L"keep_awake", true));
+        SetSwitch(HideCursorToggle(), HideCursorState(), settings.GetNamedBoolean(L"hide_cursor_on_leave", true));
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
 
         // Encryption is not a choice: every connection is encrypted. Without

@@ -31,7 +31,8 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// 12: `cancel_transfer`; the snapshot gains `manual_addresses` and
 /// `transfers`; settings `shortcut_remap`, `switch_hotkeys`, `keep_awake`,
 /// `lock_sync`, `manual_addresses` and `peer_input`.
-pub const PROTOCOL_VERSION: u32 = 12;
+/// 13: setting `hide_cursor_on_leave`.
+pub const PROTOCOL_VERSION: u32 = 13;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")

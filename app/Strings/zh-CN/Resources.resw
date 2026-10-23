@@ -129,6 +129,9 @@
   <data name="ShortcutRemapDescription.Text" xml:space="preserve"><value>Mac 控制这台电脑时，⌘C、⌘V 等按 Ctrl 快捷键执行。关闭后 ⌘ 对应 Windows 键。</value></data>
   <data name="ShortcutRemapToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>沿用 Mac 的快捷键</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>锁屏与唤醒</value></data>
+  <data name="HideCursorTitle.Text" xml:space="preserve"><value>其他设备离开后隐藏光标</value></data>
+  <data name="HideCursorDescription.Text" xml:space="preserve"><value>其他设备控制完这台电脑、光标移走后，这里的光标先藏起来；动一下这台电脑的鼠标或触摸板就会出现。</value></data>
+  <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>其他设备离开后隐藏光标</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>
   <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>你在已连接的其他设备上操作时，这台电脑不熄屏，也不会因闲置而锁定。</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>

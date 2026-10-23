@@ -12,6 +12,7 @@ mod displays;
 mod edge;
 mod effect;
 mod elevated;
+mod hider;
 mod i18n;
 mod identity;
 mod inject;
@@ -150,6 +151,15 @@ fn main() {
     // Started right after the core, like the edge thread.
     let presence_slot = Arc::new(OnceLock::<presence::PresenceHandle>::new());
     let presence_events = presence_slot.clone();
+    // This PC's cursor hides where a peer's pointer left it.
+    let hider = match hider::Hider::start(settings.clone()) {
+        Ok(hider) => Some(hider),
+        Err(error) => {
+            log!("cannot start the cursor hider: {error}");
+            None
+        }
+    };
+    let hider_events = hider.as_ref().map(hider::Hider::handle);
     let window_opened = std::sync::Mutex::new(None::<std::time::Instant>);
     let core = match Core::start(
         config,
@@ -199,6 +209,9 @@ fn main() {
             }
             if let Some(presence) = presence_events.get() {
                 presence.core_event(&json);
+            }
+            if let Some(hider) = &hider_events {
+                hider.core_event(&json);
             }
         },
         move |event| input.play(event),
@@ -317,6 +330,8 @@ fn main() {
     drop(presence);
     drop(power);
     drop(overlay);
+    // Shows the cursor if it is hidden.
+    drop(hider);
     // The IPC thread only holds a weak reference, so this stops the core and
     // lets connected peers see a clean disconnect before the process exits.
     // Stopping the core queues key-ups for anything the peer still held; the

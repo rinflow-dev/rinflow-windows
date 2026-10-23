@@ -103,6 +103,9 @@ impl Services {
         {
             let _ = core.set_manual_addresses(settings.manual_addresses.clone());
         }
+        if values.contains_key("hide_cursor_on_leave") && !settings.hide_cursor_on_leave {
+            crate::hider::reveal();
+        }
         self.edge.settings_changed();
         // A shortcut that failed to register may work now; the edge thread
         // reports it again if not.

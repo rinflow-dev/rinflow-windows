@@ -56,6 +56,7 @@ agent/
   src/trust.rs               paired devices (%LOCALAPPDATA%\LinkCursor\trusted.json)
   src/power.rs               sleep, wake and IP address changes, reported to the core
   src/inject.rs              plays a controlling peer's input with SendInput (or through the input helper)
+  src/hider.rs               hides the cursor where a controlling peer's pointer left it
   src/elevated.rs            the agent's end of the input helper's pipe
   src/keymap.rs              USB HID usage → Windows scan code
   src/win.rs                 Win32 helpers: mutex, user SID, pipe security
@@ -213,6 +214,7 @@ Core handles everything that is the same on every platform. The agent only trans
 | Games | agent, core | A game or a pointer-lock web page hides the cursor and confines it (`ClipCursor`), and reads raw relative motion. While that is so, motion is played as relative moves instead, and the controlling device is told (`set_pointer_locked`, the core's `PointerLock` message) so it stops crossing at the edges: the camera keeps turning. When the game lets go, the controlling device puts the cursor back where it tracks it. |
 | Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. See also [Presence](#presence). |
 | No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
+| After the peer leaves | agent ([hider.rs](agent/src/hider.rs)) | With **其他设备离开后隐藏光标** (`hide_cursor_on_leave`, on by default), when the last peer driving this PC moves its pointer away (`remote_control_ended`, reason `remote reset`), the cursor is hidden where it was left, as Universal Control, Deskflow and Mouse Without Borders do. A 1×1 topmost window that takes no focus and shows no cursor goes under it, and the hider thread's cursor display count drops below zero (`ShowCursor`), so another program's `SetCursor` does not bring it back; nothing under it gets hover effects. A low-level mouse hook, installed only meanwhile, shows the cursor at the first motion, button or wheel of this PC's own mouse, touchpad, pen or touch screen, before Windows routes that event, so the first click lands where it was aimed. A peer driving this PC again, this PC starting to drive one, or turning the setting off show it too. A lost connection or a takeover leaves the cursor as it is. |
 
 Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The capture hooks use it to skip input the agent itself played.
 
@@ -223,7 +225,7 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | | Where | What |
 | --- | --- | --- |
 | Crossing | agent ([edge.rs](agent/src/edge.rs)) | The edge thread measures the push with raw input at the portals of connected peers, like the demo. After crossing, it sends the peer an absolute move to the matching point of its edge, 2 points inside. |
-| While driving | agent ([capture.rs](agent/src/capture.rs)) | Low-level mouse and keyboard hooks, installed only while driving, swallow local input and send it through the core. The Windows cursor waits in the middle of its monitor, hidden by a tiny window with no cursor. Motion is measured from there, so Windows' own pointer speed and acceleration apply. Keys go by scan code (→ HID usage), auto-repeats are marked as repeats, and the wheel sends 10 points per notch. |
+| While driving | agent ([capture.rs](agent/src/capture.rs)) | Low-level mouse and keyboard hooks, installed only while driving, swallow local input and send it through the core. The Windows cursor waits in the middle of its monitor, hidden by a tiny window with no cursor and a cursor display count below zero (`ShowCursor`, as Deskflow does), so another program setting a cursor meanwhile does not show it. Motion is measured from there, so Windows' own pointer speed and acceleration apply. Keys go by scan code (→ HID usage), auto-repeats are marked as repeats, and the wheel sends 10 points per notch. |
 | Where the pointer is | core (`layout::RemotePointer`) | Tracks the pointer in the peer's space as the peer plays the same motion. It slides along edges that lead nowhere. Moving out through a portal ends the crossing at the matching local point, 2 points inside the edge. |
 | Coming back | agent | The cursor reappears there with the effect's emerge animation. For the **连续切换免阻力** time, going back across needs no push. |
 | Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
@@ -345,6 +347,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
 | 用快捷键切换设备 | `switch_hotkeys`, `switch_modifiers` | On by default with Ctrl+Alt+Shift (`7`); Ctrl+Alt (`3`) is the other choice. The arrow keys with those modifiers move the pointer to the device on that side; see [Controlling another device](#controlling-another-device). |
 | 沿用 Mac 的快捷键 | `shortcut_remap` | On by default. See [Being controlled by another device](#being-controlled-by-another-device). |
+| 其他设备离开后隐藏光标 | `hide_cursor_on_leave` | On by default. See [Being controlled by another device](#being-controlled-by-another-device) (After the peer leaves). |
 | 在其他设备上工作时保持唤醒 | `keep_awake` | On by default. See [Presence](#presence). |
 | 一起锁定 | `lock_sync` | Off by default. See [Presence](#presence). |
 | 通过地址添加 (添加设备) | `manual_addresses` | Up to 32 host names or IPv4 addresses (optionally `:port`, the discovery port). See [Arranging devices](#arranging-devices). |
@@ -392,7 +395,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":12}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":13}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -416,7 +419,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":12,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":13,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 

@@ -48,10 +48,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, GetCursorPos, HC_ACTION, HHOOK,
     KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_UP, LWA_ALPHA, MSLLHOOKSTRUCT, PostMessageW,
     RegisterClassW, SW_SHOWNOACTIVATE, SetCursor, SetCursorPos, SetLayeredWindowAttributes,
-    SetWindowsHookExW, ShowWindow, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_APP,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE,
-    WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR, WM_XBUTTONDOWN, WM_XBUTTONUP,
-    WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    SetWindowsHookExW, ShowCursor, ShowWindow, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL,
+    WM_APP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
+    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR, WM_XBUTTONDOWN,
+    WM_XBUTTONUP, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_POPUP,
 };
 
 /// Posted to the edge thread's window when a hook decided to end the
@@ -323,10 +324,16 @@ fn start(
     // Keys still draining from an earlier capture are held on this PC now,
     // which the snapshot below records.
     end_drain();
+    // The cursor a peer left hidden here is this capture's to hide now.
+    crate::hider::reveal();
     let cursor_window = create_cursor_window(park);
     // SAFETY: moves the cursor onto the window that hides it, then installs
     // the hooks on this thread, which runs a message loop.
     let (mouse_hook, keyboard_hook) = unsafe {
+        // Below zero, this thread's display count keeps the cursor hidden
+        // over its window even if another program sets a cursor meanwhile
+        // (as Deskflow does); undone when the capture ends.
+        ShowCursor(0);
         SetCursorPos(park.x, park.y);
         let module = GetModuleHandleW(null());
         (
@@ -447,6 +454,8 @@ pub fn finish() -> Option<Ended> {
                 DRAIN.with(|slot| *slot.borrow_mut() = Some(drain));
             }
         }
+        // The display count lowered when the capture started.
+        ShowCursor(1);
         DestroyWindow(capture.cursor_window);
     }
     let exit = capture.ending.unwrap_or_else(|| capture.home());

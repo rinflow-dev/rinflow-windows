@@ -129,6 +129,9 @@
   <data name="ShortcutRemapDescription.Text" xml:space="preserve"><value>When a Mac controls this PC, ⌘C, ⌘V and the like work as Ctrl shortcuts. When off, ⌘ is the Windows key.</value></data>
   <data name="ShortcutRemapToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep Mac shortcuts</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>Lock and sleep</value></data>
+  <data name="HideCursorTitle.Text" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
+  <data name="HideCursorDescription.Text" xml:space="preserve"><value>When another device stops controlling this PC and its pointer moves away, the pointer here is hidden until you move this PC's mouse or touchpad.</value></data>
+  <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
   <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>While you use another connected device, this PC keeps its screen on and doesn&apos;t lock for being idle.</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>

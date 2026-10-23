@@ -628,6 +628,19 @@
                         <TextBlock x:Name="ShortcutRemapState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="ShortcutRemapToggle" x:Uid="ShortcutRemapToggle" Grid.Column="2" AutomationProperties.Name="沿用 Mac 的快捷键" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="HideCursorTitle" Style="{StaticResource RowTitleStyle}" Text="其他设备离开后隐藏光标" />
+                            <TextBlock x:Uid="HideCursorDescription" Style="{StaticResource RowDescriptionStyle}" Text="其他设备控制完这台电脑、光标移走后，这里的光标先藏起来；动一下这台电脑的鼠标或触摸板就会出现。" />
+                        </StackPanel>
+                        <TextBlock x:Name="HideCursorState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="HideCursorToggle" x:Uid="HideCursorToggle" Grid.Column="2" AutomationProperties.Name="其他设备离开后隐藏光标" Style="{StaticResource BareSwitchStyle}" />
+                    </Grid>
 
                     <TextBlock x:Uid="PresenceHeader" Style="{StaticResource SectionHeaderStyle}" Text="锁屏与唤醒" />
                     <Grid Style="{StaticResource CardStyle}">
