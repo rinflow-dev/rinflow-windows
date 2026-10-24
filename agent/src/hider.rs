@@ -17,6 +17,9 @@
 //!   plays it again (after a zero-pixel move, so Windows picks again) with
 //!   whatever buttons followed meanwhile, in order. So the first click lands
 //!   where it was aimed, even a touchpad tap whose release comes at once.
+//! - Motion the agent played does not show it: the last moves of the peer
+//!   that left often arrive a little after its reset (the input service
+//!   plays them asynchronously), and the window follows them instead.
 //! - A peer driving this PC again, this PC starting to drive a peer
 //!   (`capture.rs`) and the setting turned off show it at once.
 //!
@@ -145,6 +148,10 @@ enum HookAction {
     Pass,
     /// Motion: show the cursor and let it through.
     Show,
+    /// Motion the agent played (the last moves of a peer that just left,
+    /// still on their way through the input service): the window follows,
+    /// and the cursor stays hidden.
+    Follow,
     /// The first button or wheel: show the cursor, hold the event back and
     /// play it again.
     Replay,
@@ -176,6 +183,10 @@ fn hook_action(
     if message == WM_MOUSEMOVE {
         if point.x == at.x && point.y == at.y {
             HookAction::Pass
+        } else if ours {
+            // A peer driving this PC again shows it through its
+            // `remote_control_started`, not through its motion.
+            HookAction::Follow
         } else {
             HookAction::Show
         }
@@ -427,6 +438,22 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
         });
         match (action, replay_input(message, info.mouseData)) {
             (HookAction::Pass, _) => {}
+            (HookAction::Follow, _) => STATE.with_borrow_mut(|state| {
+                // SAFETY: moves this thread's own window under the point the
+                // move goes to, before Windows routes it.
+                unsafe {
+                    SetWindowPos(
+                        state.window,
+                        HWND_TOPMOST,
+                        info.pt.x,
+                        info.pt.y,
+                        1,
+                        1,
+                        SWP_NOACTIVATE,
+                    );
+                }
+                state.hidden_at = Some(info.pt);
+            }),
             (HookAction::Replay, Some(input)) => {
                 STATE.with_borrow_mut(|state| {
                     state.replay.push(input);
@@ -558,6 +585,11 @@ mod tests {
         assert_eq!(
             hook_action(hidden, false, WM_MOUSEMOVE, off, false),
             HookAction::Show
+        );
+        // The last moves of the peer that left, played late: followed.
+        assert_eq!(
+            hook_action(hidden, false, WM_MOUSEMOVE, off, true),
+            HookAction::Follow
         );
         assert_eq!(
             hook_action(hidden, false, WM_LBUTTONDOWN, at, false),
