@@ -10,6 +10,7 @@
 #endif
 #include "PeerItem.h"
 #include "AppShell.h"
+#include "AppIcon.h"
 #include "Strings.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
@@ -80,6 +81,13 @@ namespace winrt::LinkCursor::implementation
     void MainWindow::InitializeComponent()
     {
         MainWindowT::InitializeComponent();
+
+        ::LinkCursorApp::SetWindowIcon(AppWindow(), Root().ActualTheme() == ElementTheme::Dark);
+        Root().ActualThemeChanged([weak = get_weak()](auto&&, auto&&)
+        {
+            if (auto self = weak.get())
+                ::LinkCursorApp::SetWindowIcon(self->AppWindow(), self->Root().ActualTheme() == ElementTheme::Dark);
+        });
 
         ExtendsContentIntoTitleBar(true);
         SetTitleBar(AppTitleBar());

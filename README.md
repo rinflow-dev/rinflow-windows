@@ -112,6 +112,10 @@ The Windows App Runtime is not needed on the machine: the app is self-contained 
 
 ## Building
 
+The application logo source and generated Windows icons live in
+[app/Assets](app/Assets/README.md). They are shared by the main window, tray,
+executables and installer; normal builds require no image-generation tools.
+
 From any PowerShell or Command Prompt window:
 
 ```powershell

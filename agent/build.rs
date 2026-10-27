@@ -34,7 +34,10 @@ fn version_info() {
     // Numbers instead of winver.h names, so rc.exe needs no include path:
     // VOS_NT_WINDOWS32, VFT_APP; U.S. English, Unicode.
     let script = format!(
-        r#"1 VERSIONINFO
+        r#"#pragma code_page(65001)
+101 ICON "{icon}"
+102 ICON "{dark_icon}"
+1 VERSIONINFO
 FILEVERSION {major},{minor},{patch},0
 PRODUCTVERSION {major},{minor},{patch},0
 FILEOS 0x40004L
@@ -58,11 +61,21 @@ BEGIN
     VALUE "Translation", 0x409, 1200
   END
 END
-"#
+"#,
+        icon = icon_path("LinkCursor.ico"),
+        dark_icon = icon_path("LinkCursor.Dark.ico"),
     );
     let path = PathBuf::from(std::env::var("OUT_DIR").expect("out dir")).join("version.rc");
     std::fs::write(&path, script).expect("write version.rc");
     embed_resource::compile(&path, embed_resource::NONE)
         .manifest_optional()
         .expect("compile the version resource");
+}
+
+fn icon_path(name: &str) -> String {
+    let path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir"))
+        .join("../app/Assets")
+        .join(name);
+    println!("cargo:rerun-if-changed={}", path.display());
+    path.to_string_lossy().replace('\\', "/")
 }

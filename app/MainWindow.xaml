@@ -155,25 +155,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <!-- The LinkCursor mark: two overlapping rounded squares. -->
-                <Grid Width="18" Height="18" VerticalAlignment="Center">
-                    <Border
-                        Width="12"
-                        Height="12"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Background="#6CB4F0"
-                        CornerRadius="3" />
-                    <Border
-                        Width="13.5"
-                        Height="13.5"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Bottom"
-                        Background="#0F6CBD"
-                        BorderBrush="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                        BorderThickness="1.5"
-                        CornerRadius="4" />
-                </Grid>
+                <Image Width="24" Height="24" VerticalAlignment="Center" Stretch="Uniform" Source="{ThemeResource AppLogo}" AutomationProperties.AccessibilityView="Raw" />
                 <TextBlock
                     Grid.Column="1"
                     VerticalAlignment="Center"

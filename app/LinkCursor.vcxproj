@@ -115,11 +115,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
+    <ResourceCompile Include="LinkCursor.rc" />
+    <Content Include="Assets\*.svg;Assets\*.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="AgentClient.h" />
     <ClInclude Include="AppShell.h" />
+    <ClInclude Include="AppIcon.h" />
     <ClInclude Include="DeviceModel.h" />
     <ClInclude Include="Strings.h" />
     <ClInclude Include="App.xaml.h">

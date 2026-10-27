@@ -43,6 +43,7 @@ OutputBaseFilename=LinkCursor-Setup-{#AppVersion}-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\app\Assets\LinkCursor.ico
 ; Closes LinkCursor when it holds files being replaced.
 CloseApplications=force
 RestartApplications=no

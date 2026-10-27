@@ -1,0 +1,2 @@
+// Keep the primary icon first so Explorer, shortcuts and setup agree.
+101 ICON "Assets\\LinkCursor.ico"

@@ -33,6 +33,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="AgentClient.h" />
     <ClInclude Include="AppShell.h" />
+    <ClInclude Include="AppIcon.h" />
     <ClInclude Include="DeviceModel.h" />
     <ClInclude Include="App.xaml.h" />
     <ClInclude Include="MainWindow.xaml.h" />
@@ -41,6 +42,8 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
+    <ResourceCompile Include="LinkCursor.rc" />
+    <Content Include="Assets\*.svg;Assets\*.ico" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Generated Files">

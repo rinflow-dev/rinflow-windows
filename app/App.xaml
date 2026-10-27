@@ -10,6 +10,15 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/LinkCursor.svg" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Default">
+                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/LinkCursor.Dark.svg" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
             <!-- Switches end at their track: the template reserves this much
                  width for the on / off text, which these switches show on
                  their left instead (SwitchStateStyle). -->
