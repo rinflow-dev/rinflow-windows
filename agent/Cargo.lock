@@ -393,6 +393,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "windows",
+ "windows-core",
  "windows-numerics",
  "windows-sys 0.61.2",
 ]

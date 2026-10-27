@@ -113,6 +113,7 @@ namespace winrt::LinkCursor::implementation
             signature += std::to_wstring(static_cast<uint64_t>(transfer.GetNamedNumber(L"transfer", 0)));
             signature += transfer.GetNamedString(L"peer_name", L"");
             signature += transfer.GetNamedString(L"name", L"");
+            signature += transfer.GetNamedBoolean(L"awaiting_acceptance", false) ? L"offered" : L"active";
             signature += L'\x1f';
         }
         if (signature != m_transferSignature)
@@ -124,6 +125,7 @@ namespace winrt::LinkCursor::implementation
             {
                 auto transfer = value.GetObject();
                 bool receiving = transfer.GetNamedString(L"direction", L"") == L"receiving";
+                bool offered = transfer.GetNamedBoolean(L"awaiting_acceptance", false);
                 auto number = static_cast<uint32_t>(transfer.GetNamedNumber(L"transfer", 0));
                 auto items = static_cast<uint64_t>(transfer.GetNamedNumber(L"items", 0));
                 std::wstring name{ transfer.GetNamedString(L"name", L"") };
@@ -131,7 +133,7 @@ namespace winrt::LinkCursor::implementation
                 std::wstring what{ items > 1
                     ? LinkCursorApp::Format(L"TransferManyItems", name, items)
                     : LinkCursorApp::Format(L"TransferOneItem", name) };
-                auto title = receiving
+                auto title = offered ? LinkCursorApp::Format(L"TransferOffered", peer, what) : receiving
                     ? LinkCursorApp::Format(L"TransferReceiving", peer, what)
                     : LinkCursorApp::Format(L"TransferSending", peer, what);
 
@@ -183,6 +185,26 @@ namespace winrt::LinkCursor::implementation
                 });
                 card.Children().Append(cancel);
 
+                if (offered)
+                {
+                    StackPanel actions;
+                    actions.Orientation(Orientation::Horizontal);
+                    actions.Spacing(8);
+                    actions.VerticalAlignment(VerticalAlignment::Center);
+                    Grid::SetColumn(actions, 2);
+                    Button receive;
+                    receive.Content(box_value(LinkCursorApp::Text(L"TransferReceive")));
+                    receive.Click([weak, number](auto&&, auto&&)
+                    {
+                        if (auto self = weak.get()) self->m_agent->AcceptTransfer(number);
+                    });
+                    actions.Children().Append(receive);
+                    card.Children().RemoveAtEnd();
+                    actions.Children().Append(cancel);
+                    card.Children().Append(actions);
+                    bar.Visibility(Visibility::Collapsed);
+                }
+
                 TransfersPanel().Children().Append(card);
                 m_transferRows[std::wstring(transfer.GetNamedString(L"direction", L"")) + std::to_wstring(number)] = { bar, detail };
             }
@@ -198,7 +220,9 @@ namespace winrt::LinkCursor::implementation
             double total = transfer.GetNamedNumber(L"total", 0);
             row->second.bar.IsIndeterminate(total <= 0);
             row->second.bar.Value(total > 0 ? done * 100.0 / total : 0);
-            row->second.detail.Text(hstring(FormatBytes(done) + L" / " + FormatBytes(total)));
+            row->second.detail.Text(transfer.GetNamedBoolean(L"awaiting_acceptance", false)
+                ? LinkCursorApp::Text(L"TransferLegacyHint")
+                : hstring(FormatBytes(done) + L" / " + FormatBytes(total)));
         }
         TransfersPanel().Visibility(transfers.Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
     }

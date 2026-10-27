@@ -87,6 +87,7 @@ pub struct DeviceView {
 /// Files on their way to or from a peer.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct TransferView {
+    pub awaiting_acceptance: bool,
     pub transfer: u32,
     pub peer_id: String,
     /// The peer's name, or its ID.
@@ -484,8 +485,8 @@ impl SharedState {
                 snapshot.last_error = event["message"].as_str().map(str::to_owned);
                 true
             }
-            "files_failed" | "files_send_ended" => {
-                let direction = if kind == "files_failed" {
+            "files_failed" | "files_stream_ended" | "files_send_ended" => {
+                let direction = if kind != "files_send_ended" {
                     "receiving"
                 } else {
                     "sending"
@@ -496,6 +497,8 @@ impl SharedState {
                     // Done, declined here (or sharing is off), or the peer
                     // copied something else meanwhile: nothing went wrong.
                     "done"
+                    | "delivered"
+                    | "released"
                     | "cancelled"
                     | "replaced by a newer copy"
                     | "files are no longer on the clipboard" => {
@@ -513,8 +516,8 @@ impl SharedState {
                 true
             }
             "files_received" => snapshot.remove_transfer(&event, "receiving"),
-            "files_receiving" | "files_sending" => {
-                let direction = if kind == "files_receiving" {
+            "files_offered" | "files_receiving" | "files_sending" => {
+                let direction = if kind != "files_sending" {
                     "receiving"
                 } else {
                     "sending"
@@ -529,6 +532,7 @@ impl SharedState {
                 };
                 let number = |key: &str| event[key].as_u64().unwrap_or(0);
                 let view = TransferView {
+                    awaiting_acceptance: kind == "files_offered",
                     transfer,
                     peer_id: peer_id.to_owned(),
                     peer_name: snapshot.peer_name(peer_id),
@@ -720,8 +724,14 @@ mod tests {
         );
         apply(
             &state,
+            serde_json::json!({"event": "files_offered", "peer_id": "mac", "transfer": 7, "name": "报告", "items": 2, "count": 4, "total_size": 400}),
+        );
+        assert!(state.0.borrow().transfers[0].awaiting_acceptance);
+        apply(
+            &state,
             serde_json::json!({"event": "files_receiving", "peer_id": "mac", "transfer": 7, "name": "报告", "items": 2, "count": 4, "total_size": 400}),
         );
+        assert!(!state.0.borrow().transfers[0].awaiting_acceptance);
         apply(
             &state,
             serde_json::json!({"event": "files_progress", "peer_id": "mac", "transfer": 7, "received": 100, "total": 400}),

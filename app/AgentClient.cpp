@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 13;
+    constexpr int ProtocolVersion = 14;
 
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
@@ -175,6 +175,13 @@ namespace LinkCursorApp
     void AgentClient::CancelTransfer(uint32_t transfer)
     {
         auto message = Request(L"cancel_transfer");
+        message.Insert(L"transfer", JsonValue::CreateNumberValue(transfer));
+        Send(message);
+    }
+
+    void AgentClient::AcceptTransfer(uint32_t transfer)
+    {
+        auto message = Request(L"accept_transfer");
         message.Insert(L"transfer", JsonValue::CreateNumberValue(transfer));
         Send(message);
     }

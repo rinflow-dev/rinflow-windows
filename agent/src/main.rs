@@ -117,10 +117,10 @@ fn main() {
         // Always offered to peers; whether this PC's clipboard is actually
         // shared is the user's setting, applied by `clipboard.rs`.
         clipboard: true,
-        // Copied files travel with the clipboard. Every incoming transfer
-        // waits for `clipboard.rs` (limit 0), which takes it or not
-        // according to the same setting.
+        // Native virtual files pull bounded ranges on Read. Older peers
+        // wait for an explicit Receive action in the transfer card.
         files: true,
+        on_demand_files: true,
         download_directory: Some(
             clipboard::download_directory()
                 .to_string_lossy()

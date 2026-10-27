@@ -9,8 +9,10 @@
 //!
 //! Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`;
 //! the core turns them into a manifest and the peer pulls them. Files a peer
-//! copied land in Downloads\LinkCursor and are put on the clipboard as files,
-//! so Ctrl+V in Explorer copies them.
+//! copied are published as OLE virtual files and read on demand. Older peers
+//! use an explicit compatibility download to Downloads\LinkCursor.
+
+mod virtual_files;
 
 use crate::win::wide;
 use linkcursor_core::{Clipboard, ClipboardFormat, Core, MIME_HTML, MIME_PNG, MIME_TEXT};
@@ -38,9 +40,8 @@ use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Shell::{FOLDERID_Downloads, SHGetKnownFolderPath};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, HWND_MESSAGE,
-    IDYES, KillTimer, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MSG, MessageBoxW,
-    PostMessageW, PostThreadMessageW, RegisterClassW, SetTimer, TranslateMessage, WM_APP,
-    WM_CLIPBOARDUPDATE, WM_QUIT, WM_TIMER, WNDCLASSW,
+    KillTimer, MSG, PostMessageW, PostThreadMessageW, RegisterClassW, SetTimer, TranslateMessage,
+    WM_APP, WM_CLIPBOARDUPDATE, WM_QUIT, WM_TIMER, WNDCLASSW,
 };
 
 const CF_UNICODETEXT: u32 = 13;
@@ -48,8 +49,6 @@ const CF_DIB: u32 = 8;
 const CF_HDROP: u32 = 15;
 /// Copied files, as `file://` URLs one per line (the core's MIME type).
 const MIME_URI_LIST: &str = "text/uri-list";
-/// Files a peer copied are taken without asking up to this size in all.
-const AUTO_ACCEPT_BYTES: u64 = 512 * 1024 * 1024;
 /// A peer's clipboard is waiting in `Shared::incoming`.
 const WM_WRITE_CLIPBOARD: u32 = WM_APP + 1;
 /// Sharing was turned on or off: report the clipboard (or nothing) again.
@@ -75,9 +74,23 @@ struct Shared {
     enabled: AtomicBool,
     /// The clipboard thread's window; 0 until it runs.
     window: AtomicIsize,
-    incoming: Mutex<Option<Clipboard>>,
+    incoming: Mutex<Option<Incoming>>,
+    legacy_sequence: Mutex<Option<(u32, u32)>>,
     /// Set when the thread starts, for decisions on offered files.
     core: OnceLock<Weak<Core>>,
+}
+
+enum IncomingContent {
+    Clipboard(Clipboard),
+    Files {
+        manifest: linkcursor_core::FileManifest,
+        peer: String,
+    },
+    Unavailable(String),
+}
+struct Incoming {
+    sequence: u32,
+    content: IncomingContent,
 }
 
 /// Where files from peers go: Downloads\LinkCursor (the core creates it).
@@ -127,12 +140,22 @@ impl ClipboardHandle {
     /// at once; turned off, the core forgets it and nothing is sent.
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.store(enabled, Ordering::SeqCst);
+        if !enabled && let Some(core) = self.0.core.get().and_then(Weak::upgrade) {
+            let _ = core.revoke_file_streams();
+            if let Some((transfer, _)) = self.0.legacy_sequence.lock().unwrap().take() {
+                let _ = core.cancel_files(transfer);
+            }
+        }
         self.post(WM_REPORT_CLIPBOARD);
     }
 
     /// Picks peers' clipboards and file offers out of the core's events.
     pub fn core_event(&self, json: &str) {
-        if !(json.contains("\"clipboard\"") || json.contains("\"files_offered\"")) {
+        if !(json.contains("\"clipboard\"")
+            || json.contains("\"files_offered\"")
+            || json.contains("\"files_available\"")
+            || json.contains("\"files_unavailable\""))
+        {
             return;
         }
         let Ok(event) = serde_json::from_str::<Value>(json) else {
@@ -141,14 +164,32 @@ impl ClipboardHandle {
         match event["event"].as_str() {
             Some("clipboard") => self.peer_clipboard(&event),
             Some("files_offered") => self.files_offered(&event),
+            Some("files_available") if self.enabled() => {
+                if let (Ok(manifest), Some(peer)) = (
+                    serde_json::from_value::<linkcursor_core::FileManifest>(
+                        event["manifest"].clone(),
+                    ),
+                    event["peer_id"].as_str(),
+                ) {
+                    self.queue_incoming(
+                        IncomingContent::Files {
+                            manifest,
+                            peer: peer.to_owned(),
+                        },
+                        None,
+                    );
+                }
+            }
+            Some("files_unavailable") => {
+                if let Some(peer) = event["peer_id"].as_str() {
+                    self.queue_incoming(IncomingContent::Unavailable(peer.to_owned()), None);
+                }
+            }
             _ => {}
         }
     }
 
-    /// Files a peer copied. The core waits for this decision on every
-    /// transfer (its own limit is set to 0): taken at once while sharing is
-    /// on and they are not too large, after asking when they are, and never
-    /// while sharing is off.
+    /// An older peer's offer waits for explicit consent in the transfer card.
     fn files_offered(&self, event: &Value) {
         let Some(transfer) = event["transfer"]
             .as_u64()
@@ -164,47 +205,17 @@ impl ClipboardHandle {
             let _ = core.cancel_files(transfer);
             return;
         }
-        let total = event["total_size"].as_u64().unwrap_or(0);
-        if total <= AUTO_ACCEPT_BYTES {
-            let _ = core.accept_files(transfer);
-            return;
-        }
-        let count = event["count"].as_u64().unwrap_or(0);
-        let core = Arc::downgrade(&core);
-        // Asked on a thread of its own: the core's callback must not wait.
-        std::thread::spawn(move || {
-            let size = total as f64 / (1024.0 * 1024.0);
-            let text = wide(&if crate::i18n::chinese() {
-                format!(
-                    "另一台设备复制了 {count} 个文件，共 {size:.1} MB。\n\n现在接收到“下载\\LinkCursor”吗？"
-                )
-            } else if count == 1 {
-                format!(
-                    "Another device copied a file ({size:.1} MB).\n\nReceive it now? It will be saved in Downloads\\LinkCursor."
-                )
-            } else {
-                format!(
-                    "Another device copied {count} files ({size:.1} MB in total).\n\nReceive them now? They will be saved in Downloads\\LinkCursor."
-                )
-            });
-            let caption = wide("LinkCursor");
-            // SAFETY: a modal message box with valid NUL-terminated strings.
-            let answer = unsafe {
-                MessageBoxW(
-                    null_mut(),
-                    text.as_ptr(),
-                    caption.as_ptr(),
-                    MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND,
-                )
-            };
-            if let Some(core) = core.upgrade() {
-                let _ = if answer == IDYES {
-                    core.accept_files(transfer)
-                } else {
-                    core.cancel_files(transfer)
-                };
-            }
-        });
+        // An older peer: explicit Receive in the settings transfer card.
+        // Never grab focus or pre-download just because the pointer crossed.
+        *self.0.legacy_sequence.lock().unwrap() =
+            Some((transfer, unsafe { GetClipboardSequenceNumber() }));
+        crate::tray::notify(
+            crate::i18n::tr("有文件可接收", "Files available"),
+            crate::i18n::tr(
+                "对方使用旧版文件协议。打开 LinkCursor，在传输卡片中点“接收”。",
+                "This peer uses the older file protocol. Open LinkCursor and choose Receive in the transfer card.",
+            ),
+        );
     }
 
     fn peer_clipboard(&self, event: &Value) {
@@ -217,13 +228,35 @@ impl ClipboardHandle {
         }
         match Clipboard::from_json(event) {
             Ok(clipboard) => {
-                if let Ok(mut incoming) = self.0.incoming.lock() {
-                    *incoming = Some(clipboard);
-                }
-                self.post(WM_WRITE_CLIPBOARD);
+                let sequence = event["transfer"].as_u64().and_then(|transfer| {
+                    let mut legacy = self.0.legacy_sequence.lock().unwrap();
+                    if legacy.is_some_and(|(id, _)| u64::from(id) == transfer) {
+                        legacy.take().map(|(_, seq)| seq)
+                    } else {
+                        None
+                    }
+                });
+                self.queue_incoming(IncomingContent::Clipboard(clipboard), sequence);
             }
             Err(error) => log!("peer clipboard not used: {error}"),
         }
+    }
+
+    fn queue_incoming(&self, content: IncomingContent, sequence: Option<u32>) {
+        let mut slot = self.0.incoming.lock().unwrap();
+        if let IncomingContent::Unavailable(peer) = &content {
+            match slot.as_ref().map(|pending| &pending.content) {
+                Some(IncomingContent::Files { peer: pending, .. }) if pending == peer => {}
+                Some(_) => return,
+                None => {}
+            }
+        }
+        *slot = Some(Incoming {
+            content,
+            sequence: sequence.unwrap_or_else(|| unsafe { GetClipboardSequenceNumber() }),
+        });
+        drop(slot);
+        self.post(WM_WRITE_CLIPBOARD);
     }
 
     fn post(&self, message: u32) {
@@ -235,20 +268,55 @@ impl ClipboardHandle {
             }
         }
     }
+
+    pub fn accept_legacy_files(&self, transfer: u32) -> Result<(), String> {
+        if !self.enabled() {
+            return Err("clipboard sharing disabled".into());
+        }
+        let mut offered = self.0.legacy_sequence.lock().unwrap();
+        if !offered.is_some_and(|(id, _)| id == transfer) {
+            return Err("file offer expired".into());
+        }
+        // Consent happens here; clipboard changes after this point must not
+        // be overwritten when the compatibility download finishes.
+        *offered = Some((transfer, unsafe { GetClipboardSequenceNumber() }));
+        self.0
+            .core
+            .get()
+            .and_then(Weak::upgrade)
+            .ok_or("core stopped")?
+            .accept_files(transfer)
+    }
 }
 
 /// The thread that owns the clipboard window.
 pub struct ClipboardThread {
     thread_id: u32,
     join: Option<JoinHandle<()>>,
+    core: Weak<Core>,
 }
 
 impl ClipboardThread {
     pub fn start(handle: ClipboardHandle, core: Weak<Core>) -> io::Result<Self> {
+        let shutdown_core = core.clone();
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
             .name("linkcursor-clipboard".to_owned())
             .spawn(move || {
+                // OLE's clipboard owner must keep a pumping STA alive.
+                if let Err(error) = unsafe { windows::Win32::System::Ole::OleInitialize(None) } {
+                    let _ = ready_tx.send(Err(io::Error::other(error.to_string())));
+                    return;
+                }
+                struct OleGuard;
+                impl Drop for OleGuard {
+                    fn drop(&mut self) {
+                        unsafe {
+                            windows::Win32::System::Ole::OleUninitialize();
+                        }
+                    }
+                }
+                let _ole = OleGuard;
                 let window = match create_window() {
                     Ok(window) => window,
                     Err(error) => {
@@ -265,6 +333,8 @@ impl ClipboardThread {
                         handle: handle.clone(),
                         core,
                         written: None,
+                        native: None,
+                        native_peer: None,
                         report_attempts: 0,
                         write_attempts: 0,
                     });
@@ -282,11 +352,15 @@ impl ClipboardThread {
                     RemoveClipboardFormatListener(window);
                     DestroyWindow(window);
                 }
+                STATE.with(|state| {
+                    state.borrow_mut().take();
+                });
             })?;
         match ready_rx.recv() {
             Ok(Ok(thread_id)) => Ok(Self {
                 thread_id,
                 join: Some(join),
+                core: shutdown_core,
             }),
             Ok(Err(error)) => Err(error),
             Err(_) => Err(io::Error::other("clipboard thread exited during start-up")),
@@ -296,6 +370,9 @@ impl ClipboardThread {
 
 impl Drop for ClipboardThread {
     fn drop(&mut self) {
+        if let Some(core) = self.core.upgrade() {
+            let _ = core.revoke_file_streams();
+        }
         // SAFETY: asks the clipboard thread's message loop to finish.
         unsafe {
             PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0);
@@ -316,6 +393,8 @@ struct State {
     /// The clipboard sequence number right after writing a peer's clipboard:
     /// that change is not reported back.
     written: Option<u32>,
+    native: Option<windows::Win32::System::Com::IDataObject>,
+    native_peer: Option<String>,
     /// Tries left for a report or write that found the clipboard busy.
     report_attempts: u32,
     write_attempts: u32,
@@ -325,9 +404,11 @@ impl State {
     fn changed(&mut self, window: HWND) {
         // SAFETY: plain clipboard query.
         let sequence = unsafe { GetClipboardSequenceNumber() };
-        if self.written == Some(sequence) {
+        if self.written == Some(sequence) || self.owns_native() {
             return;
         }
+        self.native = None;
+        self.native_peer = None;
         self.report_attempts = RETRY_ATTEMPTS;
         self.report(window);
     }
@@ -336,6 +417,11 @@ impl State {
     /// Another program holding the clipboard is not an empty clipboard: the
     /// report is tried again shortly.
     fn report(&mut self, window: HWND) {
+        if !self.handle.enabled() {
+            self.clear_native();
+        } else if self.owns_native() {
+            return;
+        }
         let clipboard = if self.handle.enabled() {
             match read(window) {
                 Some(clipboard) => clipboard,
@@ -372,7 +458,57 @@ impl State {
         if !self.handle.enabled() {
             return;
         }
-        if write(window, &clipboard) {
+        let sequence = unsafe { GetClipboardSequenceNumber() };
+        if sequence != clipboard.sequence && self.written != Some(sequence) {
+            return;
+        }
+        let success = match &clipboard.content {
+            IncomingContent::Clipboard(value) => {
+                let ok = write(window, value, sequence);
+                if ok {
+                    self.native = None;
+                    self.native_peer = None;
+                }
+                ok
+            }
+            IncomingContent::Files { manifest, peer } => {
+                match virtual_files::data_object(
+                    manifest.clone(),
+                    peer.clone(),
+                    self.core.clone(),
+                    self.handle.clone(),
+                ) {
+                    Ok(object) => {
+                        if unsafe { GetClipboardSequenceNumber() } != sequence {
+                            return;
+                        }
+                        if unsafe { windows::Win32::System::Ole::OleSetClipboard(&object) }.is_ok()
+                        {
+                            self.native = Some(object);
+                            self.native_peer = Some(peer.clone());
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Err(error) => {
+                        log!("cannot publish virtual files: {error}");
+                        crate::tray::notify(
+                            crate::i18n::tr("无法共享这些文件", "Cannot share these files"),
+                            &error.to_string(),
+                        );
+                        return;
+                    }
+                }
+            }
+            IncomingContent::Unavailable(peer) => {
+                if self.native_peer.as_ref() == Some(peer) {
+                    self.clear_native();
+                }
+                return;
+            }
+        };
+        if success {
             // SAFETY: plain clipboard query.
             self.written = Some(unsafe { GetClipboardSequenceNumber() });
             self.write_attempts = RETRY_ATTEMPTS;
@@ -391,6 +527,26 @@ impl State {
         }
         // SAFETY: a timer on this thread's window.
         unsafe { SetTimer(window, WRITE_RETRY_TIMER, RETRY_DELAY_MS, None) };
+    }
+
+    fn owns_native(&self) -> bool {
+        self.native.as_ref().is_some_and(|object| {
+            unsafe { windows::Win32::System::Ole::OleIsCurrentClipboard(object) }.is_ok()
+        })
+    }
+    fn clear_native(&mut self) {
+        if self.owns_native()
+            && unsafe {
+                windows::Win32::System::Ole::OleSetClipboard(
+                    None::<&windows::Win32::System::Com::IDataObject>,
+                )
+            }
+            .is_ok()
+        {
+            self.written = Some(unsafe { GetClipboardSequenceNumber() });
+        }
+        self.native = None;
+        self.native_peer = None;
     }
 }
 
@@ -688,12 +844,15 @@ fn convert(raw: Raw) -> Clipboard {
 }
 
 /// Replaces the clipboard with a peer's. False when it could not be opened.
-fn write(window: HWND, clipboard: &Clipboard) -> bool {
+fn write(window: HWND, clipboard: &Clipboard, expected_sequence: u32) -> bool {
     // Everything converted first: the clipboard is held only to copy it in.
     let entries = clipboard_entries(clipboard);
     let Some(_opened) = Opened::new(window) else {
         return false;
     };
+    if unsafe { GetClipboardSequenceNumber() } != expected_sequence {
+        return false;
+    }
     // SAFETY: the clipboard is open for this window.
     unsafe {
         EmptyClipboard();
