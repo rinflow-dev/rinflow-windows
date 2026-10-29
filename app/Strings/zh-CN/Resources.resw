@@ -23,7 +23,6 @@
   <data name="StatusNotConnected" xml:space="preserve"><value>未连接</value></data>
   <data name="ThisPC" xml:space="preserve"><value>本机</value></data>
   <data name="DisplayNumber" xml:space="preserve"><value>显示器 {0}</value></data>
-  <data name="ThisPCWith" xml:space="preserve"><value>本机 · {0}</value></data>
   <data name="ArrangementHintDrag" xml:space="preserve"><value>拖动以调整屏幕位置</value></data>
   <data name="ArrangementHintEmpty" xml:space="preserve"><value>连接设备后，可以在这里把它拖到屏幕旁边</value></data>
   <data name="SuffixNotConnected" xml:space="preserve"><value> · 未连接</value></data>

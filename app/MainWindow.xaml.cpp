@@ -196,7 +196,7 @@ namespace winrt::LinkCursor::implementation
         show(SettingsPage(), page == Page::Settings);
         show(EffectPage(), page == Page::Effect && DevelopmentBuild);
         show(BackButton(), page != Page::Devices);
-        if (page == Page::Devices && m_layoutDirty && !m_drag)
+        if (page == Page::Devices && m_layoutDirty && !m_drag && !m_settling)
         {
             RenderArrangement();
         }

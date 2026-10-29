@@ -4,13 +4,15 @@
 // core snaps every drop to a valid spot (touching an edge, enough overlap)
 // and syncs it to the peer, so this page only proposes positions and draws
 // what comes back. While dragging, the agent reports where the device would
-// land (the same snapping), drawn as a dashed outline. The ⋯ menu of a
-// device removes its placement.
+// land (the same snapping): close to it the device snaps there like a
+// magnet, farther away a dashed outline shows it. Dropped, the device glides
+// to that spot. The ⋯ menu of a device removes its placement.
 
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #include "DeviceModel.h"
 #include "Strings.h"
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -32,6 +34,15 @@ namespace
     constexpr double DotSpacing = 22;
     // A press that moves less than this is a click, not a drag.
     constexpr double DragThreshold = 6;
+    // The magnet (canvas pixels): a device dragged this close to where it
+    // would land jumps there, and stays until the pointer is this far away,
+    // so it does not flicker at the edge.
+    constexpr double SnapIn = 14;
+    constexpr double SnapOut = 24;
+    // A dropped device glides to where it lands in this long.
+    constexpr auto SettleDuration = std::chrono::milliseconds(180);
+    // Redrawing waits this long for the snapshot with the new placement.
+    constexpr auto SnapshotWait = std::chrono::milliseconds(500);
 
     LayoutRect ParseRect(JsonObject const& value)
     {
@@ -72,22 +83,16 @@ namespace
         return 0;
     }
 
-    hstring Pixels(LayoutRect const& display)
-    {
-        return hstring(std::format(L"{}×{}", std::lround(display.width * display.scale),
-            std::lround(display.height * display.scale)));
-    }
-
     double Distance(Point a, Point b)
     {
         return std::hypot(a.X - b.X, a.Y - b.Y);
     }
 
     // Screens are drawn to scale but inset by this much (pixels) on sides
-    // facing another device, so devices that touch show a small gap. Sides
-    // where a display meets another display of the same device stay flush:
-    // those are one computer's monitors side by side.
-    constexpr double ScreenGap = 3;
+    // facing another device, so devices that touch show a hairline gap (twice
+    // this). Sides where a display meets another display of the same device
+    // stay flush: those are one computer's monitors side by side.
+    constexpr double ScreenGap = 1;
 
     Thickness ScreenInsets(std::vector<LayoutRect> const& displays, size_t index)
     {
@@ -110,9 +115,11 @@ namespace
 
     // Rounded corners, except where another display of the same device
     // continues past the corner: one computer's monitors read as one shape.
+    // 4 like other in-page elements in Windows 11 (8 is for flyouts and
+    // dialogs), and 0 where straight edges meet.
     CornerRadius ScreenCorners(std::vector<LayoutRect> const& displays, size_t index)
     {
-        constexpr double radius = 8;
+        constexpr double radius = 4;
         constexpr double tolerance = 0.5;
         auto const& d = displays[index];
         double topLeft = radius, topRight = radius, bottomRight = radius, bottomLeft = radius;
@@ -158,7 +165,7 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self) return;
             self->RenderDots();
-            if (!self->m_drag) self->RenderArrangement();
+            if (!self->m_drag && !self->m_settling) self->RenderArrangement();
         });
     }
 
@@ -225,7 +232,7 @@ namespace winrt::LinkCursor::implementation
             m_layoutDevices.push_back(std::move(device));
         }
 
-        if (m_drag || m_page != Page::Devices)
+        if (m_drag || m_settling || m_page != Page::Devices)
         {
             m_layoutDirty = true;
             return;
@@ -339,7 +346,7 @@ namespace winrt::LinkCursor::implementation
                 ScreenInsets(m_localDisplays, i), ScreenCorners(m_localDisplays, i),
                 main ? L"\xE7F4" : L"",
                 main ? m_localName : LinkCursorApp::Format(L"DisplayNumber", number),
-                main ? LinkCursorApp::Format(L"ThisPCWith", std::wstring(Pixels(display))) : Pixels(display));
+                main ? LinkCursorApp::Text(L"ThisPC") : hstring());
             if (!main) ++number;
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);
@@ -396,6 +403,8 @@ namespace winrt::LinkCursor::implementation
                 self->ArrangementCanvas().Children().Append(ghost);
                 self->m_drag = LayoutDrag{ peerId, ghost,
                     Point{ static_cast<float>(ghostWidth / 2), static_cast<float>(ghostHeight / 2) }, position, true };
+                self->m_drag->free = Point{ static_cast<float>(position.X - ghostWidth / 2),
+                    static_cast<float>(position.Y - ghostHeight / 2) };
                 sender.as<UIElement>().CapturePointer(args.Pointer());
                 args.Handled(true);
             });
@@ -445,7 +454,7 @@ namespace winrt::LinkCursor::implementation
             hstring subtitle;
             if (main)
             {
-                subtitle = LinkCursorApp::PlatformLabel(device.platform) + L" · " + Pixels(display);
+                subtitle = LinkCursorApp::PlatformLabel(device.platform);
                 if (!connected) subtitle = subtitle + LinkCursorApp::Text(online ? L"SuffixNotConnected" : L"SuffixOffline");
             }
             auto screen = Screen(L"PeerScreenTemplate", display.width * scale, display.height * scale,
@@ -504,6 +513,7 @@ namespace winrt::LinkCursor::implementation
         auto top = Canvas::GetTop(element);
         m_drag = LayoutDrag{ peerId, element,
             Point{ static_cast<float>(position.X - left), static_cast<float>(position.Y - top) }, position, false, local };
+        m_drag->free = Point{ static_cast<float>(left), static_cast<float>(top) };
         element.CapturePointer(args.Pointer());
         // Drawn above the other devices while it moves.
         Canvas::SetZIndex(element, 10);
@@ -519,8 +529,8 @@ namespace winrt::LinkCursor::implementation
         {
             m_drag->element.Visibility(Visibility::Visible);
         }
-        Canvas::SetLeft(m_drag->element, position.X - m_drag->grab.X);
-        Canvas::SetTop(m_drag->element, position.Y - m_drag->grab.Y);
+        m_drag->free = Point{ position.X - m_drag->grab.X, position.Y - m_drag->grab.Y };
+        PlaceDragged();
         args.Handled(true);
         if (moved)
         {
@@ -528,10 +538,36 @@ namespace winrt::LinkCursor::implementation
         }
     }
 
+    void MainWindow::PlaceDragged()
+    {
+        if (!m_drag) return;
+        auto& drag = *m_drag;
+        auto to = drag.free;
+        if (drag.landing)
+        {
+            // Into the magnet when close, out of it only farther away.
+            drag.snapped = Distance(drag.free, *drag.landing) <= (drag.snapped ? SnapOut : SnapIn);
+            if (drag.snapped) to = *drag.landing;
+        }
+        else
+        {
+            drag.snapped = false;
+        }
+        Canvas::SetLeft(drag.element, to.X);
+        Canvas::SetTop(drag.element, to.Y);
+        // The outline shows where it lands while the device is not there.
+        if (m_preview)
+        {
+            m_preview.Visibility(drag.snapped ? Visibility::Collapsed : Visibility::Visible);
+        }
+    }
+
     std::pair<double, double> MainWindow::DraggedOffset() const
     {
-        double worldX = Canvas::GetLeft(m_drag->element) / m_layoutScale + m_layoutOriginX;
-        double worldY = Canvas::GetTop(m_drag->element) / m_layoutScale + m_layoutOriginY;
+        // Where the pointer has it, not where the magnet holds it: the core
+        // snaps from there, and the magnet lets go when that is far enough.
+        double worldX = m_drag->free.X / m_layoutScale + m_layoutOriginX;
+        double worldY = m_drag->free.Y / m_layoutScale + m_layoutOriginY;
         if (m_drag->local)
         {
             // How far this PC moved.
@@ -607,10 +643,14 @@ namespace winrt::LinkCursor::implementation
         }
         auto device = FindLayoutDevice(m_previewPeer);
         auto offset = message.GetNamedValue(L"offset", JsonValue::CreateNullValue());
-        if (!device || !device->offset || offset.ValueType() != JsonValueType::Object)
+        // Moving this PC lands it beside a placed peer, so that one needs a
+        // place; a peer dragged from its chip has none yet and still lands.
+        if (!device || (m_drag->local && !device->offset) || offset.ValueType() != JsonValueType::Object)
         {
             // Nowhere to land from here.
+            m_drag->landing.reset();
             ClearPreview();
+            PlaceDragged();
             return;
         }
         auto point = offset.GetObject();
@@ -656,8 +696,12 @@ namespace winrt::LinkCursor::implementation
             ArrangementCanvas().Children().Append(outline);
             m_preview = outline;
         }
-        Canvas::SetLeft(m_preview, (left - m_layoutOriginX) * m_layoutScale);
-        Canvas::SetTop(m_preview, (top - m_layoutOriginY) * m_layoutScale);
+        Point landing{ static_cast<float>((left - m_layoutOriginX) * m_layoutScale),
+            static_cast<float>((top - m_layoutOriginY) * m_layoutScale) };
+        Canvas::SetLeft(m_preview, landing.X);
+        Canvas::SetTop(m_preview, landing.Y);
+        m_drag->landing = landing;
+        PlaceDragged();
     }
 
     void MainWindow::ClearPreview()
@@ -701,24 +745,88 @@ namespace winrt::LinkCursor::implementation
             auto [x, y] = DraggedOffset();
             m_agent->SetPlacement(m_drag->peerId, x, y);
         }
+        auto element = m_drag->element;
+        auto landing = m_drag->landing;
         m_drag.reset();
         ClearPreview();
         // The next drag asks afresh, whether or not this answer still comes.
         m_previewPending = false;
         m_previewQueued = false;
-
-        // Redraw from the stored arrangement shortly, in case the drop changed
-        // nothing (a click, or dropped back on its spot) and no snapshot comes.
+        // The snapshot with the new placement redraws, even if unchanged;
+        // one held back during the drag is older than this drop.
         m_layoutSignature.clear();
+        m_layoutDirty = false;
+
+        if (moved && landing)
+        {
+            // It lands where the core showed: glide there, then redraw.
+            Settle(element, landing->X, landing->Y);
+            return;
+        }
+        // A click, or nowhere to land: redraw from the stored arrangement
+        // shortly, in case no snapshot comes.
         auto timer = DispatcherQueue().CreateTimer();
-        timer.Interval(std::chrono::milliseconds(moved ? 250 : 0));
+        timer.Interval(moved ? std::chrono::milliseconds(250) : std::chrono::milliseconds(0));
         timer.IsRepeating(false);
         auto weak = get_weak();
         timer.Tick([weak](auto&& sender, auto&&)
         {
             sender.Stop();
-            if (auto self = weak.get(); self && !self->m_drag) self->RenderArrangement();
+            if (auto self = weak.get(); self && !self->m_drag && !self->m_settling) self->RenderArrangement();
         });
         timer.Start();
+    }
+
+    void MainWindow::Settle(FrameworkElement const& element, double left, double top)
+    {
+        using namespace Microsoft::UI::Xaml::Media::Animation;
+        m_settling = true;
+        Storyboard board;
+        auto glide = [&](double from, double to, hstring const& property)
+        {
+            DoubleAnimation animation;
+            animation.From(from);
+            animation.To(to);
+            animation.Duration(DurationHelper::FromTimeSpan(Windows::Foundation::TimeSpan{ SettleDuration }));
+            CubicEase ease;
+            ease.EasingMode(EasingMode::EaseOut);
+            animation.EasingFunction(ease);
+            // Canvas.Left/Top are layout properties, animated on this thread.
+            animation.EnableDependentAnimation(true);
+            Storyboard::SetTarget(animation, element);
+            Storyboard::SetTargetProperty(animation, property);
+            board.Children().Append(animation);
+        };
+        glide(Canvas::GetLeft(element), left, L"(Canvas.Left)");
+        glide(Canvas::GetTop(element), top, L"(Canvas.Top)");
+        auto weak = get_weak();
+        board.Completed([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self) return;
+            self->m_settling = false;
+            if (self->m_drag) return;
+            // The snapshot came meanwhile: draw it. Otherwise it draws itself
+            // when it comes; this redraw is for a drop that changed nothing.
+            if (self->m_layoutDirty)
+            {
+                self->RenderArrangement();
+                return;
+            }
+            auto timer = self->DispatcherQueue().CreateTimer();
+            timer.Interval(SnapshotWait);
+            timer.IsRepeating(false);
+            timer.Tick([weak](auto&& sender, auto&&)
+            {
+                sender.Stop();
+                auto self = weak.get();
+                if (self && !self->m_drag && !self->m_settling && self->m_layoutSignature.empty())
+                {
+                    self->RenderArrangement();
+                }
+            });
+            timer.Start();
+        });
+        board.Begin();
     }
 }

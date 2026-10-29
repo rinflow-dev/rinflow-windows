@@ -29,7 +29,7 @@
                         Background="{ThemeResource SolidBackgroundFillColorQuarternaryBrush}"
                         BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
                         BorderThickness="2"
-                        CornerRadius="8" />
+                        CornerRadius="4" />
                     <StackPanel
                         x:Name="Labels"
                         Padding="6,0"
@@ -63,7 +63,7 @@
                         Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
                         BorderBrush="{ThemeResource ControlStrongStrokeColorDisabledBrush}"
                         BorderThickness="1"
-                        CornerRadius="8" />
+                        CornerRadius="4" />
                     <StackPanel
                         x:Name="Labels"
                         Padding="6,0"
@@ -109,11 +109,11 @@
                     <Rectangle
                         Fill="{ThemeResource AccentFillColorDefaultBrush}"
                         Opacity="0.14"
-                        RadiusX="8"
-                        RadiusY="8" />
+                        RadiusX="4"
+                        RadiusY="4" />
                     <Rectangle
-                        RadiusX="8"
-                        RadiusY="8"
+                        RadiusX="4"
+                        RadiusY="4"
                         Stroke="{ThemeResource AccentFillColorDefaultBrush}"
                         StrokeDashArray="4,3"
                         StrokeThickness="2" />

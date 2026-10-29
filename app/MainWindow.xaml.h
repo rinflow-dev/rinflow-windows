@@ -67,6 +67,13 @@ namespace winrt::LinkCursor::implementation
             Windows::Foundation::Point start{}; // where the pointer went down
             bool fromChip{ false };
             bool local{ false };
+            // Where the element would be if it followed the pointer exactly
+            // (canvas pixels); previews are asked for this spot.
+            Windows::Foundation::Point free{};
+            // Where the core says it lands (canvas pixels), once it answered.
+            std::optional<Windows::Foundation::Point> landing;
+            // Held at `landing` by the magnet, not following the pointer.
+            bool snapped{ false };
         };
 
     private:
@@ -110,6 +117,10 @@ namespace winrt::LinkCursor::implementation
         void RequestPreview();
         void ApplyPlacementPreview(Windows::Data::Json::JsonObject const& message);
         void ClearPreview();
+        // Puts the dragged element at the magnet's spot or the pointer's.
+        void PlaceDragged();
+        // Glides `element` to (left, top), then redraws the arrangement.
+        void Settle(Microsoft::UI::Xaml::FrameworkElement const& element, double left, double top);
 
         // ---- Pairing (MainWindow.Pairing.cpp) -----------------------------
         void SetupPairing();
@@ -209,6 +220,8 @@ namespace winrt::LinkCursor::implementation
         double m_layoutOriginX{ 0.0 };
         double m_layoutOriginY{ 0.0 };
         std::optional<LayoutDrag> m_drag;
+        // A dropped device glides to where it lands; redrawing waits for it.
+        bool m_settling{ false };
         bool m_layoutDirty{ false };
         // The landing spot shown while dragging.
         Microsoft::UI::Xaml::FrameworkElement m_preview{ nullptr };

@@ -23,7 +23,6 @@
   <data name="StatusNotConnected" xml:space="preserve"><value>Not connected</value></data>
   <data name="ThisPC" xml:space="preserve"><value>This PC</value></data>
   <data name="DisplayNumber" xml:space="preserve"><value>Display {0}</value></data>
-  <data name="ThisPCWith" xml:space="preserve"><value>This PC · {0}</value></data>
   <data name="ArrangementHintDrag" xml:space="preserve"><value>Drag to arrange your screens</value></data>
   <data name="ArrangementHintEmpty" xml:space="preserve"><value>Connect a device, then drag it next to your screen here</value></data>
   <data name="SuffixNotConnected" xml:space="preserve"><value> · Not connected</value></data>
