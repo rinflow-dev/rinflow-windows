@@ -25,15 +25,15 @@
             <x:Double x:Key="ToggleSwitchThemeMinWidth">0</x:Double>
 
             <!-- A card: one settings row, a device row, the sharing switch.
-                 As Windows Settings (the Toolkit's SettingsCard): 16 epx side
-                 padding, the in-page corner radius (4), cards 4 epx apart. -->
+                 Like Windows Settings, a little denser: 16 epx side padding,
+                 56 epx rows, the in-page corner radius (4), cards 4 epx apart. -->
             <Style x:Key="CardStyle" TargetType="Grid">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
-                <Setter Property="Padding" Value="16,12" />
-                <Setter Property="MinHeight" Value="64" />
+                <Setter Property="Padding" Value="16,10" />
+                <Setter Property="MinHeight" Value="56" />
                 <Setter Property="ColumnSpacing" Value="16" />
             </Style>
 
@@ -41,7 +41,7 @@
             <Style x:Key="PageTitleStyle" BasedOn="{StaticResource TitleTextBlockStyle}" TargetType="TextBlock" />
 
             <Style x:Key="SectionHeaderStyle" BasedOn="{StaticResource BodyStrongTextBlockStyle}" TargetType="TextBlock">
-                <Setter Property="Margin" Value="0,28,0,8" />
+                <Setter Property="Margin" Value="0,20,0,8" />
             </Style>
 
             <Style x:Key="RowTitleStyle" BasedOn="{StaticResource BodyTextBlockStyle}" TargetType="TextBlock">

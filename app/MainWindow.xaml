@@ -170,8 +170,8 @@
                  viewport's width (a ScrollViewer would centre a narrower page
                  by its desired width). -->
             <ScrollView x:Name="DevicesPage" ContentOrientation="Vertical">
-                <StackPanel MaxWidth="1040" Padding="36,12,36,36">
-                    <Grid Margin="0,0,0,24" ColumnSpacing="12">
+                <StackPanel MaxWidth="1040" Padding="28,8,28,24">
+                    <Grid Margin="0,0,0,16" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -247,7 +247,7 @@
                         x:Uid="LockBar" Title="已锁定到当前屏幕" />
 
                     <!-- Sharing on / off -->
-                    <Grid Height="68" Style="{StaticResource CardStyle}">
+                    <Grid Height="56" Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -277,8 +277,8 @@
                     <!-- Arrangement -->
                     <Grid
                         x:Name="ArrangementHost"
-                        Height="340"
-                        Margin="0,16,0,0"
+                        Height="280"
+                        Margin="0,12,0,0"
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
@@ -419,7 +419,7 @@
                 x:Name="SettingsPage"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
-                <StackPanel MaxWidth="1040" Padding="36,12,36,36" Spacing="4">
+                <StackPanel MaxWidth="1040" Padding="28,8,28,24" Spacing="4">
                     <TextBlock Style="{StaticResource PageTitleStyle}" x:Uid="SettingsTitle" Text="设置" />
 
                     <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="GeneralHeader" Text="常规" />
@@ -797,7 +797,7 @@
                 x:Name="EffectPage"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
-                <StackPanel MaxWidth="1040" Padding="36,12,36,36" Spacing="12">
+                <StackPanel MaxWidth="1040" Padding="28,8,28,24" Spacing="12">
                     <StackPanel Spacing="4">
                         <TextBlock Style="{StaticResource PageTitleStyle}" Text="动画效果" />
                         <TextBlock

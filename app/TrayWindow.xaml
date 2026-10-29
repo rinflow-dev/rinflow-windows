@@ -24,22 +24,22 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Padding="16,16,16,12" Spacing="12">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <Image Width="24" Height="24" VerticalAlignment="Center" Stretch="Uniform" Source="{ThemeResource AppLogo}" AutomationProperties.AccessibilityView="Raw" />
+        <StackPanel Padding="12,12,12,8" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Image Width="20" Height="20" VerticalAlignment="Center" Stretch="Uniform" Source="{ThemeResource AppLogo}" AutomationProperties.AccessibilityView="Raw" />
                 <TextBlock
                     VerticalAlignment="Center"
                     Style="{StaticResource BodyStrongTextBlockStyle}"
                     Text="LinkCursor" />
             </StackPanel>
 
-            <Grid MinHeight="56" Padding="16,0" Style="{StaticResource CardStyle}">
+            <Grid MinHeight="48" Padding="12,0" ColumnSpacing="12" Style="{StaticResource CardStyle}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE962;" />
+                <FontIcon VerticalAlignment="Center" FontSize="16" Glyph="&#xE962;" />
                 <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" x:Uid="TraySharingTitle" Text="键鼠共享" />
                 <ToggleSwitch
                     x:Name="SharingToggle"
@@ -55,10 +55,10 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 x:Uid="TrayDevicesHeader" Text="设备" />
-            <ItemsControl Margin="0,-6,0,0" ItemsSource="{x:Bind Devices}">
+            <ItemsControl Margin="0,-4,0,0" ItemsSource="{x:Bind Devices}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="local:PeerItem">
-                        <Grid Padding="4,9" ColumnSpacing="14">
+                        <Grid Padding="4,6" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -66,7 +66,7 @@
                             </Grid.ColumnDefinitions>
                             <FontIcon
                                 VerticalAlignment="Center"
-                                FontSize="18"
+                                FontSize="16"
                                 Glyph="{x:Bind Glyph}"
                                 Opacity="{x:Bind ContentOpacity}" />
                             <TextBlock
@@ -97,8 +97,8 @@
 
         <Grid
             Grid.Row="1"
-            Height="56"
-            Padding="12,0,10,0"
+            Height="44"
+            Padding="8,0,6,0"
             Background="{ThemeResource LayerOnAcrylicFillColorDefaultBrush}"
             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0"

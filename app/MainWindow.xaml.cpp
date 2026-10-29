@@ -92,10 +92,22 @@ namespace winrt::LinkCursor::implementation
         ExtendsContentIntoTitleBar(true);
         SetTitleBar(AppTitleBar());
 
+        // Opens centred on the work area of the display Windows picked for it
+        // (the one it was launched from), shrunk to fit a small screen.
         HWND hwnd{};
         check_hresult(m_inner.as<::IWindowNative>()->get_WindowHandle(&hwnd));
-        double scale = GetDpiForWindow(hwnd) / 96.0;
-        AppWindow().Resize({ static_cast<int32_t>(960 * scale), static_cast<int32_t>(840 * scale) });
+        auto monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO info{ sizeof(info) };
+        GetMonitorInfoW(monitor, &info);
+        UINT dpiX = 96, dpiY = 96;
+        if (FAILED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY))) dpiX = GetDpiForWindow(hwnd);
+        double scale = dpiX / 96.0;
+        auto const& work = info.rcWork;
+        int32_t workW = work.right - work.left;
+        int32_t workH = work.bottom - work.top;
+        int32_t w = (std::min)(static_cast<int32_t>(std::lround(800 * scale)), workW);
+        int32_t h = (std::min)(static_cast<int32_t>(std::lround(680 * scale)), workH);
+        AppWindow().MoveAndResize({ work.left + (workW - w) / 2, work.top + (workH - h) / 2, w, h });
 
         auto dispatcher = DispatcherQueue();
         auto weak = get_weak();

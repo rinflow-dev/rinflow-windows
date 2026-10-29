@@ -19,8 +19,8 @@ using namespace winrt::Windows::Data::Json;
 
 namespace
 {
-    constexpr double PanelWidth = 360;
-    constexpr double Gap = 12;
+    constexpr double PanelWidth = 300;
+    constexpr double Gap = 10;
     // Rows beyond this many devices are left out; the main window has all.
     constexpr size_t MaxRows = 8;
 }
