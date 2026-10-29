@@ -47,9 +47,11 @@ pub struct Settings {
     /// Only paired devices may connect: others pair first (both users check
     /// a code).
     pub paired_only: bool,
-    /// A Mac driving this PC uses its own shortcuts: Command plays as Ctrl
-    /// (⌘C copies), instead of keeping its position as the Windows key.
-    pub shortcut_remap: bool,
+    /// What a Mac's modifier keys play as while it drives this PC (see
+    /// linkcursor-core `remap.rs`). By default Command and Control swap: ⌘C
+    /// copies, and the Mac's Control is the Windows key. The settings page
+    /// offers that, keeping keys where they are, or a choice per key.
+    pub modifier_map: linkcursor_core::ModifierMap,
     /// When a peer that drove this PC moves its pointer away, this PC's
     /// cursor is hidden where it was left, until this PC's own mouse moves
     /// or a peer drives it again (see `hider.rs`).
@@ -132,7 +134,7 @@ impl Default for Settings {
             lock_hotkey: Hotkey::default(),
             port: None,
             paired_only: true,
-            shortcut_remap: true,
+            modifier_map: linkcursor_core::ModifierMap::SWAP,
             hide_cursor_on_leave: true,
             switch_hotkeys: true,
             switch_modifiers: MOD_CONTROL | MOD_ALT | MOD_SHIFT,
@@ -455,6 +457,41 @@ mod tests {
     }
 
     #[test]
+    fn a_macs_modifier_keys_are_chosen_per_key() {
+        use linkcursor_core::{Modifier, ModifierMap};
+        let settings = Settings::default();
+        let kept = settings
+            .merged(&values(json!({"modifier_map": {
+                "super": "super", "control": "control", "alt": "alt"
+            }})))
+            .unwrap();
+        assert_eq!(kept.modifier_map, ModifierMap::KEEP);
+        let custom = settings
+            .merged(&values(json!({"modifier_map": {
+                "super": "control", "control": "none", "alt": "shift"
+            }})))
+            .unwrap();
+        assert_eq!(
+            custom.modifier_map,
+            ModifierMap {
+                super_key: Modifier::Control,
+                control: Modifier::None,
+                alt: Modifier::Shift,
+            }
+        );
+        assert!(
+            settings
+                .merged(&values(json!({"modifier_map": {"super": "hyper"}})))
+                .is_err()
+        );
+        assert!(
+            settings
+                .merged(&values(json!({"modifier_map": true})))
+                .is_err()
+        );
+    }
+
+    #[test]
     fn merging_checks_every_value() {
         let settings = Settings::default();
         let merged = settings
@@ -488,7 +525,8 @@ mod tests {
     #[test]
     fn addresses_and_per_device_input_are_checked() {
         let settings = Settings::default();
-        assert!(settings.shortcut_remap && settings.keep_awake && settings.hide_cursor_on_leave);
+        assert_eq!(settings.modifier_map, linkcursor_core::ModifierMap::SWAP);
+        assert!(settings.keep_awake && settings.hide_cursor_on_leave);
         assert!(settings.switch_hotkeys);
         assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT | MOD_SHIFT);
         assert!(

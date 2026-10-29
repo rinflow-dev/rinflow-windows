@@ -3,7 +3,7 @@
 #![allow(non_snake_case)]
 use super::{ClipboardHandle, register};
 use linkcursor_core::{Core, FileManifest, MAX_READ_SIZE, RemoteFileLease};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
 use std::mem::{ManuallyDrop, size_of};
 use std::sync::{
@@ -106,16 +106,15 @@ fn descriptors(manifest: &FileManifest) -> Result<Vec<u8>> {
     let mut bytes =
         vec![0; size_of::<u32>() + manifest.entries.len() * size_of::<FILEDESCRIPTORW>()];
     bytes[..4].copy_from_slice(&(manifest.entries.len() as u32).to_le_bytes());
-    let mut names = HashSet::new();
-    for (i, entry) in manifest.entries.iter().enumerate() {
+    let paths = windows_paths(manifest);
+    for (i, (entry, path)) in manifest.entries.iter().zip(&paths).enumerate() {
         // Windows shell descriptors have MAX_PATH storage, including NUL.
-        // Reject rather than truncate or silently alias two source entries.
-        let path = entry.path.replace('/', "\\");
+        // Refuse rather than truncate; names themselves were made valid.
         let units: Vec<_> = path.encode_utf16().collect();
-        if units.len() >= 260 || !names.insert(path.to_lowercase()) || !valid_windows_path(&path) {
+        if units.len() >= 260 || !valid_windows_path(path) {
             return Err(windows::core::Error::new(
                 E_INVALIDARG,
-                "File name cannot be represented on Windows",
+                format!("path too long for Windows: {path}"),
             ));
         }
         let mut descriptor = FILEDESCRIPTORW {
@@ -140,6 +139,55 @@ fn descriptors(manifest: &FileManifest) -> Result<Vec<u8>> {
         }
     }
     Ok(bytes)
+}
+
+/// Each entry's path as Explorer gets it: every name made valid on Windows
+/// (`linkcursor_core::sanitize_file_name`), and one that then equals an
+/// earlier name in its folder, ignoring case, numbered (`a (1).txt`), as
+/// two names a Mac tells apart can be one here ("a:b" and "a_b", or
+/// "Read" and "read" on a case-sensitive disk). A folder's new name carries
+/// over to everything in it. Entries list a folder before its contents.
+fn windows_paths(manifest: &FileManifest) -> Vec<String> {
+    let mut renamed: HashMap<&str, String> = HashMap::new();
+    let mut taken: HashSet<String> = HashSet::new();
+    let mut paths = Vec::with_capacity(manifest.entries.len());
+    for entry in &manifest.entries {
+        let (parent, name) = match entry.path.rsplit_once('/') {
+            Some((parent, name)) => (Some(parent), name),
+            None => (None, entry.path.as_str()),
+        };
+        let parent = parent.map(|parent| {
+            renamed.get(parent).cloned().unwrap_or_else(|| {
+                parent
+                    .split('/')
+                    .map(linkcursor_core::sanitize_file_name)
+                    .collect::<Vec<_>>()
+                    .join("\\")
+            })
+        });
+        let join = |name: &str| match &parent {
+            Some(parent) => format!("{parent}\\{name}"),
+            None => name.to_owned(),
+        };
+        let name = linkcursor_core::sanitize_file_name(name);
+        let mut path = join(&name);
+        let mut number = 1;
+        while !taken.insert(path.to_lowercase()) {
+            path = join(&numbered(&name, number, entry.dir));
+            number += 1;
+        }
+        renamed.insert(entry.path.as_str(), path.clone());
+        paths.push(path);
+    }
+    paths
+}
+
+/// `name (n)`, before a file's extension: `a (1).txt`.
+fn numbered(name: &str, number: u32, dir: bool) -> String {
+    match name.rfind('.') {
+        Some(dot) if dot > 0 && !dir => format!("{} ({number}){}", &name[..dot], &name[dot..]),
+        _ => format!("{name} ({number})"),
+    }
 }
 
 fn valid_windows_path(path: &str) -> bool {
@@ -580,7 +628,7 @@ mod tests {
     use windows::core::{Interface, PCWSTR};
 
     #[test]
-    fn descriptors_preserve_large_sizes_and_reject_ambiguous_names() {
+    fn descriptors_preserve_large_sizes_and_make_names_valid() {
         let mut manifest = FileManifest {
             transfer: 1,
             total_size: (1 << 33) + 19,
@@ -599,17 +647,77 @@ mod tests {
             (u64::from(high) << 32) | u64::from(low),
             manifest.total_size
         );
-        for path in ["CON.txt", "a:stream", "a\\..\\b", "COM¹.txt", "x. "] {
-            manifest.entries[0].path = path.into();
-            assert!(descriptors(&manifest).is_err(), "{path}");
+        // Names a Mac allows but Windows does not are made valid, not refused.
+        let name_of = |path: &str| {
+            let manifest = FileManifest {
+                transfer: 1,
+                total_size: 0,
+                entries: vec![FileEntry {
+                    path: path.into(),
+                    size: 0,
+                    dir: false,
+                }],
+            };
+            let bytes = descriptors(&manifest).unwrap();
+            let descriptor = unsafe {
+                std::ptr::read_unaligned(bytes.as_ptr().add(4).cast::<FILEDESCRIPTORW>())
+            };
+            let name = descriptor.cFileName;
+            let end = name
+                .iter()
+                .position(|&unit| unit == 0)
+                .unwrap_or(name.len());
+            String::from_utf16_lossy(&name[..end])
+        };
+        for (path, windows) in [
+            ("CON.txt", "_CON.txt"),
+            ("a:stream", "a_stream"),
+            ("a\\..\\b", "a_.._b"),
+            ("COM¹.txt", "_COM¹.txt"),
+            ("x. ", "x"),
+            ("相册/Icon\r", "相册\\Icon"),
+            ("what?.txt", "what_.txt"),
+        ] {
+            assert_eq!(name_of(path), windows, "{path:?}");
         }
-        manifest.entries[0].path = "ok.txt".into();
-        manifest.entries.push(FileEntry {
-            path: "OK.txt".into(),
-            size: 1,
-            dir: false,
-        });
+        // A path Windows cannot hold is still refused, not truncated.
+        manifest.entries[0].path = format!("{}.txt", "x".repeat(300));
         assert!(descriptors(&manifest).is_err());
+    }
+
+    #[test]
+    fn names_equal_on_windows_are_numbered_and_folders_carry_over() {
+        let entry = |path: &str, dir: bool| FileEntry {
+            path: path.into(),
+            size: 0,
+            dir,
+        };
+        let manifest = FileManifest {
+            transfer: 1,
+            total_size: 0,
+            entries: vec![
+                entry("照片", true),
+                entry("照片/a:b.jpg", false),
+                entry("照片/a_b.jpg", false),
+                entry("照片/A_B.jpg", false),
+                entry("照片/x:y", true),
+                entry("照片/x_y", true),
+                entry("照片/x_y/1.jpg", false),
+            ],
+        };
+        assert_eq!(
+            windows_paths(&manifest),
+            [
+                "照片",
+                "照片\\a_b.jpg",
+                "照片\\a_b (1).jpg",
+                "照片\\A_B (2).jpg",
+                "照片\\x_y",
+                "照片\\x_y (1)",
+                "照片\\x_y (1)\\1.jpg",
+            ]
+        );
+        assert!(descriptors(&manifest).is_ok());
     }
 
     fn port() -> u16 {
@@ -923,5 +1031,219 @@ mod tests {
         drop(source);
         drop(target);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Benchmark, run by hand: a folder of many small files, from copying it
+    /// on one core to every file read through the virtual files the way
+    /// Explorer reads them, one after another. Two encrypted cores over
+    /// loopback: network latency is left out, and so is Explorer's own work
+    /// per file (creating it, progress), so real pastes take longer.
+    ///
+    /// ```text
+    /// cargo test --release bench_many_small_files -- --ignored --nocapture
+    /// ```
+    /// `LINKCURSOR_BENCH_SOURCE=<folder>` copies that folder (only read);
+    /// otherwise `LINKCURSOR_BENCH_FILES` files of `LINKCURSOR_BENCH_SIZE`
+    /// bytes are made, 100 to a folder (default 9 900 × 4 KiB: under the
+    /// 10 000 entries a manifest may hold, folders included).
+    #[test]
+    #[ignore]
+    fn bench_many_small_files() {
+        unsafe {
+            windows::Win32::System::Ole::OleInitialize(None).unwrap();
+        }
+        struct Ole;
+        impl Drop for Ole {
+            fn drop(&mut self) {
+                unsafe {
+                    windows::Win32::System::Ole::OleUninitialize();
+                }
+            }
+        }
+        let _ole = Ole;
+        let number = |name: &str, default: usize| {
+            std::env::var(name)
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(default)
+        };
+        let root = std::env::temp_dir().join(format!(
+            "linkcursor-bench-{}-{}",
+            std::process::id(),
+            port()
+        ));
+        let folder = match std::env::var_os("LINKCURSOR_BENCH_SOURCE") {
+            Some(source) => std::path::PathBuf::from(source),
+            None => {
+                let count = number("LINKCURSOR_BENCH_FILES", 9_900);
+                let size = number("LINKCURSOR_BENCH_SIZE", 4096);
+                let folder = root.join("source").join("many");
+                let content: Vec<u8> = (0..size).map(|i| (i * 7) as u8).collect();
+                for i in 0..count {
+                    let dir = folder.join(format!("d{:03}", i / 100));
+                    if i % 100 == 0 {
+                        std::fs::create_dir_all(&dir).unwrap();
+                    }
+                    std::fs::write(dir.join(format!("f{i:05}.bin")), &content).unwrap();
+                }
+                folder
+            }
+        };
+        let destination = root.join("destination");
+        std::fs::create_dir_all(&destination).unwrap();
+        let discovery_port = port();
+        let config = |id: &str| CoreConfig {
+            device_id: id.into(),
+            device_name: id.into(),
+            platform: "windows".into(),
+            discovery_port,
+            control_port: port(),
+            clipboard: true,
+            files: true,
+            on_demand_files: true,
+            download_directory: Some(root.join("unused-cache").to_string_lossy().into()),
+            auto_connect: false,
+            ..Default::default()
+        };
+        let (source_events, source_rx) = std::sync::mpsc::channel();
+        let source = Arc::new(
+            Core::start(
+                config("bench-source"),
+                move |s| {
+                    let _ = source_events.send(s);
+                },
+                |_| {},
+            )
+            .unwrap(),
+        );
+        let (target_events, target_rx) = std::sync::mpsc::channel();
+        let target = Arc::new(
+            Core::start(
+                config("bench-target"),
+                move |s| {
+                    let _ = target_events.send(s);
+                },
+                |_| {},
+            )
+            .unwrap(),
+        );
+        event(&source_rx, "peer_up");
+        source.connect("bench-target").unwrap();
+        event(&source_rx, "connected");
+        event(&target_rx, "connected");
+
+        // 1. Copy, cross over, wait for the manifest: the scan of the folder
+        // on the source, the manifest on the wire, its checks on the target.
+        let started = Instant::now();
+        source
+            .set_clipboard(Clipboard {
+                formats: vec![ClipboardFormat {
+                    mime: MIME_URI_LIST.into(),
+                    data: super::super::file_url(&folder.to_string_lossy()).into_bytes(),
+                }],
+            })
+            .unwrap();
+        source
+            .send_input(LcInputEvent {
+                kind: LC_INPUT_MOUSE_MOVE,
+                delta_x: 1.0,
+                ..Default::default()
+            })
+            .unwrap();
+        let offered = loop {
+            let raw = target_rx
+                .recv_timeout(Duration::from_secs(300))
+                .expect("no files_available within 5 minutes");
+            let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
+            if value["event"] == "files_available" {
+                break value;
+            }
+            if value["event"] == "error" {
+                panic!("target: {value}");
+            }
+        };
+        let manifest_time = started.elapsed();
+        let manifest: FileManifest = serde_json::from_value(offered["manifest"].clone()).unwrap();
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap().len();
+        let files = manifest.entries.iter().filter(|e| !e.dir).count();
+        let dirs = manifest.entries.len() - files;
+
+        // 2. The virtual files Explorer is given (descriptors only).
+        let started = Instant::now();
+        let object = data_object(
+            manifest.clone(),
+            "bench-source".into(),
+            Arc::downgrade(&target),
+            ClipboardHandle::new(true),
+        )
+        .unwrap();
+        let object_time = started.elapsed();
+
+        // 3. Every file read through its IStream into a file, in order.
+        let started = Instant::now();
+        let mut first_file = None;
+        unsafe {
+            let operation: IDataObjectAsyncCapability = object.cast().unwrap();
+            operation.StartOperation(None).unwrap();
+            for (index, entry) in manifest.entries.iter().enumerate() {
+                let path = destination.join(&entry.path);
+                if entry.dir {
+                    std::fs::create_dir_all(&path).unwrap();
+                    continue;
+                }
+                let mut medium = object
+                    .GetData(&fmt(
+                        register("FileContents") as u16,
+                        TYMED_ISTREAM,
+                        index as i32,
+                    ))
+                    .unwrap();
+                let source_stream = medium.u.pstm.as_ref().unwrap().clone();
+                let name: Vec<u16> = path
+                    .to_string_lossy()
+                    .encode_utf16()
+                    .chain(Some(0))
+                    .collect();
+                let output = SHCreateStreamOnFileEx(
+                    PCWSTR(name.as_ptr()),
+                    (STGM_WRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE).0,
+                    0x80,
+                    true,
+                    None,
+                )
+                .unwrap();
+                let mut read = 0;
+                source_stream
+                    .CopyTo(&output, entry.size + 1, Some(&mut read), None)
+                    .unwrap();
+                assert_eq!(read, entry.size, "{}", entry.path);
+                output.Commit(STGC_DEFAULT).unwrap();
+                windows::Win32::System::Ole::ReleaseStgMedium(&mut medium);
+                first_file.get_or_insert_with(|| started.elapsed());
+            }
+            operation.EndOperation(S_OK, None, 1).unwrap();
+        }
+        let copy_time = started.elapsed();
+
+        let megabytes = manifest.total_size as f64 / 1_048_576.0;
+        let seconds = copy_time.as_secs_f64();
+        println!("folder:            {}", folder.display());
+        println!(
+            "entries:           {files} files, {dirs} folders, {megabytes:.1} MiB; manifest {:.1} KiB",
+            manifest_bytes as f64 / 1024.0
+        );
+        println!("1. copy → manifest: {manifest_time:.2?} (scan, send, checks)");
+        println!("2. virtual files:   {object_time:.2?}");
+        println!(
+            "3. read every file: {copy_time:.2?}  = {:.0} files/s, {:.1} MiB/s, {:.2} ms per file (first file {:.2?})",
+            files as f64 / seconds,
+            megabytes / seconds,
+            seconds * 1000.0 / files.max(1) as f64,
+            first_file.unwrap_or_default()
+        );
+        drop(object);
+        drop(source);
+        drop(target);
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -38,7 +38,9 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// 16: `accept_transfer` and transfer `awaiting_acceptance` are gone: files
 /// come only through file streams; offers in the old file protocol are
 /// declined.
-pub const PROTOCOL_VERSION: u32 = 16;
+/// 17: setting `modifier_map` (a Mac's modifier keys, chosen per key)
+/// replaces `shortcut_remap`.
+pub const PROTOCOL_VERSION: u32 = 17;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")

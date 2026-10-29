@@ -95,6 +95,26 @@ struct Incoming {
     content: IncomingContent,
 }
 
+/// Why copied files are not shared (the core's `files_not_shared`: past
+/// its limits), and what to do instead.
+pub fn files_not_shared_text(event: &Value) -> String {
+    let limit = event["limit"].as_u64().unwrap_or(0);
+    match (event["reason"].as_str(), crate::i18n::chinese()) {
+        (Some("too_deep"), true) => {
+            format!("文件夹嵌套超过 {limit} 层，无法共享。请先压缩成一个 zip 文件再复制。")
+        }
+        (Some("too_deep"), false) => format!(
+            "The folders are nested more than {limit} levels deep to share. Zip them into one file, then copy that."
+        ),
+        (_, true) => {
+            format!("复制的文件和文件夹超过 {limit} 个，无法共享。请先压缩成一个 zip 文件再复制。")
+        }
+        (_, false) => format!(
+            "More than {limit} files and folders were copied, too many to share. Zip them into one file, then copy that."
+        ),
+    }
+}
+
 /// The core's download folder, Downloads\LinkCursor. Files are not
 /// downloaded any more (peers' files are pulled on demand), but the core
 /// still plans an old-protocol offer there before it is declined.
@@ -155,7 +175,8 @@ impl ClipboardHandle {
         if !(json.contains("\"clipboard\"")
             || json.contains("\"files_offered\"")
             || json.contains("\"files_available\"")
-            || json.contains("\"files_unavailable\""))
+            || json.contains("\"files_unavailable\"")
+            || json.contains("\"files_not_shared\""))
         {
             return;
         }
@@ -165,6 +186,11 @@ impl ClipboardHandle {
         match event["event"].as_str() {
             Some("clipboard") => self.peer_clipboard(&event),
             Some("files_offered") => self.files_offered(&event),
+            // Said right when the user copied them, not only on the page.
+            Some("files_not_shared") => crate::tray::notify(
+                crate::i18n::tr("无法共享复制的文件", "Can't share the copied files"),
+                &files_not_shared_text(&event),
+            ),
             Some("files_available") if self.enabled() => {
                 if let (Ok(manifest), Some(peer)) = (
                     serde_json::from_value::<linkcursor_core::FileManifest>(

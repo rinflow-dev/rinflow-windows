@@ -131,9 +131,15 @@
   <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>有的组合已被其他程序占用，那几个方向用不了。换一组试试。</value></data>
   <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切换设备的组合键</value></data>
   <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>用快捷键切换设备</value></data>
-  <data name="ShortcutRemapTitle.Text" xml:space="preserve"><value>沿用 Mac 的快捷键</value></data>
-  <data name="ShortcutRemapDescription.Text" xml:space="preserve"><value>Mac 控制这台电脑时，⌘C、⌘V 等按 Ctrl 快捷键执行。关闭后 ⌘ 对应 Windows 键。</value></data>
-  <data name="ShortcutRemapToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>沿用 Mac 的快捷键</value></data>
+  <data name="ModifierMapTitle.Text" xml:space="preserve"><value>Mac 控制本机时的修饰键</value></data>
+  <data name="ModifierPresetCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Mac 控制本机时的修饰键</value></data>
+  <data name="ModifierPresetMac.Content" xml:space="preserve"><value>Mac 习惯（推荐）</value></data>
+  <data name="ModifierPresetKeep.Content" xml:space="preserve"><value>保持键位</value></data>
+  <data name="ModifierPresetCustom.Content" xml:space="preserve"><value>自定义</value></data>
+  <data name="ModifierMacDescription" xml:space="preserve"><value>⌘C、⌘V 等按 Ctrl 快捷键执行，⌃ 对应 Windows 键。</value></data>
+  <data name="ModifierKeepDescription" xml:space="preserve"><value>按键保持原来的位置：⌘ 对应 Windows 键，⌃ 对应 Ctrl。</value></data>
+  <data name="ModifierCustomDescription" xml:space="preserve"><value>为 Mac 的每个修饰键选择它在这台电脑上对应的按键。</value></data>
+  <data name="ModifierNone" xml:space="preserve"><value>无</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>锁屏与唤醒</value></data>
   <data name="HideCursorTitle.Text" xml:space="preserve"><value>其他设备离开后隐藏光标</value></data>
   <data name="HideCursorDescription.Text" xml:space="preserve"><value>其他设备控制完这台电脑、光标移走后，这里的光标先藏起来；动一下这台电脑的鼠标或触摸板就会出现。</value></data>

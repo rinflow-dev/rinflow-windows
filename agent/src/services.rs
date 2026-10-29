@@ -93,10 +93,10 @@ impl Services {
         if values.contains_key("language") {
             crate::i18n::set_language(&settings.language);
         }
-        if values.contains_key("shortcut_remap")
+        if values.contains_key("modifier_map")
             && let Some(core) = self.core.upgrade()
         {
-            let _ = core.set_shortcut_remap(settings.shortcut_remap);
+            let _ = core.set_modifier_map(settings.modifier_map);
         }
         if values.contains_key("manual_addresses")
             && let Some(core) = self.core.upgrade()

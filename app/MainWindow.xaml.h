@@ -170,6 +170,9 @@ namespace winrt::LinkCursor::implementation
         bool m_errorFromAgent{ false };
         // The elevated-input switch while its change is under way: what it
         // was switched to, and which change (an older one's end is ignored).
+        // The user chose 自定义 for a Mac's modifier keys: the per-key choices
+        // stay open even while the map matches a preset.
+        bool m_modifierCustom{ false };
         bool m_elevatedPending{ false };
         bool m_elevatedTarget{ false };
         uint32_t m_elevatedRequest{ 0 };

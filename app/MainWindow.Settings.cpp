@@ -109,6 +109,38 @@ namespace
         value.Insert(L"key", JsonValue::CreateNumberValue(key));
         return value;
     }
+
+    // What one of a Mac's modifier keys can play as here, in the order the
+    // custom choices list them (the agent's `modifier_map`, keys by position:
+    // "super" is ⌘ on a Mac and the Windows key here).
+    constexpr std::wstring_view ModifierTargets[] = { L"control", L"super", L"alt", L"shift", L"none" };
+
+    hstring ModifierTargetLabel(std::wstring_view target)
+    {
+        if (target == L"control") return L"Ctrl";
+        if (target == L"super") return L"Win";
+        if (target == L"alt") return L"Alt";
+        if (target == L"shift") return L"Shift";
+        return LinkCursorApp::Text(L"ModifierNone");
+    }
+
+    int ModifierTargetIndex(std::wstring_view target)
+    {
+        for (int i = 0; i < static_cast<int>(std::size(ModifierTargets)); ++i)
+        {
+            if (ModifierTargets[i] == target) return i;
+        }
+        return -1;
+    }
+
+    JsonObject ModifierMapValue(std::wstring_view super, std::wstring_view control, std::wstring_view alt)
+    {
+        JsonObject map;
+        map.Insert(L"super", JsonValue::CreateStringValue(super));
+        map.Insert(L"control", JsonValue::CreateStringValue(control));
+        map.Insert(L"alt", JsonValue::CreateStringValue(alt));
+        return map;
+    }
 }
 
 namespace winrt::LinkCursor::implementation
@@ -137,7 +169,6 @@ namespace winrt::LinkCursor::implementation
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
         wire(PairedOnlyToggle(), PairedOnlyState(), L"paired_only");
         wire(SwitchHotkeysToggle(), SwitchHotkeysState(), L"switch_hotkeys");
-        wire(ShortcutRemapToggle(), ShortcutRemapState(), L"shortcut_remap");
         wire(KeepAwakeToggle(), KeepAwakeState(), L"keep_awake");
         wire(HideCursorToggle(), HideCursorState(), L"hide_cursor_on_leave");
         wire(LockSyncToggle(), LockSyncState(), L"lock_sync");
@@ -150,6 +181,55 @@ namespace winrt::LinkCursor::implementation
             std::wstring path = std::wstring(folder.get()) + L"\\LinkCursor\\logs";
             CreateDirectoryW(path.c_str(), nullptr);
             ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        });
+
+        // A Mac's modifier keys: a preset sends its map at once; 自定义 shows
+        // one choice per key, each sending the whole map when changed.
+        auto sendCustomModifiers = [weak]
+        {
+            auto self = weak.get();
+            if (!self || self->m_applying) return;
+            auto target = [](ComboBox const& combo)
+            {
+                auto index = combo.SelectedIndex();
+                return index >= 0 && index < static_cast<int>(std::size(ModifierTargets))
+                    ? ModifierTargets[index] : std::wstring_view{};
+            };
+            auto super = target(self->ModifierSuperCombo());
+            auto control = target(self->ModifierControlCombo());
+            auto alt = target(self->ModifierAltCombo());
+            if (super.empty() || control.empty() || alt.empty()) return;
+            self->m_agent->UpdateSetting(L"modifier_map", ModifierMapValue(super, control, alt));
+        };
+        for (auto const& combo : { ModifierSuperCombo(), ModifierControlCombo(), ModifierAltCombo() })
+        {
+            for (auto target : ModifierTargets)
+            {
+                ComboBoxItem item;
+                item.Content(box_value(ModifierTargetLabel(target)));
+                combo.Items().Append(item);
+            }
+            combo.SelectionChanged([sendCustomModifiers](auto&&, auto&&) { sendCustomModifiers(); });
+        }
+        ModifierPresetCombo().SelectionChanged([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self || self->m_applying) return;
+            auto item = self->ModifierPresetCombo().SelectedItem().try_as<ComboBoxItem>();
+            if (!item) return;
+            auto preset = unbox_value_or<hstring>(item.Tag(), L"mac");
+            if (preset == L"custom")
+            {
+                // The choices start from the map in use; nothing changes yet.
+                self->m_modifierCustom = true;
+                self->ModifierCustomPanel().Visibility(Visibility::Visible);
+                self->ModifierMapDescription().Text(LinkCursorApp::Text(L"ModifierCustomDescription"));
+                return;
+            }
+            self->m_modifierCustom = false;
+            self->m_agent->UpdateSetting(L"modifier_map", preset == L"keep"
+                ? ModifierMapValue(L"super", L"control", L"alt")
+                : ModifierMapValue(L"control", L"super", L"alt"));
         });
 
         SwitchModifiersCombo().SelectionChanged([weak](auto&&, auto&&)
@@ -344,7 +424,32 @@ namespace winrt::LinkCursor::implementation
         // A combination another program registered first.
         SwitchHotkeysWarning().Visibility(switchHotkeys && state.GetNamedBoolean(L"switch_hotkeys_blocked", false)
             ? Visibility::Visible : Visibility::Collapsed);
-        SetSwitch(ShortcutRemapToggle(), ShortcutRemapState(), settings.GetNamedBoolean(L"shortcut_remap", true));
+        // A Mac's modifier keys: Command and Control swapped by default.
+        {
+            auto map = settings.GetNamedObject(L"modifier_map", JsonObject{});
+            std::wstring super{ map.GetNamedString(L"super", L"control") };
+            std::wstring control{ map.GetNamedString(L"control", L"super") };
+            std::wstring alt{ map.GetNamedString(L"alt", L"alt") };
+            bool mac = super == L"control" && control == L"super" && alt == L"alt";
+            bool keep = super == L"super" && control == L"control" && alt == L"alt";
+            // A map no preset matches is custom; so is one the user chose
+            // 自定义 for, until they pick a preset again.
+            if (!mac && !keep) m_modifierCustom = true;
+            int presetIndex = m_modifierCustom ? 2 : mac ? 0 : 1;
+            if (ModifierPresetCombo().SelectedIndex() != presetIndex)
+            {
+                ModifierPresetCombo().SelectedIndex(presetIndex);
+            }
+            ModifierMapDescription().Text(LinkCursorApp::Text(m_modifierCustom ? L"ModifierCustomDescription"
+                : mac ? L"ModifierMacDescription" : L"ModifierKeepDescription"));
+            ModifierCustomPanel().Visibility(m_modifierCustom ? Visibility::Visible : Visibility::Collapsed);
+            for (auto const& [combo, target] : { std::pair{ ModifierSuperCombo(), super },
+                std::pair{ ModifierControlCombo(), control }, std::pair{ ModifierAltCombo(), alt } })
+            {
+                int index = ModifierTargetIndex(target);
+                if (combo.SelectedIndex() != index) combo.SelectedIndex(index);
+            }
+        }
         SetSwitch(KeepAwakeToggle(), KeepAwakeState(), settings.GetNamedBoolean(L"keep_awake", true));
         SetSwitch(HideCursorToggle(), HideCursorState(), settings.GetNamedBoolean(L"hide_cursor_on_leave", true));
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));

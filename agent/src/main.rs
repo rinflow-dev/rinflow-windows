@@ -145,8 +145,8 @@ fn main() {
         identity_path: Some(trust::identity_path().to_string_lossy().into_owned()),
         trusted_peers: trust.peers(),
         require_pairing: preferences.paired_only,
-        // A Mac's ⌘ shortcuts work here as Ctrl ones (the user's setting).
-        shortcut_remap: preferences.shortcut_remap,
+        // What a Mac's modifier keys play as here (the user's setting).
+        modifier_map: preferences.modifier_map,
         // Devices to find by address where multicast does not reach.
         manual_addresses: preferences.manual_addresses.clone(),
         ..CoreConfig::default()

@@ -212,7 +212,7 @@ Core handles everything that is the same on every platform. The agent only trans
 
 | | Where | What |
 | --- | --- | --- |
-| Shortcuts | core (`remap.rs`) | With **沿用 Mac 的快捷键** (`shortcut_remap`, on by default) a Mac's ⌘ arrives as Ctrl (⌘C copies) and its Control stays Ctrl. Off, keys keep their position: ⌘ is the Windows key, as in Deskflow. Changes apply at once; keys held through a change are released first. |
+| Shortcuts | core (`remap.rs`) | **Mac 控制本机时的修饰键** (`modifier_map`) offers three choices. **Mac 习惯** (the default) swaps ⌘ and ⌃: ⌘C copies, and ⌃ is the Windows key. **保持键位** keeps keys where they are: ⌘ is the Windows key, as in Deskflow. **自定义** chooses for each of ⌘, ⌃ and ⌥ whether it plays as Ctrl, Win, Alt, Shift or nothing. Changes apply at once; keys held through a change are released first. |
 | Control start/end | core | `remote_control_started` / `remote_control_ended` events. When control ends or the connection drops, core first releases every key and button the peer still holds. |
 | Pointer motion | agent | Played as an absolute move on the virtual desktop: current position + delta × this monitor's scale. Windows does not accelerate it a second time, multi-monitor layouts and negative coordinates work, and sub-pixel movement is carried over. |
 | Arrival | agent | A move flagged `LC_INPUT_FLAG_ABSOLUTE_POSITION` (sent by the Mac when the pointer crosses over) is converted from logical points to pixels through the monitor that contains it, so the cursor appears at the matching point of this PC's edge. |
@@ -354,7 +354,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
 | 用快捷键切换设备 | `switch_hotkeys`, `switch_modifiers` | On by default with Ctrl+Alt+Shift (`7`); Ctrl+Alt (`3`) is the other choice. The arrow keys with those modifiers move the pointer to the device on that side; see [Controlling another device](#controlling-another-device). |
-| 沿用 Mac 的快捷键 | `shortcut_remap` | On by default. See [Being controlled by another device](#being-controlled-by-another-device). |
+| Mac 控制本机时的修饰键 | `modifier_map` | Mac 习惯 (⌘ and ⌃ swapped) by default. See [Being controlled by another device](#being-controlled-by-another-device). |
 | 其他设备离开后隐藏光标 | `hide_cursor_on_leave` | On by default. See [Being controlled by another device](#being-controlled-by-another-device) (After the peer leaves). |
 | 在其他设备上工作时保持唤醒 | `keep_awake` | On by default. See [Presence](#presence). |
 | 一起锁定 | `lock_sync` | Off by default. See [Presence](#presence). |

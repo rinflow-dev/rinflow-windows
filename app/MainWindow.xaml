@@ -609,18 +609,50 @@
                         <TextBlock x:Name="SwitchHotkeysState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="SwitchHotkeysToggle" x:Uid="SwitchHotkeysToggle" Grid.Column="3" AutomationProperties.Name="用快捷键切换设备" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
+                    <!-- What a Mac's modifier keys play as while it controls
+                         this PC: a preset, or a choice per key (the custom
+                         card below; MainWindow.Settings.cpp fills it). -->
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock x:Uid="ShortcutRemapTitle" Style="{StaticResource RowTitleStyle}" Text="沿用 Mac 的快捷键" />
-                            <TextBlock x:Uid="ShortcutRemapDescription" Style="{StaticResource RowDescriptionStyle}" Text="Mac 控制这台电脑时，⌘C、⌘V 等按 Ctrl 快捷键执行。关闭后 ⌘ 对应 Windows 键。" />
+                            <TextBlock x:Uid="ModifierMapTitle" Style="{StaticResource RowTitleStyle}" Text="Mac 控制本机时的修饰键" />
+                            <TextBlock x:Name="ModifierMapDescription" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
-                        <TextBlock x:Name="ShortcutRemapState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="ShortcutRemapToggle" x:Uid="ShortcutRemapToggle" Grid.Column="2" AutomationProperties.Name="沿用 Mac 的快捷键" Style="{StaticResource BareSwitchStyle}" />
+                        <ComboBox
+                            x:Name="ModifierPresetCombo"
+                            x:Uid="ModifierPresetCombo"
+                            Grid.Column="1"
+                            MinWidth="200"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="Mac 控制本机时的修饰键">
+                            <ComboBoxItem x:Uid="ModifierPresetMac" Content="Mac 习惯（推荐）" Tag="mac" />
+                            <ComboBoxItem x:Uid="ModifierPresetKeep" Content="保持键位" Tag="keep" />
+                            <ComboBoxItem x:Uid="ModifierPresetCustom" Content="自定义" Tag="custom" />
+                        </ComboBox>
+                    </Grid>
+                    <Grid
+                        x:Name="ModifierCustomPanel"
+                        RowSpacing="8"
+                        Style="{StaticResource CardStyle}"
+                        Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="⌘ Command" />
+                        <ComboBox x:Name="ModifierSuperCombo" Grid.Column="1" MinWidth="200" AutomationProperties.Name="⌘ Command" />
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="⌃ Control" />
+                        <ComboBox x:Name="ModifierControlCombo" Grid.Row="1" Grid.Column="1" MinWidth="200" AutomationProperties.Name="⌃ Control" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="⌥ Option" />
+                        <ComboBox x:Name="ModifierAltCombo" Grid.Row="2" Grid.Column="1" MinWidth="200" AutomationProperties.Name="⌥ Option" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>

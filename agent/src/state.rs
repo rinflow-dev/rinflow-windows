@@ -488,6 +488,11 @@ impl SharedState {
                 snapshot.last_error = event["message"].as_str().map(str::to_owned);
                 true
             }
+            // Copied files past the core's limits: the page says to zip them.
+            "files_not_shared" => {
+                snapshot.last_error = Some(crate::clipboard::files_not_shared_text(&event));
+                true
+            }
             "files_failed" | "files_stream_ended" | "files_send_ended" => {
                 let direction = if kind != "files_send_ended" {
                     "receiving"
@@ -716,6 +721,29 @@ mod tests {
 
     fn apply(state: &SharedState, event: serde_json::Value) {
         state.apply_core_event(&event.to_string());
+    }
+
+    #[test]
+    fn files_past_the_limits_ask_to_zip_them() {
+        let state = state();
+        apply(
+            &state,
+            serde_json::json!({"event": "files_not_shared", "reason": "too_many_files", "limit": 10000}),
+        );
+        let error = state.0.borrow().last_error.clone().unwrap();
+        assert!(
+            error.contains("10000") && error.to_lowercase().contains("zip"),
+            "{error}"
+        );
+        apply(
+            &state,
+            serde_json::json!({"event": "files_not_shared", "reason": "too_deep", "limit": 32}),
+        );
+        let error = state.0.borrow().last_error.clone().unwrap();
+        assert!(
+            error.contains("32") && error.to_lowercase().contains("zip"),
+            "{error}"
+        );
     }
 
     #[test]
