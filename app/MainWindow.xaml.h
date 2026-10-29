@@ -168,7 +168,11 @@ namespace winrt::LinkCursor::implementation
         // dismissed error does not come back with the next snapshot.
         hstring m_agentError;
         bool m_errorFromAgent{ false };
+        // The elevated-input switch while its change is under way: what it
+        // was switched to, and which change (an older one's end is ignored).
         bool m_elevatedPending{ false };
+        bool m_elevatedTarget{ false };
+        uint32_t m_elevatedRequest{ 0 };
         Page m_page{ Page::Devices };
         LinkCursorApp::DeviceModel m_model;
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{

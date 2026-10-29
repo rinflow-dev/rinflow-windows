@@ -170,6 +170,10 @@ pub struct ElevatedInputView {
     pub available: bool,
     /// The machine-wide setting is on.
     pub enabled: bool,
+    /// The service can be installed when the user turns the setting on: this
+    /// copy was installed into Program Files, with the service beside it.
+    /// Setup installs the service only while the setting is on.
+    pub installable: bool,
 }
 
 #[derive(Clone)]

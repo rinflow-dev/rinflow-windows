@@ -38,6 +38,7 @@
   <data name="PortHint" xml:space="preserve"><value>其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>需要用安装包安装 LinkCursor：由随附的输入服务完成。</value></data>
+  <data name="ElevatedRecommended" xml:space="preserve"><value>建议打开：其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。打开时需要管理员确认，并会安装 LinkCursor 输入服务。</value></data>
   <data name="Version" xml:space="preserve"><value>版本 {0}</value></data>
   <data name="HotkeyNeedsModifier" xml:space="preserve"><value>需要包含 Ctrl、Alt 或 Win</value></data>
   <data name="MenuDisconnect" xml:space="preserve"><value>断开连接</value></data>

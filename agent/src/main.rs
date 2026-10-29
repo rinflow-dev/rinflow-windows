@@ -294,10 +294,16 @@ fn main() {
     // answered here.
     let elevated_state = state.clone();
     let elevated_edge = edge.handle();
+    let installable = linkcursor_input::win::service_installable();
+    elevated_state.set_elevated_input(state::ElevatedInputView {
+        installable,
+        ..Default::default()
+    });
     elevated::start(move |status| {
         elevated_state.set_elevated_input(state::ElevatedInputView {
             available: status.available,
             enabled: status.enabled,
+            installable,
         });
         if status.secure {
             elevated_edge.release_capture();

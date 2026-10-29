@@ -6,7 +6,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 14;
+    constexpr int ProtocolVersion = 15;
 
     // A started agent opens its pipe within a second or two; past this it
     // is stuck (or another agent exited 0 for one that never came up).

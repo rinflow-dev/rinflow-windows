@@ -38,6 +38,7 @@
   <data name="PortHint" xml:space="preserve"><value>Other devices connect to this PC on this port. A change applies after LinkCursor restarts.</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>While another device controls this PC, it can also use apps running as administrator, UAC prompts and the lock screen. Changing this needs administrator approval.</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>Needs LinkCursor installed with its setup program, which adds the input service.</value></data>
+  <data name="ElevatedRecommended" xml:space="preserve"><value>Recommended: while another device controls this PC, it can also use apps running as administrator, UAC prompts and the lock screen. Turning this on needs administrator approval and installs the LinkCursor Input service.</value></data>
   <data name="Version" xml:space="preserve"><value>Version {0}</value></data>
   <data name="HotkeyNeedsModifier" xml:space="preserve"><value>Include Ctrl, Alt or Win</value></data>
   <data name="MenuDisconnect" xml:space="preserve"><value>Disconnect</value></data>

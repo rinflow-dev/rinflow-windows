@@ -33,7 +33,9 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// `lock_sync`, `manual_addresses` and `peer_input`.
 /// 13: setting `hide_cursor_on_leave`.
 /// 14: `accept_transfer` and transfer `awaiting_acceptance`.
-pub const PROTOCOL_VERSION: u32 = 14;
+/// 15: `elevated_input` gains `installable` (setup installs the input service
+/// only while its setting is on; the settings switch adds it).
+pub const PROTOCOL_VERSION: u32 = 15;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")

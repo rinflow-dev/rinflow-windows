@@ -8,10 +8,13 @@
 //! run it as an administrator):
 //! - `linkcursor-service --install` registers this executable as the
 //!   service (automatic start, restarted after a failure) and starts it; an
-//!   existing registration is updated.
+//!   existing registration is updated. Only from Program Files: the service
+//!   trusts the programs beside it.
 //! - `linkcursor-service --uninstall` stops and removes it.
-//! - `linkcursor-service --elevated-input on|off` writes the machine-wide
-//!   setting the helper follows.
+//! - `linkcursor-service --elevated-input on|off` is the settings switch:
+//!   `on` installs the service and turns the machine-wide setting on, `off`
+//!   removes the service and turns it off. The service exists only while the
+//!   feature is on, so no LocalSystem process runs for a PC that left it off.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -52,9 +55,7 @@ define_windows_service!(ffi_service_main, service_main);
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let command = match arguments.as_slice() {
-        [flag, value] if flag == "--elevated-input" => {
-            Some(win::set_elevated_input_setting(value == "on").map_err(|error| error.to_string()))
-        }
+        [flag, value] if flag == "--elevated-input" => Some(set_elevated_input(value == "on")),
         [flag] if flag == "--install" => Some(install().map_err(|error| error.to_string())),
         [flag] if flag == "--uninstall" => Some(uninstall().map_err(|error| error.to_string())),
         _ => None,
@@ -78,6 +79,20 @@ fn main() {
     }
 }
 
+/// The settings switch: the service and the setting together. On, the
+/// service is installed first, so a failure leaves the setting as it was;
+/// off, it is removed first, so the helper stops before the setting changes.
+fn set_elevated_input(on: bool) -> Result<(), String> {
+    if on {
+        install().map_err(|error| error.to_string())?;
+        win::set_elevated_input_setting(true).map_err(|error| error.to_string())
+    } else {
+        let removed = uninstall().map_err(|error| error.to_string());
+        win::set_elevated_input_setting(false).map_err(|error| error.to_string())?;
+        removed
+    }
+}
+
 /// Registers this executable as the service, or updates the registration,
 /// and starts it.
 fn install() -> windows_service::Result<()> {
@@ -88,6 +103,17 @@ fn install() -> windows_service::Result<()> {
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
     let executable = std::env::current_exe().map_err(windows_service::Error::Winapi)?;
+    // LocalSystem would run whatever replaces this file: only a folder
+    // ordinary users cannot write to will do.
+    if !executable.parent().is_some_and(win::in_program_files) {
+        return Err(windows_service::Error::Winapi(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "{} is not in Program Files; the input service installs only from there",
+                executable.display()
+            ),
+        )));
+    }
     let manager = ServiceManager::local_computer(
         None::<&str>,
         ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,

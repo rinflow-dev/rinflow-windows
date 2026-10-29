@@ -61,6 +61,7 @@ pub const ELEVATED_INPUT_VALUE: &str = "ElevatedInput";
 
 pub const AGENT_EXE: &str = "linkcursor-agent.exe";
 pub const INPUT_EXE: &str = "linkcursor-input.exe";
+pub const SERVICE_EXE: &str = "linkcursor-service.exe";
 
 /// The pipe of the input helper in a session.
 pub fn pipe_name(session: u32) -> String {

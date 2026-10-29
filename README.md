@@ -402,7 +402,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":13}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":15}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -426,7 +426,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":13,"agent_version":"0.1.0"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":15,"agent_version":"0.1.0"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 

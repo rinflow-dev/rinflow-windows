@@ -544,11 +544,13 @@ fn send(input: INPUT) {
 /// the lock screen, and what makes them work.
 fn tell_refused() {
     use crate::i18n::tr;
-    let installed = elevated::available();
+    // Installed with setup: the settings switch adds the service (setup
+    // leaves it out while the setting is off).
+    let installed = elevated::available() || linkcursor_input::win::service_installable();
     log!(
         "a UAC prompt or the lock screen has input: Windows refuses this process's input there; {}",
         if installed {
-            "the input service is installed but its setting is off"
+            "the input service is off (the settings switch turns it on)"
         } else {
             "it needs the input service that the setup program installs"
         }

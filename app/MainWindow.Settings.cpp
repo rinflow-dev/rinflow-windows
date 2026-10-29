@@ -237,10 +237,12 @@ namespace winrt::LinkCursor::implementation
             if (auto self = weak.get()) self->EditHotkey();
         });
 
-        // A machine-wide setting: only an administrator may change it, so
-        // the service's command line runs elevated (UAC asks). The helper
-        // notices within seconds and the next snapshot shows the result;
-        // until then, and if the user says no, the switch goes back.
+        // A machine-wide setting with a LocalSystem service behind it: only
+        // an administrator may change it, so the service's command line runs
+        // elevated (UAC asks). On installs and starts the service, off
+        // removes it. The switch waits until a snapshot shows the new state
+        // (ApplySettings), or the limit below; if the user says no, it goes
+        // back at once.
         ElevatedInputToggle().Toggled([weak](auto&&, auto&&)
         {
             auto self = weak.get();
@@ -251,10 +253,12 @@ namespace winrt::LinkCursor::implementation
             // Snapshots leave the switch alone until this is over: it would
             // flip back while UAC asks.
             self->m_elevatedPending = true;
+            self->m_elevatedTarget = on;
+            auto request = ++self->m_elevatedRequest;
             // The thread touches no window: only the dispatcher, which may
             // be used from anywhere.
             auto dispatcher = self->DispatcherQueue();
-            std::thread([dispatcher, weak, on]
+            std::thread([dispatcher, weak, on, request]
             {
                 auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
                 std::wstring service = exe.get();
@@ -268,18 +272,21 @@ namespace winrt::LinkCursor::implementation
                 info.nShow = SW_HIDE;
                 if (ShellExecuteExW(&info) && info.hProcess)
                 {
+                    // Stopping the service may take it up to ten seconds.
                     DWORD exitCode = 1;
-                    WaitForSingleObject(info.hProcess, 10000);
+                    WaitForSingleObject(info.hProcess, 30000);
                     GetExitCodeProcess(info.hProcess, &exitCode);
                     CloseHandle(info.hProcess);
-                    // Changed: the input helper reads the setting every two
-                    // seconds; wait for it rather than show the old value.
-                    if (exitCode == 0) Sleep(2500);
+                    // Changed: the service starts its helper and the agent
+                    // finds it within seconds; a snapshot that shows it ends
+                    // the wait sooner.
+                    if (exitCode == 0) Sleep(15000);
                 }
-                dispatcher.TryEnqueue([weak]
+                dispatcher.TryEnqueue([weak, request]
                 {
                     auto self = weak.get();
                     if (!self || self->m_closed) return;
+                    if (!self->m_elevatedPending || self->m_elevatedRequest != request) return;
                     self->m_elevatedPending = false;
                     // What the agent reports, whatever happened.
                     if (self->m_lastState) self->ApplySettings(self->m_lastState);
@@ -400,16 +407,26 @@ namespace winrt::LinkCursor::implementation
             ? LinkCursorApp::Format(L"PortPending", configured, running)
             : LinkCursorApp::Text(L"PortHint"));
 
-        // The input service: present only when installed.
+        // The input service: running while the feature is on. Installed with
+        // setup, the switch can add it; a portable copy cannot.
         auto elevated = state.GetNamedObject(L"elevated_input", JsonObject{});
         bool elevatedAvailable = elevated.GetNamedBoolean(L"available", false);
+        bool elevatedInstallable = elevated.GetNamedBoolean(L"installable", false);
+        bool elevatedOn = elevatedAvailable && elevated.GetNamedBoolean(L"enabled", false);
+        // The change took effect: no need to wait for the limit.
+        if (m_elevatedPending && elevatedOn == m_elevatedTarget)
+        {
+            m_elevatedPending = false;
+        }
         if (!m_elevatedPending)
         {
-            SetSwitch(ElevatedInputToggle(), ElevatedInputState(), elevatedAvailable && elevated.GetNamedBoolean(L"enabled", false));
-            ElevatedInputToggle().IsEnabled(elevatedAvailable);
+            SetSwitch(ElevatedInputToggle(), ElevatedInputState(), elevatedOn);
+            ElevatedInputToggle().IsEnabled(elevatedAvailable || elevatedInstallable);
         }
-        ElevatedInputDescription().Text(elevatedAvailable
+        ElevatedInputDescription().Text(elevatedOn
             ? LinkCursorApp::Text(L"ElevatedOn")
+            : elevatedAvailable || elevatedInstallable
+            ? LinkCursorApp::Text(L"ElevatedRecommended")
             : LinkCursorApp::Text(L"ElevatedOff"));
 
         // The first four and last three bytes; the tooltip and 复制 give all 32.

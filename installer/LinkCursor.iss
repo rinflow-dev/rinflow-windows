@@ -9,13 +9,17 @@
 ; check each other):
 ; - LinkCursor.exe with the Windows App Runtime it needs (self-contained),
 ;   linkcursor-agent.exe, linkcursor-input.exe and linkcursor-service.exe.
-; - The LinkCursorInput service (linkcursor-service.exe --install).
 ; - A firewall rule for the agent, on private and public networks: Windows
 ;   often marks a new Wi-Fi network public, and LinkCursor would then find
-;   no device without saying why.
+;   no device without saying why. (This, and Program Files, are why setup
+;   needs an administrator even without the service.)
 ; - HKLM\SOFTWARE\LinkCursor ElevatedInput: whether devices controlling this
-;   PC may operate elevated windows, UAC prompts and the lock screen (a task,
-;   on by default; the settings page changes it later).
+;   PC may operate elevated windows, UAC prompts and the lock screen. A task
+;   on the first install, checked by default; the settings switch changes it
+;   later, and an upgrade keeps what is set.
+; - The LinkCursorInput service (linkcursor-service.exe --install), a
+;   LocalSystem process, only while ElevatedInput is on: the settings switch
+;   installs it when turned on and removes it when turned off.
 
 #ifndef AppVersion
   #define AppVersion "0.1.0"
@@ -87,7 +91,9 @@ chinesesimp.StatusService=正在安装输入服务…
 chinesesimp.RunApp=启动 LinkCursor
 
 [Tasks]
-Name: "elevatedinput"; Description: "{cm:TaskElevatedInput}"; GroupDescription: "{cm:GroupControlled}"
+; Asked on the first install only: later the settings switch decides, and
+; an upgrade keeps it (ElevatedChosen).
+Name: "elevatedinput"; Description: "{cm:TaskElevatedInput}"; GroupDescription: "{cm:GroupControlled}"; Check: IsFirstInstall
 Name: "autostart"; Description: "{cm:TaskAutostart}"; GroupDescription: "{cm:GroupStartup}"
 Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:GroupShortcuts}"; Flags: unchecked
 
@@ -99,8 +105,8 @@ Name: "{autoprograms}\LinkCursor"; Filename: "{app}\LinkCursor.exe"
 Name: "{autodesktop}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "1"; Tasks: elevatedinput; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "0"; Tasks: not elevatedinput; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "1"; Check: ElevatedChosen; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "0"; Check: not ElevatedChosen; Flags: uninsdeletekey
 
 [Run]
 ; Starting at sign-in is per user: the agent writes it (the value its
@@ -109,7 +115,8 @@ Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "Eleva
 Filename: "{app}\linkcursor-agent.exe"; Parameters: "--launch-at-login on"; Tasks: autostart; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""LinkCursor"""; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""LinkCursor"" dir=in action=allow program=""{app}\linkcursor-agent.exe"" enable=yes profile=private,public"; StatusMsg: "{cm:StatusFirewall}"; Flags: runhidden waituntilterminated
-Filename: "{app}\linkcursor-service.exe"; Parameters: "--install"; StatusMsg: "{cm:StatusService}"; Flags: runhidden waituntilterminated
+; The service only with the feature on (PrepareToInstall removed any old one).
+Filename: "{app}\linkcursor-service.exe"; Parameters: "--install"; StatusMsg: "{cm:StatusService}"; Check: ElevatedChosen; Flags: runhidden waituntilterminated
 Filename: "{app}\LinkCursor.exe"; Description: "{cm:RunApp}"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
@@ -125,6 +132,41 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 Type: filesandordirs; Name: "{app}\logs"
 
 [Code]
+var
+  // ElevatedInput as setup found it: -1 when not there (a first install,
+  // or after an uninstall), else 0 or 1.
+  PreviousElevated: Integer;
+
+function InitializeSetup(): Boolean;
+var
+  Value: Cardinal;
+begin
+  if RegQueryDWordValue(HKLM64, 'SOFTWARE\LinkCursor', 'ElevatedInput', Value) then
+  begin
+    if Value <> 0 then
+      PreviousElevated := 1
+    else
+      PreviousElevated := 0;
+  end
+  else
+    PreviousElevated := -1;
+  Result := True;
+end;
+
+function IsFirstInstall(): Boolean;
+begin
+  Result := PreviousElevated < 0;
+end;
+
+// The task on a first install; on an upgrade, what the settings switch set.
+function ElevatedChosen(): Boolean;
+begin
+  if PreviousElevated < 0 then
+    Result := WizardIsTaskSelected('elevatedinput')
+  else
+    Result := PreviousElevated = 1;
+end;
+
 // Before files are replaced (an upgrade): the service and its helper hold
 // their executables, and the agent and the app may be running.
 function PrepareToInstall(var NeedsRestart: Boolean): String;

@@ -15,8 +15,8 @@ use windows_sys::Win32::Security::{
 };
 use windows_sys::Win32::System::Registry::{
     HKEY, HKEY_LOCAL_MACHINE, KEY_SET_VALUE, KEY_WOW64_64KEY, REG_DWORD, REG_OPTION_NON_VOLATILE,
-    RRF_RT_REG_DWORD, RRF_SUBKEY_WOW6464KEY, RegCloseKey, RegCreateKeyExW, RegGetValueW,
-    RegSetValueExW,
+    RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RRF_SUBKEY_WOW6464KEY, RegCloseKey, RegCreateKeyExW,
+    RegGetValueW, RegSetValueExW,
 };
 use windows_sys::Win32::System::RemoteDesktop::{ProcessIdToSessionId, WTSQueryUserToken};
 use windows_sys::Win32::System::Threading::{
@@ -89,6 +89,53 @@ pub fn own_dir() -> Option<PathBuf> {
     // SAFETY: the pseudo-handle of this process needs no cleanup.
     let image = image_of(unsafe { GetCurrentProcess() })?;
     image.parent().map(Path::to_path_buf)
+}
+
+/// This PC's Program Files folder, as administrators set it in HKLM; not the
+/// `ProgramFiles` variable, which comes from whoever started this process.
+fn program_files_dir() -> Option<PathBuf> {
+    let key = wide(r"SOFTWARE\Microsoft\Windows\CurrentVersion");
+    let value = wide("ProgramFilesDir");
+    let mut buffer = vec![0u16; 1024];
+    let mut size = (buffer.len() * size_of::<u16>()) as u32;
+    // SAFETY: `buffer` holds `size` bytes.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            key.as_ptr(),
+            value.as_ptr(),
+            RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+            null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    if status != 0 {
+        return None;
+    }
+    let length = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+    (length > 0).then(|| PathBuf::from(String::from_utf16_lossy(&buffer[..length])))
+}
+
+/// Whether `dir` is in Program Files, where only administrators can change
+/// files. The LocalSystem service trusts the programs beside it, so it runs
+/// from nowhere else (a folder picked elsewhere usually lets every user
+/// write to it).
+pub fn in_program_files(dir: &Path) -> bool {
+    let Some(root) = program_files_dir() else {
+        return false;
+    };
+    let root = root.to_string_lossy().trim_end_matches('\\').to_lowercase();
+    let dir = dir.to_string_lossy().to_lowercase();
+    dir.strip_prefix(&root)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('\\'))
+}
+
+/// Whether the input service can be installed from this program's folder:
+/// the setup program put this copy into Program Files, with the service
+/// beside it. A portable copy (or a development build) cannot.
+pub fn service_installable() -> bool {
+    own_dir().is_some_and(|dir| in_program_files(&dir) && dir.join(crate::SERVICE_EXE).is_file())
 }
 
 /// Whether process `pid` runs `exe` from this executable's folder, in this
@@ -318,4 +365,23 @@ pub fn is_local_system() -> bool {
 pub fn current_pid() -> u32 {
     // SAFETY: no arguments.
     unsafe { GetCurrentProcessId() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_folders_inside_program_files_count() {
+        let root = program_files_dir().expect("ProgramFilesDir is set on every Windows");
+        assert!(in_program_files(&root.join("LinkCursor")));
+        // Paths differ in case only: the same folder.
+        let upper = PathBuf::from(root.to_string_lossy().to_uppercase());
+        assert!(in_program_files(&upper.join("LinkCursor")));
+        // A folder whose name only starts the same is elsewhere.
+        let mut lookalike = root.clone().into_os_string();
+        lookalike.push(" Evil");
+        assert!(!in_program_files(&PathBuf::from(lookalike).join("LinkCursor")));
+        assert!(!in_program_files(Path::new(r"C:\LinkCursor")));
+    }
 }
