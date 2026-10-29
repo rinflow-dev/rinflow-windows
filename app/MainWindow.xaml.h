@@ -76,6 +76,8 @@ namespace winrt::LinkCursor::implementation
         void ApplyDevices(Windows::Data::Json::JsonObject const& state);
         void ApplyTheme(hstring const& theme);
         void SetAgentLinked(bool linked);
+        // Says why the background service is not running, with a retry.
+        void ShowAgentProblem(::LinkCursorApp::AgentProblem problem, uint32_t code);
         // `fromAgent`: the agent's last_error, which closing the bar clears.
         void ShowError(hstring const& message, bool fromAgent);
         void SetupDevicesPage();

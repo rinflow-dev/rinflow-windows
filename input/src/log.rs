@@ -1,7 +1,9 @@
 //! A small log for the programs that run as LocalSystem, where nobody sees
-//! their console: `%ProgramData%\LinkCursor\logs\<name>.log`, which only
-//! administrators and LocalSystem can change. Started from a console (a
-//! development run), it writes to stderr instead.
+//! their console: `logs\<name>.log` in their own folder (Program Files when
+//! installed), which only administrators and LocalSystem can change. Not
+//! `%ProgramData%`: any user may create a folder there first, owning it, and
+//! turn it into a junction that sends LocalSystem's writes somewhere else.
+//! Started from a console (a development run), it writes to stderr instead.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -14,8 +16,7 @@ static FILE: Mutex<Option<File>> = Mutex::new(None);
 const MAX_SIZE: u64 = 1024 * 1024;
 
 pub fn logs_dir() -> Option<PathBuf> {
-    let data = std::env::var_os("ProgramData")?;
-    Some(PathBuf::from(data).join("LinkCursor").join("logs"))
+    crate::win::own_dir().map(|dir| dir.join("logs"))
 }
 
 /// Logs to the file `name` when running as LocalSystem; to stderr otherwise.

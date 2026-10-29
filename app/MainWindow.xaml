@@ -233,6 +233,18 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- The background service could not be started
+                         (AgentClient's problems); its text comes from code. -->
+                    <InfoBar
+                        x:Name="AgentBar"
+                        Margin="0,0,0,12"
+                        IsClosable="False"
+                        IsOpen="False"
+                        Severity="Error">
+                        <InfoBar.ActionButton>
+                            <Button x:Name="AgentRetryButton" x:Uid="AgentRetryButton" Content="重试" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
                     <InfoBar
                         x:Name="ErrorBar"
                         Margin="0,0,0,12"

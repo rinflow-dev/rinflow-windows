@@ -59,6 +59,11 @@
   <data name="StatusCoreStopped" xml:space="preserve"><value>The LinkCursor service stopped</value></data>
   <data name="StatusStarting" xml:space="preserve"><value>Starting…</value></data>
   <data name="StatusAgentConnecting" xml:space="preserve"><value>Connecting to the background service…</value></data>
+  <data name="AgentProblemTitle" xml:space="preserve"><value>The background service isn't running</value></data>
+  <data name="AgentCannotStart" xml:space="preserve"><value>linkcursor-agent.exe can't be started (error {0}). Antivirus software may have blocked or removed it; reinstalling LinkCursor usually fixes this.</value></data>
+  <data name="AgentExited" xml:space="preserve"><value>The background service quit right after starting (code {0}). The log says why: Settings → Open logs folder.</value></data>
+  <data name="AgentNoAnswer" xml:space="preserve"><value>The background service started but isn't responding.</value></data>
+  <data name="AgentRetryButton.Content" xml:space="preserve"><value>Retry</value></data>
   <data name="TransferOneItem" xml:space="preserve"><value>&quot;{0}&quot;</value></data>
   <data name="TransferManyItems" xml:space="preserve"><value>&quot;{0}&quot; and {1} items in all</value></data>
   <data name="TransferReceiving" xml:space="preserve"><value>Receiving {1} from {0}</value></data>

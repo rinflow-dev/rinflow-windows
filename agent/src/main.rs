@@ -37,6 +37,17 @@ const INSTANCE_MUTEX: &str = "Local\\LinkCursor.Agent";
 /// Pairing requests open the main window at most this often.
 const PAIRING_WINDOW_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// How a start that failed ends, so the settings app that launched the
+/// agent can say so (app/AgentClient.cpp; the log has the details). 0 is a
+/// normal end, or another agent already running in this session.
+mod exit_code {
+    pub const IDENTITY: i32 = 2;
+    pub const OVERLAY: i32 = 3;
+    pub const INJECTION: i32 = 4;
+    pub const CORE: i32 = 5;
+    pub const EDGE: i32 = 6;
+}
+
 fn main() {
     // `--launch-at-login on|off`: the installer turns starting at sign-in on
     // (or off) for the user who runs it, the same value as the 开机时启动
@@ -60,7 +71,7 @@ fn main() {
         Ok(identity) => identity,
         Err(error) => {
             log!("cannot load device identity: {error}");
-            return;
+            std::process::exit(exit_code::IDENTITY);
         }
     };
 
@@ -86,14 +97,14 @@ fn main() {
         Ok(overlay) => overlay,
         Err(error) => {
             log!("cannot start the edge overlay: {error}");
-            return;
+            std::process::exit(exit_code::OVERLAY);
         }
     };
     let injector = match inject::Injector::spawn() {
         Ok(injector) => injector,
         Err(error) => {
             log!("cannot start input injection: {error}");
-            return;
+            std::process::exit(exit_code::INJECTION);
         }
     };
     let monitors = displays::monitors();
@@ -219,7 +230,7 @@ fn main() {
         Ok(core) => Arc::new(core),
         Err(error) => {
             log!("cannot start core: {error}");
-            return;
+            std::process::exit(exit_code::CORE);
         }
     };
     // Offered files are decided from the core's first events on.
@@ -272,7 +283,7 @@ fn main() {
         Ok(edge) => edge,
         Err(error) => {
             log!("cannot watch the screen edges: {error}");
-            return;
+            std::process::exit(exit_code::EDGE);
         }
     };
     let _ = edge_slot.set(edge.handle());

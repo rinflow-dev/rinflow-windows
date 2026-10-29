@@ -63,12 +63,21 @@ pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Opti
     }
 }
 
+/// The device ID, made on first use. Only a missing (or empty) file gets a
+/// new one: a file that cannot be read now (locked by a scanner, a disk
+/// error) is an error. Pairings and placements on every peer are keyed by
+/// this ID, so a new one would turn this PC into a stranger to all of them.
 fn load_or_create_device_id(directory: &std::path::Path) -> io::Result<String> {
     let path = directory.join("device-id");
-    if let Ok(stored) = fs::read_to_string(&path) {
-        let stored = stored.trim();
-        if !stored.is_empty() {
-            return Ok(stored.to_owned());
+    match fs::read_to_string(&path) {
+        Ok(stored) if !stored.trim().is_empty() => return Ok(stored.trim().to_owned()),
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(io::Error::new(
+                error.kind(),
+                format!("cannot read {} ({error}); it is kept, not replaced", path.display()),
+            ));
         }
     }
     let id = win::new_guid_string()?;

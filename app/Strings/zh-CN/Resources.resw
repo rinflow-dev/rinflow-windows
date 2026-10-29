@@ -59,6 +59,11 @@
   <data name="StatusCoreStopped" xml:space="preserve"><value>核心服务已停止</value></data>
   <data name="StatusStarting" xml:space="preserve"><value>正在启动…</value></data>
   <data name="StatusAgentConnecting" xml:space="preserve"><value>正在连接后台服务…</value></data>
+  <data name="AgentProblemTitle" xml:space="preserve"><value>后台服务没有运行</value></data>
+  <data name="AgentCannotStart" xml:space="preserve"><value>无法启动 linkcursor-agent.exe（错误 {0}）。它可能被杀毒软件拦截或被删除了，重新安装 LinkCursor 通常可以解决。</value></data>
+  <data name="AgentExited" xml:space="preserve"><value>后台服务启动后立即退出了（代码 {0}）。原因记录在日志里：设置 → 打开日志文件夹。</value></data>
+  <data name="AgentNoAnswer" xml:space="preserve"><value>后台服务已经启动，但一直没有响应。</value></data>
+  <data name="AgentRetryButton.Content" xml:space="preserve"><value>重试</value></data>
   <data name="TransferOneItem" xml:space="preserve"><value>“{0}”</value></data>
   <data name="TransferManyItems" xml:space="preserve"><value>“{0}”等 {1} 项</value></data>
   <data name="TransferReceiving" xml:space="preserve"><value>正在从 {0} 接收{1}</value></data>

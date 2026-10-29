@@ -267,7 +267,7 @@ linkcursor-agent (user)  ── named pipe ──►  linkcursor-input (LocalSys
 | Helper ([input.rs](input/src/bin/input.rs)) | Plays what the agent sends: `SendInput` values (keys, buttons, wheel, absolute moves) and motion in pixels (it reads the pointer on the input desktop, which the agent cannot see there). Every 200 ms it checks which desktop has input; its injecting thread has no windows or hooks, so it follows with `SetThreadDesktop`. No network, no files. |
 | Agent ([elevated.rs](agent/src/elevated.rs)) | Connects when the helper exists and hands it every event while the setting is on; otherwise plays input itself as before (a build from the source tree, the setting off). Windows then refuses input meant for a UAC prompt or the lock screen (`SendInput` fails with access denied); the agent logs why once and shows a notification saying what makes it work (the setup program, or turning the setting on), instead of failing silently. When a UAC prompt or the lock screen takes input while this PC drives a peer, the peer is given back so the prompt can be answered here. |
 | Protocol ([lib.rs](input/src/lib.rs)) | Length-prefixed binary frames: `Hello`, `Input`, `MoveBy`, `RemoteControl` to the helper; `State { enabled, secure }` back. |
-| Logs | `%ProgramData%\LinkCursor\logs\service.log` and `input.log`. |
+| Logs | `service.log` and `input.log` in `logs` beside the programs: `%ProgramFiles%\LinkCursor\logs` when installed. Not `%ProgramData%`, where any user could create the folder first and redirect LocalSystem's writes. |
 
 Safeguards, since the helper acts with LocalSystem's rights:
 
@@ -359,7 +359,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 | 一起锁定 | `lock_sync` | Off by default. See [Presence](#presence). |
 | 通过地址添加 (添加设备) | `manual_addresses` | Up to 32 host names or IPv4 addresses (optionally `:port`, the discovery port). See [Arranging devices](#arranging-devices). |
 | 鼠标和滚动 (device menu) | `peer_input` | `{"<device ID>": {"pointer_speed", "scroll_speed", "invert_scroll"}}`. See [Controlling another device](#controlling-another-device). |
-| 诊断日志 | (none) | **打开日志文件夹** opens `%LOCALAPPDATA%\LinkCursor\logs`: `agent.log` ([log.rs](agent/src/log.rs)), moved aside to `agent.1.log` past 2 MB. It records connections, pairing, transfers and errors with the local time (never clipboard contents, keys or the pairing code), and panics. The input service and helper log to `%ProgramData%\LinkCursor\logs`. |
+| 诊断日志 | (none) | **打开日志文件夹** opens `%LOCALAPPDATA%\LinkCursor\logs`: `agent.log` ([log.rs](agent/src/log.rs)), moved aside to `agent.1.log` past 2 MB. It records connections, pairing, transfers and errors with the local time (never clipboard contents, keys or the pairing code), and panics. The input service and helper log to `%ProgramFiles%\LinkCursor\logs`. |
 | 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
 | 端口 | `port` | The core's UDP port for connections (`null`: 42421). Applies after LinkCursor restarts; must not be the discovery port 42420. |

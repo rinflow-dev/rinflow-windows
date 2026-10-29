@@ -8,6 +8,10 @@ namespace
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
     constexpr int ProtocolVersion = 14;
 
+    // A started agent opens its pipe within a second or two; past this it
+    // is stuck (or another agent exited 0 for one that never came up).
+    constexpr auto AgentAnswerTimeout = std::chrono::seconds(15);
+
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
     {
@@ -45,12 +49,18 @@ namespace LinkCursorApp
         Stop();
     }
 
-    void AgentClient::Start(MessageHandler onMessage, LinkHandler onLink)
+    void AgentClient::Start(MessageHandler onMessage, LinkHandler onLink, ProblemHandler onProblem)
     {
         m_onMessage = std::move(onMessage);
         m_onLink = std::move(onLink);
+        m_onProblem = std::move(onProblem);
         m_pipeName = AgentPipeName();
         m_thread = std::thread([this] { Run(); });
+    }
+
+    void AgentClient::Retry()
+    {
+        m_retry = true;
     }
 
     void AgentClient::Stop()
@@ -227,6 +237,15 @@ namespace LinkCursorApp
 
     bool AgentClient::Open()
     {
+        if (m_retry.exchange(false))
+        {
+            // Start it afresh, even after the user had quit it: they asked.
+            m_agentLaunched = false;
+            m_agentQuit = false;
+            m_agentProcess.reset();
+            m_problem = AgentProblem::None;
+        }
+
         // Overlapped I/O lets the reader thread block in ReadFile while the
         // UI thread writes; synchronous handles would serialize the two. The
         // server may identify this user but not act as it.
@@ -241,10 +260,14 @@ namespace LinkCursorApp
                 WaitOrStop(2000);
                 return false;
             }
-            std::lock_guard lock(m_pipeLock);
-            m_pipe = std::move(opened);
+            {
+                std::lock_guard lock(m_pipeLock);
+                m_pipe = std::move(opened);
+            }
             // Answered: should it go away later (not quit), start it again.
             m_agentLaunched = false;
+            m_agentProcess.reset();
+            Report(AgentProblem::None, 0);
             return true;
         }
 
@@ -260,6 +283,10 @@ namespace LinkCursorApp
             {
                 m_agentLaunched = true;
                 LaunchAgent();
+            }
+            else if (m_agentProcess)
+            {
+                CheckLaunch();
             }
             break;
         }
@@ -286,11 +313,52 @@ namespace LinkCursorApp
     {
         auto path = AgentExecutablePath();
         STARTUPINFOW startup{ sizeof(startup) };
-        wil::unique_process_information process;
+        PROCESS_INFORMATION process{};
+        m_launchedAt = std::chrono::steady_clock::now();
         if (!CreateProcessW(path.c_str(), nullptr, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
             nullptr, nullptr, &startup, &process))
         {
+            auto error = GetLastError();
             OutputDebugStringW((L"LinkCursor: cannot start agent at " + path + L"\n").c_str());
+            Report(AgentProblem::CannotStart, error);
+            return;
+        }
+        CloseHandle(process.hThread);
+        m_agentProcess.reset(process.hProcess);
+    }
+
+    void AgentClient::CheckLaunch()
+    {
+        if (WaitForSingleObject(m_agentProcess.get(), 0) == WAIT_OBJECT_0)
+        {
+            DWORD exitCode = 0;
+            GetExitCodeProcess(m_agentProcess.get(), &exitCode);
+            // 0: another agent of this session was running already. Its
+            // pipe is about to appear, or the timeout below says it did not.
+            if (exitCode != 0)
+            {
+                m_agentProcess.reset();
+                Report(AgentProblem::Exited, exitCode);
+                return;
+            }
+        }
+        if (std::chrono::steady_clock::now() - m_launchedAt > AgentAnswerTimeout)
+        {
+            m_agentProcess.reset();
+            Report(AgentProblem::NoAnswer, 0);
+        }
+    }
+
+    void AgentClient::Report(AgentProblem problem, uint32_t code)
+    {
+        if (problem == m_problem && problem == AgentProblem::None)
+        {
+            return;
+        }
+        m_problem = problem;
+        if (m_onProblem)
+        {
+            m_onProblem(problem, code);
         }
     }
 

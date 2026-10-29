@@ -126,7 +126,21 @@ namespace winrt::LinkCursor::implementation
                 {
                     if (auto self = weak.get(); self && !self->m_closed) self->SetAgentLinked(linked);
                 });
+            },
+            [dispatcher, weak](::LinkCursorApp::AgentProblem problem, uint32_t code)
+            {
+                dispatcher.TryEnqueue([weak, problem, code]
+                {
+                    if (auto self = weak.get(); self && !self->m_closed) self->ShowAgentProblem(problem, code);
+                });
             });
+        AgentRetryButton().Click([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (!self) return;
+            self->AgentBar().IsOpen(false);
+            self->m_agent->Retry();
+        });
 
         SetupDevicesPage();
         SetupArrangement();
@@ -462,6 +476,29 @@ namespace winrt::LinkCursor::implementation
             m_previewPending = false;
             m_previewQueued = false;
         }
+    }
+
+    void MainWindow::ShowAgentProblem(::LinkCursorApp::AgentProblem problem, uint32_t code)
+    {
+        using ::LinkCursorApp::AgentProblem;
+        if (problem == AgentProblem::None)
+        {
+            AgentBar().IsOpen(false);
+            return;
+        }
+        // Exit codes and NTSTATUS values read best in hex (0xC0000135 is a
+        // missing DLL), Win32 errors in decimal (2: file not found).
+        auto hex = std::format(L"0x{:X}", code);
+        hstring message = problem == AgentProblem::CannotStart
+            ? LinkCursorApp::Format(L"AgentCannotStart", std::to_wstring(code))
+            : problem == AgentProblem::Exited
+            ? LinkCursorApp::Format(L"AgentExited", hex)
+            : LinkCursorApp::Text(L"AgentNoAnswer");
+        AgentBar().Title(LinkCursorApp::Text(L"AgentProblemTitle"));
+        AgentBar().Message(message);
+        AgentBar().IsOpen(true);
+        // Not "no devices yet": the devices are unknown while it is down.
+        DevicesEmptyText().Visibility(Visibility::Collapsed);
     }
 
     void MainWindow::ShowError(hstring const& message, bool fromAgent)

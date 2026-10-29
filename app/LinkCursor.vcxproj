@@ -104,13 +104,23 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!--
+    Release links the Visual C++ runtime statically (the "hybrid CRT", as the
+    Windows App SDK's own DLLs do): vcruntime and the C++ library go into
+    LinkCursor.exe, the Universal CRT stays the one Windows ships. Setup then
+    needs no VC++ Redistributable. Debug keeps the debug DLLs, which only a
+    development PC has anyway.
+  -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <IgnoreSpecificDefaultLibraries>libucrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <AdditionalDependencies>ucrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -214,9 +224,11 @@
   </PropertyGroup>
   <Target Name="BuildLinkCursorAgent" AfterTargets="Build" Condition="'$(SkipAgentBuild)'!='true'">
     <!-- Cargo and rustc always write UTF-8, whatever the console code page. -->
-    <Exec Command="cargo build --manifest-path &quot;$(AgentDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
+    <!-- Run from each crate's folder: Cargo reads ..\.cargo\config.toml (the
+         static VC++ runtime) from where it runs. -->
+    <Exec Command="cargo build --manifest-path &quot;$(AgentDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" WorkingDirectory="$(AgentDir)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
     <Copy SourceFiles="$(AgentDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-agent.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
-    <Exec Command="cargo build --manifest-path &quot;$(InputDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
+    <Exec Command="cargo build --manifest-path &quot;$(InputDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" WorkingDirectory="$(InputDir)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
     <Copy SourceFiles="$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-input.exe;$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-service.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
 

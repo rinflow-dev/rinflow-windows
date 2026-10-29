@@ -33,7 +33,11 @@ AppPublisher=LinkCursor
 AppPublisherURL=https://github.com/akarineren/linkcursor-windows
 DefaultDirName={autopf}\LinkCursor
 DisableProgramGroupPage=yes
-DisableDirPage=auto
+; Always Program Files: the service runs as LocalSystem and trusts the
+; programs beside it (and logs there), so their folder must be one only
+; administrators can change. A folder picked elsewhere inherits write access
+; for every user from the drive root.
+DisableDirPage=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -118,7 +122,7 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 [UninstallDelete]
 ; Logs of the service and the input helper. Settings, pairings and this
 ; PC's identity in each user's %LOCALAPPDATA%\LinkCursor stay.
-Type: filesandordirs; Name: "{commonappdata}\LinkCursor"
+Type: filesandordirs; Name: "{app}\logs"
 
 [Code]
 // Before files are replaced (an upgrade): the service and its helper hold

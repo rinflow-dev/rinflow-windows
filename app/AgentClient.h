@@ -6,19 +6,36 @@ namespace LinkCursorApp
     // object per line in each direction. Starts the agent if it is not
     // running and reconnects if it goes away. Callbacks run on a background
     // thread; callers marshal to the UI thread themselves.
+    // Why the agent this client started is not answering.
+    enum class AgentProblem
+    {
+        None,
+        // CreateProcess failed (code: the Win32 error): missing, blocked.
+        CannotStart,
+        // It ended before answering (code: its exit code, agent/src/main.rs
+        // exit_code, or an NTSTATUS such as a missing DLL).
+        Exited,
+        // It runs but has not opened its pipe in AgentAnswerTimeout.
+        NoAnswer,
+    };
+
     class AgentClient
     {
     public:
         using MessageHandler = std::function<void(winrt::Windows::Data::Json::JsonObject const&)>;
         using LinkHandler = std::function<void(bool linked)>;
+        // Called with None again once the agent answers.
+        using ProblemHandler = std::function<void(AgentProblem problem, uint32_t code)>;
 
         AgentClient() = default;
         ~AgentClient();
         AgentClient(AgentClient const&) = delete;
         AgentClient& operator=(AgentClient const&) = delete;
 
-        void Start(MessageHandler onMessage, LinkHandler onLink);
+        void Start(MessageHandler onMessage, LinkHandler onLink, ProblemHandler onProblem = {});
         void Stop();
+        // After a problem: starts the agent again (the user asked).
+        void Retry();
 
         void Connect(std::wstring_view peerId);
         void Disconnect(std::wstring_view peerId);
@@ -59,17 +76,27 @@ namespace LinkCursorApp
         bool Open();
         void ReadLoop();
         void LaunchAgent();
+        // Whether the agent started by LaunchAgent failed, reported once.
+        void CheckLaunch();
+        void Report(AgentProblem problem, uint32_t code);
         static bool IsAgentPipe(HANDLE pipe);
         bool Send(winrt::Windows::Data::Json::JsonObject const& message);
         bool WaitOrStop(DWORD milliseconds) const;
 
         MessageHandler m_onMessage;
         LinkHandler m_onLink;
+        ProblemHandler m_onProblem;
         std::wstring m_pipeName;
         // Started once per absence of the agent: again only after it had
         // answered and went away (a crash), never after the user quit it.
         bool m_agentLaunched{ false };
         std::atomic<bool> m_agentQuit{ false };
+        // The agent LaunchAgent started, until it answers or its problem is
+        // reported (reader thread only, as are the two below).
+        wil::unique_handle m_agentProcess;
+        std::chrono::steady_clock::time_point m_launchedAt{};
+        AgentProblem m_problem{ AgentProblem::None };
+        std::atomic<bool> m_retry{ false };
         wil::unique_event m_stop{ wil::EventOptions::ManualReset };
         std::mutex m_pipeLock;
         wil::unique_hfile m_pipe;
