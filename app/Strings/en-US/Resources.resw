@@ -70,9 +70,6 @@
   <data name="TransferReceiving" xml:space="preserve"><value>Receiving {1} from {0}</value></data>
   <data name="TransferSending" xml:space="preserve"><value>Sending {1} to {0}</value></data>
   <data name="TransferCancel" xml:space="preserve"><value>Cancel</value></data>
-  <data name="TransferOffered" xml:space="preserve"><value>{1} available from {0}</value></data>
-  <data name="TransferReceive" xml:space="preserve"><value>Receive</value></data>
-  <data name="TransferLegacyHint" xml:space="preserve"><value>This peer uses the older file protocol. Receive into Downloads\LinkCursor, then paste.</value></data>
   <data name="AddressInvalid" xml:space="preserve"><value>Enter an IP address or a device name.</value></data>
   <data name="AddressDuplicate" xml:space="preserve"><value>This address is already in the list.</value></data>
   <data name="AddressTooMany" xml:space="preserve"><value>You can add up to 32 addresses.</value></data>

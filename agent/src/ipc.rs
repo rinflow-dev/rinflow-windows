@@ -35,7 +35,10 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// 14: `accept_transfer` and transfer `awaiting_acceptance`.
 /// 15: `elevated_input` gains `installable` (setup installs the input service
 /// only while its setting is on; the settings switch adds it).
-pub const PROTOCOL_VERSION: u32 = 15;
+/// 16: `accept_transfer` and transfer `awaiting_acceptance` are gone: files
+/// come only through file streams; offers in the old file protocol are
+/// declined.
+pub const PROTOCOL_VERSION: u32 = 16;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
@@ -108,9 +111,6 @@ enum Request {
     ClearError,
     /// Stops files being received or sent (`transfers`).
     CancelTransfer {
-        transfer: u32,
-    },
-    AcceptTransfer {
         transfer: u32,
     },
     /// Quits the agent as the tray's 退出 does.
@@ -319,7 +319,6 @@ fn handle_request(
         Request::AcceptPairing { peer_id } => services.accept_pairing(&peer_id),
         Request::RejectPairing { peer_id } => services.reject_pairing(&peer_id),
         Request::CancelTransfer { transfer } => core()?.cancel_files(transfer),
-        Request::AcceptTransfer { transfer } => services.accept_transfer(transfer),
         Request::ClearError => {
             services.state.clear_error();
             Ok(())

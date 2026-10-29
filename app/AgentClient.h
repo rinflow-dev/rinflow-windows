@@ -65,7 +65,6 @@ namespace LinkCursorApp
         void ClearError();
         // Stops files being received or sent (the snapshot's transfers).
         void CancelTransfer(uint32_t transfer);
-        void AcceptTransfer(uint32_t transfer);
 
         // The user compared the pairing code and accepts, or declines.
         void AcceptPairing(std::wstring_view peerId);

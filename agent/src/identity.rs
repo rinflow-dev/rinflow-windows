@@ -76,7 +76,10 @@ fn load_or_create_device_id(directory: &std::path::Path) -> io::Result<String> {
         Err(error) => {
             return Err(io::Error::new(
                 error.kind(),
-                format!("cannot read {} ({error}); it is kept, not replaced", path.display()),
+                format!(
+                    "cannot read {} ({error}); it is kept, not replaced",
+                    path.display()
+                ),
             ));
         }
     }

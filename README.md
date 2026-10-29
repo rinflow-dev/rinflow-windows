@@ -23,9 +23,10 @@ Status:
 - It controls a peer when the pointer is pushed through the edge it is placed at, with the push-through effect on this PC's side.
 - Peers can be arranged around this PC's screens, and the arrangement syncs with them.
 - The clipboard can follow control to and from peers (off by default).
-  Copied files from current peers use Windows virtual files: crossing only
-  publishes a description; pasting reads the contents in bounded chunks.
-  Older peers have an explicit Receive action. See [clipboard implementation](agent/docs/clipboard.md).
+  Copied files use Windows virtual files: crossing only publishes a
+  description; pasting reads the contents in bounded chunks. Peers without
+  file streams (builds older than them) cannot send files here: their offer
+  is declined and the user is told to update that device. See [clipboard implementation](agent/docs/clipboard.md).
 - The user's devices connect by themselves and reconnect after a drop (see [Arranging devices](#arranging-devices)).
 - Every connection is encrypted (QUIC, TLS 1.3), and new devices can be required to pair with a six-digit code (see [Pairing and encryption](#pairing-and-encryption)). Devices with a core older than ABI 7 cannot connect.
 - Sharing can be paused, crossing has a switch delay, corners and full-screen games can be excluded, and a shortcut locks the pointer to the current screen (see [Settings](#settings)).

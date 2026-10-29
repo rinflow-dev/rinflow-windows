@@ -41,17 +41,12 @@ restart. The target's next new asynchronous operation can try again.
 
 ## Older peers
 
-Peers without bit 12 keep the original FileRequest/FileChunk protocol.
-Windows never auto-accepts these offers, including zero-byte files. The
-Devices page displays a Receive/Cancel card; Receive saves to
-`Downloads\LinkCursor`, after which the local files can be pasted.
-The clipboard is updated only if it has not changed since acceptance and
-the core snapshot is still current. A completed download is announced even
-when a newer clipboard makes that update inappropriate.
-
-Legacy received frames retain a per-connection 4 MiB semaphore permit until
-their disk write completes. A slow disk therefore bounds network-event and
-disk-queue memory without blocking the input connection's event loop.
+Windows receives files only through file streams (capability bit 12). A
+peer without it offers files in the original FileRequest/FileChunk
+protocol; Windows declines that offer at once (`files_offered` →
+`cancel_files`), downloads nothing, shows no transfer card, and tells the
+user once per run to update LinkCursor on that device. A peer's
+`text/uri-list` is never written to the clipboard as files.
 
 ## Source enumeration and compatibility
 

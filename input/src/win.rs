@@ -113,7 +113,10 @@ fn program_files_dir() -> Option<PathBuf> {
     if status != 0 {
         return None;
     }
-    let length = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+    let length = buffer
+        .iter()
+        .position(|&unit| unit == 0)
+        .unwrap_or(buffer.len());
     (length > 0).then(|| PathBuf::from(String::from_utf16_lossy(&buffer[..length])))
 }
 
@@ -381,7 +384,9 @@ mod tests {
         // A folder whose name only starts the same is elsewhere.
         let mut lookalike = root.clone().into_os_string();
         lookalike.push(" Evil");
-        assert!(!in_program_files(&PathBuf::from(lookalike).join("LinkCursor")));
+        assert!(!in_program_files(
+            &PathBuf::from(lookalike).join("LinkCursor")
+        ));
         assert!(!in_program_files(Path::new(r"C:\LinkCursor")));
     }
 }

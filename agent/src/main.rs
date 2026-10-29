@@ -128,8 +128,10 @@ fn main() {
         // Always offered to peers; whether this PC's clipboard is actually
         // shared is the user's setting, applied by `clipboard.rs`.
         clipboard: true,
-        // Native virtual files pull bounded ranges on Read. Older peers
-        // wait for an explicit Receive action in the transfer card.
+        // Files come only through file streams: native virtual files pull
+        // bounded ranges on Read. An offer in the old file protocol (a peer
+        // without file streams) is declined by `clipboard.rs`; with no auto
+        // receive, nothing is ever downloaded into `download_directory`.
         files: true,
         on_demand_files: true,
         download_directory: Some(
@@ -190,27 +192,6 @@ fn main() {
             {
                 *opened = Some(std::time::Instant::now());
                 std::thread::spawn(|| tray::open_app(&[]));
-            }
-            // Files arrived: say so; clicking shows them.
-            if json.contains("\"files_received\"")
-                && let Ok(event) = serde_json::from_str::<serde_json::Value>(&json)
-            {
-                let count = event["paths"].as_array().map_or(0, Vec::len);
-                let title = if i18n::chinese() {
-                    format!("已收到 {count} 项")
-                } else if count == 1 {
-                    "Received 1 item".to_owned()
-                } else {
-                    format!("Received {count} items")
-                };
-                tray::notify_with_folder(
-                    &title,
-                    i18n::tr(
-                        "保存在“下载\\LinkCursor”。点按打开文件夹。",
-                        "Saved in Downloads\\LinkCursor. Click to open the folder.",
-                    ),
-                    clipboard::download_directory(),
-                );
             }
             layout_events.core_event(&json);
             control.core_event(&json);

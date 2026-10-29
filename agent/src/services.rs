@@ -24,9 +24,6 @@ pub struct Services {
 }
 
 impl Services {
-    pub fn accept_transfer(&self, transfer: u32) -> Result<(), String> {
-        self.clipboard.accept_legacy_files(transfer)
-    }
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         core: Weak<Core>,

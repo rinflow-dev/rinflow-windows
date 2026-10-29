@@ -16,16 +16,16 @@ use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, 
 use windows_sys::Win32::UI::Controls::{LIM_SMALL, LoadIconMetric};
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY,
-    NIN_BALLOONUSERCLICK, NOTIFYICONDATAW, Shell_NotifyIconW, ShellExecuteW,
+    NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
     GetMessageW, HICON, KillTimer, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_SHOWNORMAL, SetForegroundWindow, SetTimer,
-    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP,
-    WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE,
-    WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+    RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
+    WM_DISPLAYCHANGE, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_THEMECHANGED, WM_TIMER,
+    WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -56,23 +56,9 @@ pub fn quit() -> bool {
     unsafe { PostMessageW(window as HWND, WM_CLOSE, 0, 0) != 0 }
 }
 
-/// A folder that clicking the notification shown last opens.
-static BALLOON_FOLDER: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
-
 /// Shows a notification from the tray icon, at most once per
 /// [`NOTIFY_INTERVAL`] for the same `title`. Any thread.
 pub fn notify(title: &str, text: &str) {
-    if let Ok(mut folder) = BALLOON_FOLDER.lock() {
-        *folder = None;
-    }
-    show_balloon(title, text);
-}
-
-/// Like [`notify`]; clicking the notification opens `folder`.
-pub fn notify_with_folder(title: &str, text: &str, folder: PathBuf) {
-    if let Ok(mut slot) = BALLOON_FOLDER.lock() {
-        *slot = Some(folder);
-    }
     show_balloon(title, text);
 }
 
@@ -196,12 +182,6 @@ unsafe extern "system" fn window_proc(
             match lparam as u32 {
                 WM_LBUTTONUP => open_app(&["--tray"]),
                 WM_RBUTTONUP => show_menu(window),
-                NIN_BALLOONUSERCLICK => {
-                    let folder = BALLOON_FOLDER.lock().ok().and_then(|mut slot| slot.take());
-                    if let Some(folder) = folder {
-                        open_folder(&folder);
-                    }
-                }
                 _ => {}
             }
             0
@@ -345,24 +325,6 @@ fn show_menu(window: HWND) {
             }
             _ => {}
         }
-    }
-}
-
-/// Shows a folder in Explorer, in front (the click allowed that).
-pub fn open_folder(folder: &std::path::Path) {
-    let path = wide(&folder.to_string_lossy());
-    let verb = wide("open");
-    // SAFETY: valid NUL-terminated strings; the shell opens the folder.
-    unsafe {
-        AllowSetForegroundWindow(ASFW_ANY);
-        ShellExecuteW(
-            null_mut(),
-            verb.as_ptr(),
-            path.as_ptr(),
-            null(),
-            null(),
-            SW_SHOWNORMAL,
-        );
     }
 }
 

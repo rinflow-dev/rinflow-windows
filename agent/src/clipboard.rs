@@ -9,8 +9,9 @@
 //!
 //! Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`;
 //! the core turns them into a manifest and the peer pulls them. Files a peer
-//! copied are published as OLE virtual files and read on demand. Older peers
-//! use an explicit compatibility download to Downloads\LinkCursor.
+//! copied are published as OLE virtual files and read on demand. A peer
+//! without file streams (a build older than them) offers files the old way:
+//! that offer is declined, and the user is told to update that device.
 
 mod virtual_files;
 
@@ -75,7 +76,8 @@ struct Shared {
     /// The clipboard thread's window; 0 until it runs.
     window: AtomicIsize,
     incoming: Mutex<Option<Incoming>>,
-    legacy_sequence: Mutex<Option<(u32, u32)>>,
+    /// The user was told a peer is too old to send files (once a run).
+    outdated_told: AtomicBool,
     /// Set when the thread starts, for decisions on offered files.
     core: OnceLock<Weak<Core>>,
 }
@@ -93,7 +95,9 @@ struct Incoming {
     content: IncomingContent,
 }
 
-/// Where files from peers go: Downloads\LinkCursor (the core creates it).
+/// The core's download folder, Downloads\LinkCursor. Files are not
+/// downloaded any more (peers' files are pulled on demand), but the core
+/// still plans an old-protocol offer there before it is declined.
 pub fn download_directory() -> PathBuf {
     let mut path: windows_sys::core::PWSTR = null_mut();
     // SAFETY: asks for the user's Downloads folder; the string the shell
@@ -142,9 +146,6 @@ impl ClipboardHandle {
         self.0.enabled.store(enabled, Ordering::SeqCst);
         if !enabled && let Some(core) = self.0.core.get().and_then(Weak::upgrade) {
             let _ = core.revoke_file_streams();
-            if let Some((transfer, _)) = self.0.legacy_sequence.lock().unwrap().take() {
-                let _ = core.cancel_files(transfer);
-            }
         }
         self.post(WM_REPORT_CLIPBOARD);
     }
@@ -189,7 +190,9 @@ impl ClipboardHandle {
         }
     }
 
-    /// An older peer's offer waits for explicit consent in the transfer card.
+    /// A peer without file streams offered files the old way: declined at
+    /// once (the core would otherwise hold the offer), and the user hears
+    /// once why the files did not come.
     fn files_offered(&self, event: &Value) {
         let Some(transfer) = event["transfer"]
             .as_u64()
@@ -197,25 +200,22 @@ impl ClipboardHandle {
         else {
             return;
         };
-        let Some(core) = self.0.core.get().and_then(Weak::upgrade) else {
-            // Only while shutting down: nobody is left to decide.
-            return;
-        };
-        if !self.enabled() {
+        if let Some(core) = self.0.core.get().and_then(Weak::upgrade) {
             let _ = core.cancel_files(transfer);
-            return;
         }
-        // An older peer: explicit Receive in the settings transfer card.
-        // Never grab focus or pre-download just because the pointer crossed.
-        *self.0.legacy_sequence.lock().unwrap() =
-            Some((transfer, unsafe { GetClipboardSequenceNumber() }));
-        crate::tray::notify(
-            crate::i18n::tr("有文件可接收", "Files available"),
-            crate::i18n::tr(
-                "对方使用旧版文件协议。打开 LinkCursor，在传输卡片中点“接收”。",
-                "This peer uses the older file protocol. Open LinkCursor and choose Receive in the transfer card.",
-            ),
+        log!(
+            "declined files from {} in the old file protocol (no file streams)",
+            event["peer_id"].as_str().unwrap_or("?")
         );
+        if self.enabled() && !self.0.outdated_told.swap(true, Ordering::Relaxed) {
+            crate::tray::notify(
+                crate::i18n::tr("无法接收文件", "Can't receive the files"),
+                crate::i18n::tr(
+                    "对方设备上的 LinkCursor 版本太旧，请更新后再复制文件。",
+                    "LinkCursor on the other device is too old to send files. Update it, then copy the files again.",
+                ),
+            );
+        }
     }
 
     fn peer_clipboard(&self, event: &Value) {
@@ -227,17 +227,7 @@ impl ClipboardHandle {
             return;
         }
         match Clipboard::from_json(event) {
-            Ok(clipboard) => {
-                let sequence = event["transfer"].as_u64().and_then(|transfer| {
-                    let mut legacy = self.0.legacy_sequence.lock().unwrap();
-                    if legacy.is_some_and(|(id, _)| u64::from(id) == transfer) {
-                        legacy.take().map(|(_, seq)| seq)
-                    } else {
-                        None
-                    }
-                });
-                self.queue_incoming(IncomingContent::Clipboard(clipboard), sequence);
-            }
+            Ok(clipboard) => self.queue_incoming(IncomingContent::Clipboard(clipboard), None),
             Err(error) => log!("peer clipboard not used: {error}"),
         }
     }
@@ -267,25 +257,6 @@ impl ClipboardHandle {
                 PostMessageW(window as HWND, message, 0, 0);
             }
         }
-    }
-
-    pub fn accept_legacy_files(&self, transfer: u32) -> Result<(), String> {
-        if !self.enabled() {
-            return Err("clipboard sharing disabled".into());
-        }
-        let mut offered = self.0.legacy_sequence.lock().unwrap();
-        if !offered.is_some_and(|(id, _)| id == transfer) {
-            return Err("file offer expired".into());
-        }
-        // Consent happens here; clipboard changes after this point must not
-        // be overwritten when the compatibility download finishes.
-        *offered = Some((transfer, unsafe { GetClipboardSequenceNumber() }));
-        self.0
-            .core
-            .get()
-            .and_then(Weak::upgrade)
-            .ok_or("core stopped")?
-            .accept_files(transfer)
     }
 }
 
@@ -865,33 +836,9 @@ fn write(window: HWND, clipboard: &Clipboard, expected_sequence: u32) -> bool {
 
 /// A peer's clipboard as Windows formats and their bytes.
 fn clipboard_entries(clipboard: &Clipboard) -> Vec<(u32, Vec<u8>)> {
+    // A peer's files never arrive here as paths: they come as virtual files
+    // (`IncomingContent::Files`), read from the peer on demand.
     let mut entries = Vec::new();
-    // Files received from the peer (a text/uri-list of their paths here): as
-    // files, so Ctrl+V in Explorer copies them.
-    if let Some(list) = clipboard
-        .formats
-        .iter()
-        .find(|format| format.mime == MIME_URI_LIST)
-    {
-        // Only files the core received, in the downloads folder: never a
-        // path elsewhere on this PC or on a network share, whatever a peer
-        // might send.
-        let paths: Vec<String> = String::from_utf8_lossy(&list.data)
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with('#'))
-            .filter_map(path_from_file_url)
-            .filter(|path| is_received_file(path))
-            .collect();
-        if !paths.is_empty() {
-            entries.push((CF_HDROP, drop_files_block(&paths)));
-            // DROPEFFECT_COPY: pasting copies rather than moves.
-            entries.push((
-                register("Preferred DropEffect"),
-                1u32.to_le_bytes().to_vec(),
-            ));
-        }
-    }
     for format in &clipboard.formats {
         match format.mime.as_str() {
             MIME_TEXT => {
@@ -918,21 +865,6 @@ fn clipboard_entries(clipboard: &Clipboard) -> Vec<(u32, Vec<u8>)> {
     entries
 }
 
-/// Whether `path` is inside the downloads folder (where the core puts files
-/// it received), not on a network share.
-fn is_received_file(path: &str) -> bool {
-    if path.starts_with(r"\\") {
-        return false;
-    }
-    match (
-        std::fs::canonicalize(path),
-        std::fs::canonicalize(download_directory()),
-    ) {
-        (Ok(path), Ok(folder)) => path.starts_with(folder),
-        _ => false,
-    }
-}
-
 /// The paths in a `CF_HDROP` block (`DROPFILES` and NUL-separated names).
 fn drop_files(data: &[u8]) -> Option<Vec<String>> {
     let u32_at = |at: usize| Some(u32::from_le_bytes(data.get(at..at + 4)?.try_into().ok()?));
@@ -957,21 +889,6 @@ fn drop_files(data: &[u8]) -> Option<Vec<String>> {
     )
 }
 
-/// A `CF_HDROP` block for `paths`: `DROPFILES` with wide names.
-fn drop_files_block(paths: &[String]) -> Vec<u8> {
-    let mut block = Vec::new();
-    block.extend_from_slice(&20u32.to_le_bytes()); // pFiles: names follow
-    block.extend_from_slice(&[0; 12]); // pt, fNC
-    block.extend_from_slice(&1u32.to_le_bytes()); // fWide
-    for path in paths {
-        for unit in path.encode_utf16().chain(Some(0)) {
-            block.extend_from_slice(&unit.to_le_bytes());
-        }
-    }
-    block.extend_from_slice(&[0, 0]); // the list ends with an empty name
-    block
-}
-
 /// `C:\Users\a b\x.txt` → `file:///C:/Users/a%20b/x.txt` (as the core reads
 /// and writes them; UNC paths become `file:////server/share/…`).
 fn file_url(path: &str) -> String {
@@ -988,35 +905,6 @@ fn file_url(path: &str) -> String {
         url.insert("file:///".len(), '/');
     }
     url
-}
-
-/// The reverse of [`file_url`]: a local path, or None for other URLs.
-fn path_from_file_url(url: &str) -> Option<String> {
-    let rest = url.strip_prefix("file://")?;
-    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
-    if !rest.starts_with('/') {
-        return None;
-    }
-    let bytes = rest.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'%' {
-            decoded.push(u8::from_str_radix(rest.get(index + 1..index + 3)?, 16).ok()?);
-            index += 3;
-        } else {
-            decoded.push(bytes[index]);
-            index += 1;
-        }
-    }
-    let decoded = String::from_utf8(decoded).ok()?;
-    // `/C:/…` drops the slash before the drive; `//server/share/…` is UNC.
-    let path = if decoded.starts_with("//") {
-        &decoded[..]
-    } else {
-        &decoded[1..]
-    };
-    Some(path.replace('/', "\\"))
 }
 
 /// `CF_UNICODETEXT` bytes (UTF-16, NUL-terminated) as text; None if empty.
@@ -1252,8 +1140,23 @@ mod tests {
         );
     }
 
+    /// A `CF_HDROP` block for `paths`, as Explorer puts one on the clipboard.
+    fn drop_files_block(paths: &[String]) -> Vec<u8> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&20u32.to_le_bytes()); // pFiles: names follow
+        block.extend_from_slice(&[0; 12]); // pt, fNC
+        block.extend_from_slice(&1u32.to_le_bytes()); // fWide
+        for path in paths {
+            for unit in path.encode_utf16().chain(Some(0)) {
+                block.extend_from_slice(&unit.to_le_bytes());
+            }
+        }
+        block.extend_from_slice(&[0, 0]); // the list ends with an empty name
+        block
+    }
+
     #[test]
-    fn file_lists_survive_cf_hdrop_and_file_urls() {
+    fn copied_files_become_file_urls() {
         let paths = vec![
             r"C:\Users\a b\报告.pdf".to_owned(),
             r"D:\x%y#z.txt".to_owned(),
@@ -1265,13 +1168,19 @@ mod tests {
         assert_eq!(urls[0], "file:///C:/Users/a%20b/%E6%8A%A5%E5%91%8A.pdf");
         assert_eq!(urls[1], "file:///D:/x%25y%23z.txt");
         assert_eq!(urls[2], "file:////server/share/dir");
-        let back: Vec<String> = urls
-            .iter()
-            .filter_map(|url| path_from_file_url(url))
-            .collect();
-        assert_eq!(back, paths);
-        assert_eq!(path_from_file_url("https://example.com/x"), None);
-        assert_eq!(path_from_file_url("file://host/x"), None);
+    }
+
+    #[test]
+    fn a_peers_file_paths_never_reach_the_clipboard() {
+        // Only the old file protocol sent paths (of files it downloaded);
+        // whatever a peer puts in a uri-list is not written as files here.
+        let clipboard = Clipboard {
+            formats: vec![ClipboardFormat {
+                mime: MIME_URI_LIST.to_owned(),
+                data: b"file:///C:/Windows/System32/cmd.exe".to_vec(),
+            }],
+        };
+        assert!(clipboard_entries(&clipboard).is_empty());
     }
 
     #[test]

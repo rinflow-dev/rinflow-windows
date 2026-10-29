@@ -87,7 +87,6 @@ pub struct DeviceView {
 /// Files on their way to or from a peer.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct TransferView {
-    pub awaiting_acceptance: bool,
     pub transfer: u32,
     pub peer_id: String,
     /// The peer's name, or its ID.
@@ -519,8 +518,9 @@ impl SharedState {
                 });
                 true
             }
-            "files_received" => snapshot.remove_transfer(&event, "receiving"),
-            "files_offered" | "files_receiving" | "files_sending" => {
+            // Files come only through file streams (`files_offered` and
+            // `files_received` belong to the old file protocol, declined).
+            "files_receiving" | "files_sending" => {
                 let direction = if kind != "files_sending" {
                     "receiving"
                 } else {
@@ -536,7 +536,6 @@ impl SharedState {
                 };
                 let number = |key: &str| event[key].as_u64().unwrap_or(0);
                 let view = TransferView {
-                    awaiting_acceptance: kind == "files_offered",
                     transfer,
                     peer_id: peer_id.to_owned(),
                     peer_name: snapshot.peer_name(peer_id),
@@ -726,16 +725,16 @@ mod tests {
             &state,
             serde_json::json!({"event": "connected", "peer": {"id": "mac", "name": "Mac mini", "address": "10.0.0.2", "port": 42421}, "paired": true}),
         );
+        // An offer in the old file protocol is declined: no card.
         apply(
             &state,
-            serde_json::json!({"event": "files_offered", "peer_id": "mac", "transfer": 7, "name": "报告", "items": 2, "count": 4, "total_size": 400}),
+            serde_json::json!({"event": "files_offered", "peer_id": "mac", "transfer": 6, "name": "旧", "items": 1, "count": 1, "total_size": 10}),
         );
-        assert!(state.0.borrow().transfers[0].awaiting_acceptance);
+        assert!(state.0.borrow().transfers.is_empty());
         apply(
             &state,
             serde_json::json!({"event": "files_receiving", "peer_id": "mac", "transfer": 7, "name": "报告", "items": 2, "count": 4, "total_size": 400}),
         );
-        assert!(!state.0.borrow().transfers[0].awaiting_acceptance);
         apply(
             &state,
             serde_json::json!({"event": "files_progress", "peer_id": "mac", "transfer": 7, "received": 100, "total": 400}),
@@ -778,7 +777,7 @@ mod tests {
         );
         apply(
             &state,
-            serde_json::json!({"event": "files_received", "peer_id": "mac", "transfer": 7, "paths": []}),
+            serde_json::json!({"event": "files_stream_ended", "peer_id": "mac", "transfer": 7, "reason": "done"}),
         );
         assert!(state.0.borrow().transfers.is_empty());
         assert_eq!(state.0.borrow().last_error, None);
