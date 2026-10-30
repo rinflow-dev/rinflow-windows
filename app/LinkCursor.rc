@@ -1,2 +1,4 @@
 // Keep the primary icon first so Explorer, shortcuts and setup agree.
 101 ICON "Assets\\LinkCursor.ico"
+// Icon index 1: what setup points shortcuts at on a dark system.
+102 ICON "Assets\\LinkCursor.Dark.ico"

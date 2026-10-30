@@ -7,9 +7,11 @@ Used by the workspace Makefile (make build / make run / make stop).
 
   build  Builds only (build.ps1). A running agent or settings window keeps
          running: files it holds open are moved aside, not overwritten.
-  run    Builds, then stops every running copy, then starts the agent in
+  run    Stops every running copy, then builds, then starts the agent in
          this console, where its log appears, and opens the settings
-         window. Ctrl+C quits the agent. A failed build stops nothing.
+         window. Ctrl+C quits the agent. Stopping comes first so a running
+         window cannot hold files the build must replace, and an old copy
+         never survives a failed build: after one, nothing is running.
   stop   Quits every running settings window and agent: politely first,
          as the tray menu does, then by force.
 
@@ -130,8 +132,8 @@ switch ($Action) {
     'build' { Invoke-Build }
     'stop' { Stop-LinkCursor }
     'run' {
-        Invoke-Build
         Stop-LinkCursor
+        Invoke-Build
         Start-LinkCursor
     }
 }

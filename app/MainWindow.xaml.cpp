@@ -82,13 +82,6 @@ namespace winrt::LinkCursor::implementation
     {
         MainWindowT::InitializeComponent();
 
-        ::LinkCursorApp::SetWindowIcon(AppWindow(), Root().ActualTheme() == ElementTheme::Dark);
-        Root().ActualThemeChanged([weak = get_weak()](auto&&, auto&&)
-        {
-            if (auto self = weak.get())
-                ::LinkCursorApp::SetWindowIcon(self->AppWindow(), self->Root().ActualTheme() == ElementTheme::Dark);
-        });
-
         ExtendsContentIntoTitleBar(true);
         SetTitleBar(AppTitleBar());
 
@@ -96,6 +89,7 @@ namespace winrt::LinkCursor::implementation
         // (the one it was launched from), shrunk to fit a small screen.
         HWND hwnd{};
         check_hresult(m_inner.as<::IWindowNative>()->get_WindowHandle(&hwnd));
+        ::LinkCursorApp::KeepWindowIconThemed(hwnd, AppWindow());
         auto monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(info) };
         GetMonitorInfoW(monitor, &info);

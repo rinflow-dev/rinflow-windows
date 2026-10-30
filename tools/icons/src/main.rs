@@ -6,15 +6,10 @@ const SIZES: &[u32] = &[16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256]
 
 fn main() -> Result<(), Box<dyn Error>> {
     let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/Assets");
-    let source = fs::read_to_string(assets.join("LinkCursor.svg"))?;
-    // Preserve the supplied geometry and gradient; lift only the indigo stem
-    // on dark surfaces, where the original #1E1B4B would disappear.
-    if !source.contains("#1E1B4B") {
-        return Err("expected the indigo stem in LinkCursor.svg".into());
-    }
-    let dark = source.replace("#1E1B4B", "#E0E7FF");
-    fs::write(assets.join("LinkCursor.Dark.svg"), &dark)?;
-    for (name, svg) in [("LinkCursor", source), ("LinkCursor.Dark", dark)] {
+    // Each theme has its own supplied artwork: LinkCursor.svg for light
+    // surfaces, LinkCursor.Dark.svg for dark ones.
+    for name in ["LinkCursor", "LinkCursor.Dark"] {
+        let svg = fs::read_to_string(assets.join(format!("{name}.svg")))?;
         let tree = usvg::Tree::from_str(&svg, &usvg::Options::default())?;
         let mut images = Vec::new();
         for &size in SIZES {

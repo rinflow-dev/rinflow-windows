@@ -55,7 +55,7 @@ SetupIconFile=..\app\Assets\LinkCursor.ico
 ; Closes LinkCursor when it holds files being replaced.
 CloseApplications=force
 RestartApplications=no
-UninstallDisplayIcon={app}\LinkCursor.exe
+UninstallDisplayIcon={app}\LinkCursor.exe,{code:ShellIconIndex}
 UninstallDisplayName=LinkCursor
 SetupLogging=yes
 ; Sign setup and uninstaller once there is a certificate, e.g.
@@ -101,8 +101,12 @@ Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,*.old,*.ilk,*.exp,*.lib,Microsoft.Web.WebView2.*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\LinkCursor"; Filename: "{app}\LinkCursor.exe"
-Name: "{autodesktop}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; Tasks: desktopicon
+; An unpackaged app's shortcuts cannot follow the theme by themselves: they get
+; the logo for the Windows theme at install time (LinkCursor.rc, icon index 1).
+Name: "{autoprograms}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; Check: not SystemIsDark
+Name: "{autoprograms}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; IconFilename: "{app}\LinkCursor.exe"; IconIndex: 1; Check: SystemIsDark
+Name: "{autodesktop}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; Tasks: desktopicon; Check: not SystemIsDark
+Name: "{autodesktop}\LinkCursor"; Filename: "{app}\LinkCursor.exe"; IconFilename: "{app}\LinkCursor.exe"; IconIndex: 1; Tasks: desktopicon; Check: SystemIsDark
 
 [Registry]
 Root: HKLM64; Subkey: "SOFTWARE\LinkCursor"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "1"; Check: ElevatedChosen; Flags: uninsdeletekey
@@ -136,6 +140,22 @@ var
   // ElevatedInput as setup found it: -1 when not there (a first install,
   // or after an uninstall), else 0 or 1.
   PreviousElevated: Integer;
+
+function SystemIsDark(): Boolean;
+var
+  Light: Cardinal;
+begin
+  Result := RegQueryDWordValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
+    'SystemUsesLightTheme', Light) and (Light = 0);
+end;
+
+function ShellIconIndex(Param: String): String;
+begin
+  if SystemIsDark() then
+    Result := '1'
+  else
+    Result := '0';
+end;
 
 function InitializeSetup(): Boolean;
 var
