@@ -307,7 +307,7 @@ namespace winrt::LinkCursor::implementation
         // Fit this PC with room on every side for placing, and every placed peer.
         auto local = BoundsOf(m_localDisplays);
         double roomX = local.width * 0.8;
-        double roomY = local.height * 0.45;
+        double roomY = local.height * 0.3;
         LayoutRect view{ local.x - roomX, local.y - roomY, local.width + 2 * roomX, local.height + 2 * roomY };
         for (auto const& device : m_layoutDevices)
         {

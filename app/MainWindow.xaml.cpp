@@ -99,7 +99,7 @@ namespace winrt::LinkCursor::implementation
         auto const& work = info.rcWork;
         int32_t workW = work.right - work.left;
         int32_t workH = work.bottom - work.top;
-        int32_t w = (std::min)(static_cast<int32_t>(std::lround(800 * scale)), workW);
+        int32_t w = (std::min)(static_cast<int32_t>(std::lround(720 * scale)), workW);
         int32_t h = (std::min)(static_cast<int32_t>(std::lround(680 * scale)), workH);
         AppWindow().MoveAndResize({ work.left + (workW - w) / 2, work.top + (workH - h) / 2, w, h });
 
