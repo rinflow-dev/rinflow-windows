@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Notification-area icon. Keeping the tray in the agent means the settings
 //! app only runs while one of its windows is open: clicking the icon starts
 //! it with `--tray`, which shows its tray panel (devices, the sharing switch,

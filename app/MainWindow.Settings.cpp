@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The 设置 page. Values come from the snapshot's `settings` (see
 // agent/src/settings.rs); every edit goes back as `update_settings`.
 

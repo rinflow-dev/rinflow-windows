@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! The agent's log: `%LOCALAPPDATA%\LinkCursor\logs\agent.log`, for finding
 //! out what happened when something went wrong ("打开日志文件夹" in the
 //! settings app). Release builds have no console, so without it nothing

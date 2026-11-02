@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Three smaller parts of the main window, all driven by the snapshot:
 //
 // - Files on their way (`transfers`): a card per transfer on the 设备 page,

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Sleep, wake and network changes, reported to the core, so sessions end in
 //! order before this PC sleeps and come back as soon as it wakes or the
 //! network changes (see the core's `runtime/reconnect.rs`).

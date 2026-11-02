@@ -3,6 +3,8 @@ name = "linkcursor-agent"
 version = "0.1.0"
 edition = "2024"
 description = "Background agent for LinkCursor on Windows: runs the core, the tray icon and the IPC endpoint for the settings app"
+license = "MPL-2.0"
+repository = "https://github.com/akarineren/linkcursor-windows"
 publish = false
 
 [dependencies]

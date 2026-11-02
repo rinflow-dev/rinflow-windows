@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! The arrangement of this PC and its peers, as the settings app shows it.
 //!
 //! linkcursor-core owns placements: it snaps them, syncs them with peers and

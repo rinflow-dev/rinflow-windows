@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The edge animation page, for tuning the push-through effect. Development
 // builds only: the button that opens it is hidden in release builds, where
 // the animation is going away.

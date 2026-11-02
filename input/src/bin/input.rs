@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! `linkcursor-input`: plays the agent's input on whichever desktop has
 //! input, as LocalSystem in the user's session (see the crate docs).
 //!

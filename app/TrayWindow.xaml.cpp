@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The tray panel: opened by clicking the agent's tray icon (the agent starts
 // LinkCursor.exe --tray, which a running app takes over). A small borderless
 // window by the notification area that closes as soon as it loses focus.

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The arrangement on the 设备 page: this PC's screens and the placed peers
 // around them, drawn to scale in logical points on a dotted canvas. Peers are
 // placed by dragging (from the canvas, or from the 未放置 chips); the agent's

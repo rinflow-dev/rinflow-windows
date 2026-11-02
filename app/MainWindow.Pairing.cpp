@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The pairing dialog (the design's 配对确认). The agent reports a pairing in
 // progress in its snapshot (`pairing`: the peer, the six-digit code both
 // devices show, whether this side accepted); the dialog follows it. 配对

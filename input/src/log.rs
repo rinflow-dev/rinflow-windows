@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! A small log for the programs that run as LocalSystem, where nobody sees
 //! their console: `logs\<name>.log` in their own folder (Program Files when
 //! installed), which only administrators and LocalSystem can change. Not

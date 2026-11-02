@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! OLE virtual files. Descriptor queries are local; only IStream::Read
 //! acquires a source lease and requests bounded network data.
 #![allow(non_snake_case)]

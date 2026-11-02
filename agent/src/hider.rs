@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Hides this PC's cursor where a peer's pointer left it (setting
 //! `hide_cursor_on_leave`), as Universal Control, Deskflow and Mouse Without
 //! Borders do: the device the pointer is not on shows none.

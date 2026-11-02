@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // The main window: the 设备 page (sharing switch, arrangement, the user's
 // devices), the 设置 page (MainWindow.Settings.cpp) and, in development
 // builds, the edge animation page (MainWindow.Effect.cpp). Everything shown
