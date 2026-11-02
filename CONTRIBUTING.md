@@ -1,6 +1,6 @@
 # Contributing to Rinflow for Windows
 
-Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, into a folder named `rinflow-core`, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
+Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
 
 ## Building and testing
 

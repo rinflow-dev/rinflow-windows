@@ -91,11 +91,11 @@ app/
   PeerItem.{idl,h,cpp}       row model for the device lists
 ```
 
-`rinflow-core` must be cloned next to this repository, into a folder named `rinflow-core`, as for the macOS app:
+`rinflow-core` must be cloned next to this repository, as for the macOS app:
 
 ```sh
-git clone https://github.com/rinflow-dev/rinflow-core.git rinflow-core
-git clone https://github.com/rinflow-dev/rinflow-windows.git rinflow-windows
+git clone https://github.com/rinflow-dev/rinflow-core.git
+git clone https://github.com/rinflow-dev/rinflow-windows.git
 ```
 
 ## Prerequisites
