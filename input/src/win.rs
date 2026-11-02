@@ -146,7 +146,7 @@ pub fn service_installable() -> bool {
 }
 
 /// Whether process `pid` runs `exe` from this executable's folder, in this
-/// session: the other LinkCursor program, installed with this one.
+/// session: the other Rinflow program, installed with this one.
 pub fn is_sibling_process(pid: u32, exe: &str) -> bool {
     let (Some(dir), Some(image)) = (own_dir(), process_image(pid)) else {
         return false;
@@ -381,16 +381,16 @@ mod tests {
     #[test]
     fn only_folders_inside_program_files_count() {
         let root = program_files_dir().expect("ProgramFilesDir is set on every Windows");
-        assert!(in_program_files(&root.join("LinkCursor")));
+        assert!(in_program_files(&root.join("Rinflow")));
         // Paths differ in case only: the same folder.
         let upper = PathBuf::from(root.to_string_lossy().to_uppercase());
-        assert!(in_program_files(&upper.join("LinkCursor")));
+        assert!(in_program_files(&upper.join("Rinflow")));
         // A folder whose name only starts the same is elsewhere.
         let mut lookalike = root.clone().into_os_string();
         lookalike.push(" Evil");
         assert!(!in_program_files(
-            &PathBuf::from(lookalike).join("LinkCursor")
+            &PathBuf::from(lookalike).join("Rinflow")
         ));
-        assert!(!in_program_files(Path::new(r"C:\LinkCursor")));
+        assert!(!in_program_files(Path::new(r"C:\Rinflow")));
     }
 }

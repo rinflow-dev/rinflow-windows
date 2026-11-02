@@ -66,7 +66,7 @@ namespace
     }
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void MainWindow::SetupTransfers()
     {
@@ -133,11 +133,11 @@ namespace winrt::LinkCursor::implementation
                 std::wstring name{ transfer.GetNamedString(L"name", L"") };
                 std::wstring peer{ transfer.GetNamedString(L"peer_name", L"") };
                 std::wstring what{ items > 1
-                    ? LinkCursorApp::Format(L"TransferManyItems", name, items)
-                    : LinkCursorApp::Format(L"TransferOneItem", name) };
+                    ? RinflowApp::Format(L"TransferManyItems", name, items)
+                    : RinflowApp::Format(L"TransferOneItem", name) };
                 auto title = receiving
-                    ? LinkCursorApp::Format(L"TransferReceiving", peer, what)
-                    : LinkCursorApp::Format(L"TransferSending", peer, what);
+                    ? RinflowApp::Format(L"TransferReceiving", peer, what)
+                    : RinflowApp::Format(L"TransferSending", peer, what);
 
                 Grid card;
                 card.Style(Application::Current().Resources().Lookup(box_value(L"CardStyle")).as<Style>());
@@ -176,7 +176,7 @@ namespace winrt::LinkCursor::implementation
                 cancelIcon.FontSize(16);
                 cancelIcon.Glyph(L"\xE711");
                 cancel.Content(cancelIcon);
-                auto stop = LinkCursorApp::Text(L"TransferCancel");
+                auto stop = RinflowApp::Text(L"TransferCancel");
                 ToolTipService::SetToolTip(cancel, box_value(stop));
                 Automation::AutomationProperties::SetName(cancel, stop);
                 Grid::SetColumn(cancel, 2);
@@ -238,7 +238,7 @@ namespace winrt::LinkCursor::implementation
         auto address = Trimmed(AddressBox().Text());
         auto fail = [this](wchar_t const* key)
         {
-            AddressError().Text(LinkCursorApp::Text(key));
+            AddressError().Text(RinflowApp::Text(key));
             AddressError().Visibility(Visibility::Visible);
         };
         if (address.empty()) return;
@@ -285,14 +285,14 @@ namespace winrt::LinkCursor::implementation
             if (kind == L"found")
             {
                 auto name = status.GetNamedString(L"name", status.GetNamedString(L"peer_id", L""));
-                line = LinkCursorApp::Format(L"AddressFound", std::wstring(name));
+                line = RinflowApp::Format(L"AddressFound", std::wstring(name));
             }
-            else if (kind == L"no_response") line = LinkCursorApp::Text(L"AddressNoResponse");
+            else if (kind == L"no_response") line = RinflowApp::Text(L"AddressNoResponse");
             else if (kind == L"unresolved")
             {
-                line = LinkCursorApp::Format(L"AddressUnresolved", std::wstring(status.GetNamedString(L"error", L"")));
+                line = RinflowApp::Format(L"AddressUnresolved", std::wstring(status.GetNamedString(L"error", L"")));
             }
-            else line = LinkCursorApp::Text(L"AddressSearching");
+            else line = RinflowApp::Text(L"AddressSearching");
 
             Grid row;
             row.ColumnSpacing(8);
@@ -326,7 +326,7 @@ namespace winrt::LinkCursor::implementation
             icon.FontSize(14);
             icon.Glyph(L"\xE711");
             remove.Content(icon);
-            auto removeText = LinkCursorApp::Text(L"AddressRemove");
+            auto removeText = RinflowApp::Text(L"AddressRemove");
             ToolTipService::SetToolTip(remove, box_value(removeText));
             Automation::AutomationProperties::SetName(remove, removeText);
             Grid::SetColumn(remove, 1);
@@ -351,7 +351,7 @@ namespace winrt::LinkCursor::implementation
         auto strong = get_strong();
         auto all = m_settings ? m_settings.GetNamedObject(L"peer_input", JsonObject{}) : JsonObject{};
         auto current = all.GetNamedObject(peerId, JsonObject{});
-        PeerInputDialog().Title(box_value(LinkCursorApp::Format(L"PeerInputTitle", std::wstring(name))));
+        PeerInputDialog().Title(box_value(RinflowApp::Format(L"PeerInputTitle", std::wstring(name))));
         PointerSpeedSlider().Value(current.GetNamedNumber(L"pointer_speed", 1.0));
         ScrollSpeedSlider().Value(current.GetNamedNumber(L"scroll_speed", 1.0));
         InvertScrollToggle().IsOn(current.GetNamedBoolean(L"invert_scroll", false));

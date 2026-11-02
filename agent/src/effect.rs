@@ -94,7 +94,7 @@ impl EffectParams {
 }
 
 /// Current parameters, shared by the IPC thread, the edge tracker and the
-/// overlay renderer. Saved to `%LOCALAPPDATA%\LinkCursor\effect.json`.
+/// overlay renderer. Saved to `%LOCALAPPDATA%\Rinflow\effect.json`.
 #[derive(Clone)]
 pub struct EffectStore(Arc<RwLock<EffectParams>>);
 

@@ -13,7 +13,7 @@ use crate::effect::EffectParams;
 use crate::services::Services;
 use crate::state::Snapshot;
 use crate::win::PipeSecurity;
-use linkcursor_core::layout::{Offset, Side};
+use rinflow_core::layout::{Offset, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::io;
@@ -47,7 +47,7 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 pub const PROTOCOL_VERSION: u32 = 17;
 
 pub fn pipe_name(user_sid: &str) -> String {
-    format!(r"\\.\pipe\LinkCursor.Agent.{user_sid}")
+    format!(r"\\.\pipe\Rinflow.Agent.{user_sid}")
 }
 
 #[derive(Deserialize)]
@@ -145,7 +145,7 @@ pub fn spawn(user_sid: &str, services: Arc<Services>) {
     let user_sid = user_sid.to_owned();
     let state = services.state.clone();
     let result = std::thread::Builder::new()
-        .name("linkcursor-ipc".to_owned())
+        .name("rinflow-ipc".to_owned())
         .spawn(move || {
             let runtime = match tokio::runtime::Builder::new_current_thread()
                 .enable_io()
@@ -281,7 +281,7 @@ fn handle_request(
         services
             .core
             .upgrade()
-            .ok_or("LinkCursor core is shutting down")
+            .ok_or("Rinflow core is shutting down")
     };
     let done = match request {
         Request::PreviewPlacement { peer_id, x, y } => {

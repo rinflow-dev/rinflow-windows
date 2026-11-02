@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir"))
-        .join("linkcursor-agent.manifest");
+        .join("rinflow-agent.manifest");
     println!("cargo:rerun-if-changed={}", manifest.display());
 
     // Per-monitor DPI awareness must be declared in the manifest; coordinates
@@ -24,7 +24,7 @@ fn main() {
 
 /// The version resource: its FileDescription is the name Windows shows for
 /// this program on its notifications, in Task Manager and in the firewall
-/// prompt ("linkcursor-agent.exe" without it).
+/// prompt ("rinflow-agent.exe" without it).
 fn version_info() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
@@ -51,12 +51,12 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "CompanyName", "LinkCursor"
-      VALUE "FileDescription", "LinkCursor"
+      VALUE "CompanyName", "Rinflow"
+      VALUE "FileDescription", "Rinflow"
       VALUE "FileVersion", "{version}"
-      VALUE "InternalName", "linkcursor-agent"
-      VALUE "OriginalFilename", "linkcursor-agent.exe"
-      VALUE "ProductName", "LinkCursor"
+      VALUE "InternalName", "rinflow-agent"
+      VALUE "OriginalFilename", "rinflow-agent.exe"
+      VALUE "ProductName", "Rinflow"
       VALUE "ProductVersion", "{version}"
     END
   END
@@ -66,8 +66,8 @@ BEGIN
   END
 END
 "#,
-        icon = icon_path("LinkCursor.ico"),
-        dark_icon = icon_path("LinkCursor.Dark.ico"),
+        icon = icon_path("Rinflow.ico"),
+        dark_icon = icon_path("Rinflow.Dark.ico"),
     );
     let path = PathBuf::from(std::env::var("OUT_DIR").expect("out dir")).join("version.rc");
     std::fs::write(&path, script).expect("write version.rc");

@@ -113,7 +113,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "linkcursor-icons"
+name = "rinflow-icons"
 version = "0.1.0"
 dependencies = [
  "resvg",

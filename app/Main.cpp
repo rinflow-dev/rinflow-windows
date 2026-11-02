@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // Entry point (replaces the XAML-generated one, DISABLE_XAML_GENERATED_MAIN):
-// LinkCursor.exe runs once per user session. A second launch, such as the
-// agent's tray icon starting `LinkCursor.exe --tray`, hands its request to
+// Rinflow.exe runs once per user session. A second launch, such as the
+// agent's tray icon starting `Rinflow.exe --tray`, hands its request to
 // the running app and exits.
 //
 // A named mutex says whether an app runs; its message-only window takes the
@@ -27,7 +27,7 @@ namespace
     // False if no running app took the request.
     bool HandOver(std::wstring const& request)
     {
-        HWND target = FindWindowExW(HWND_MESSAGE, nullptr, LinkCursorApp::ActivationWindowClass, nullptr);
+        HWND target = FindWindowExW(HWND_MESSAGE, nullptr, RinflowApp::ActivationWindowClass, nullptr);
         if (!target)
         {
             return false;
@@ -38,7 +38,7 @@ namespace
         GetWindowThreadProcessId(target, &process);
         AllowSetForegroundWindow(process);
         COPYDATASTRUCT data{};
-        data.dwData = LinkCursorApp::ActivationRequest;
+        data.dwData = RinflowApp::ActivationRequest;
         data.cbData = static_cast<DWORD>((request.size() + 1) * sizeof(wchar_t));
         data.lpData = const_cast<wchar_t*>(request.c_str());
         DWORD_PTR result = 0;
@@ -59,10 +59,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     bool owner = false;
     while (!owner && std::chrono::steady_clock::now() < deadline)
     {
-        wil::unique_mutex mutex{ CreateMutexW(nullptr, FALSE, LinkCursorApp::InstanceMutexName) };
+        wil::unique_mutex mutex{ CreateMutexW(nullptr, FALSE, RinflowApp::InstanceMutexName) };
         if (mutex && GetLastError() != ERROR_ALREADY_EXISTS)
         {
-            LinkCursorApp::KeepInstanceMutex(mutex.release());
+            RinflowApp::KeepInstanceMutex(mutex.release());
             owner = true;
             break;
         }
@@ -84,7 +84,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     winrt::init_apartment(winrt::apartment_type::single_threaded);
     ::winrt::Microsoft::UI::Xaml::Application::Start([](auto&&)
     {
-        ::winrt::make<::winrt::LinkCursor::implementation::App>();
+        ::winrt::make<::winrt::Rinflow::implementation::App>();
     });
     return 0;
 }

@@ -7,7 +7,7 @@
 #include "TrayWindow.g.h"
 #include "AgentClient.h"
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     struct TrayWindow : TrayWindowT<TrayWindow>
     {
@@ -35,7 +35,7 @@ namespace winrt::LinkCursor::implementation
         void ApplyState(Windows::Data::Json::JsonObject const& state);
         void FitToContent();
 
-        std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
+        std::unique_ptr<::RinflowApp::AgentClient> m_agent;
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{
             single_threaded_observable_vector<Windows::Foundation::IInspectable>()
         };
@@ -49,7 +49,7 @@ namespace winrt::LinkCursor::implementation
     };
 }
 
-namespace winrt::LinkCursor::factory_implementation
+namespace winrt::Rinflow::factory_implementation
 {
     struct TrayWindow : TrayWindowT<TrayWindow, implementation::TrayWindow>
     {

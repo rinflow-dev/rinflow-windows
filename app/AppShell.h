@@ -5,15 +5,15 @@
 #pragma once
 
 // The app's windows, for the windows themselves (App.xaml.cpp keeps them).
-// LinkCursor.exe runs once per user session: a second launch hands its
+// Rinflow.exe runs once per user session: a second launch hands its
 // request to the running one (Main.cpp), which shows the main window, or
 // the tray panel for --tray. The app ends a moment after its last window
 // closes.
-namespace LinkCursorApp
+namespace RinflowApp
 {
     // The running app's message-only window, and the mutex it holds.
-    inline constexpr wchar_t ActivationWindowClass[] = L"LinkCursor.App.Activation";
-    inline constexpr wchar_t InstanceMutexName[] = L"Local\\LinkCursor.App";
+    inline constexpr wchar_t ActivationWindowClass[] = L"Rinflow.App.Activation";
+    inline constexpr wchar_t InstanceMutexName[] = L"Local\\Rinflow.App";
     // WM_COPYDATA id of a request: "main" or "tray" (UTF-16, terminated).
     inline constexpr ULONG_PTR ActivationRequest = 0x4C43;
 

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-namespace LinkCursor
+namespace Rinflow
 {
     // One device row: in the device list, the add-device dialog and the tray
     // panel. Rows are rebuilt from every agent state snapshot. Colours stay

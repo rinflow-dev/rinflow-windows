@@ -20,7 +20,7 @@
 use crate::inject::INJECTED_MARKER;
 use crate::settings::SettingsStore;
 use crate::win::wide;
-use linkcursor_core::Core;
+use rinflow_core::Core;
 use std::io;
 use std::ptr::{null, null_mut};
 use std::sync::{Arc, Weak, mpsc};
@@ -95,7 +95,7 @@ impl PresenceWatch {
     pub fn start(core: Weak<Core>, settings: Arc<SettingsStore>) -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
-            .name("linkcursor-presence".to_owned())
+            .name("rinflow-presence".to_owned())
             .spawn(move || {
                 let window = match create_window() {
                     Ok(window) => window,
@@ -306,7 +306,7 @@ fn someone_active(now: u32, last_input: u32, nudge_tick: Option<u32>) -> bool {
 
 /// A hidden window: session notifications need one.
 fn create_window() -> io::Result<HWND> {
-    let class_name = wide("LinkCursorPresence");
+    let class_name = wide("RinflowPresence");
     // SAFETY: registers the class (again is harmless), creates a hidden
     // window on this thread and registers it for session notifications.
     unsafe {

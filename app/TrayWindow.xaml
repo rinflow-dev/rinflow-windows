@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Window
-    x:Class="LinkCursor.TrayWindow"
+    x:Class="Rinflow.TrayWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:LinkCursor"
+    xmlns:local="using:Rinflow"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="LinkCursor">
+    Title="Rinflow">
 
     <Window.SystemBackdrop>
         <DesktopAcrylicBackdrop />
@@ -30,7 +30,7 @@
                 <TextBlock
                     VerticalAlignment="Center"
                     Style="{StaticResource BodyStrongTextBlockStyle}"
-                    Text="LinkCursor" />
+                    Text="Rinflow" />
             </StackPanel>
 
             <Grid MinHeight="48" Padding="12,0" ColumnSpacing="12" Style="{StaticResource CardStyle}">
@@ -125,9 +125,9 @@
                 x:Name="QuitButton"
                 Grid.Column="2"
                 VerticalAlignment="Center"
-                x:Uid="TrayQuitButton" AutomationProperties.Name="退出 LinkCursor"
+                x:Uid="TrayQuitButton" AutomationProperties.Name="退出 Rinflow"
                 Style="{StaticResource SubtleIconButtonStyle}"
-                ToolTipService.ToolTip="退出 LinkCursor">
+                ToolTipService.ToolTip="退出 Rinflow">
                 <FontIcon FontSize="16" Glyph="&#xE7E8;" />
             </Button>
         </Grid>

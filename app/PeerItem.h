@@ -6,7 +6,7 @@
 
 #include "PeerItem.g.h"
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     struct PeerItem : PeerItemT<PeerItem>
     {
@@ -72,7 +72,7 @@ namespace winrt::LinkCursor::implementation
     };
 }
 
-namespace winrt::LinkCursor::factory_implementation
+namespace winrt::Rinflow::factory_implementation
 {
     struct PeerItem : PeerItemT<PeerItem, implementation::PeerItem>
     {

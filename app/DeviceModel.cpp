@@ -19,7 +19,7 @@ namespace
         return lower;
     }
 
-    int Rank(LinkCursorApp::DeviceInfo const& device)
+    int Rank(RinflowApp::DeviceInfo const& device)
     {
         if (device.connected) return 0;
         if (device.connecting) return 1;
@@ -45,7 +45,7 @@ namespace
     }
 }
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
     hstring PlatformLabel(hstring const& platform)
     {
@@ -123,7 +123,7 @@ namespace LinkCursorApp
     DeviceModel DeviceModel::FromState(JsonObject const& state)
     {
         DeviceModel model;
-        model.localName = state.GetNamedString(L"device_name", L"LinkCursor");
+        model.localName = state.GetNamedString(L"device_name", L"Rinflow");
         auto layout = state.GetNamedObject(L"layout", JsonObject{});
         model.localResolution = ResolutionOf(layout.GetNamedArray(L"displays", JsonArray{}));
 
@@ -231,9 +231,9 @@ namespace LinkCursorApp
         }
     }
 
-    winrt::LinkCursor::PeerItem DeviceRow(DeviceInfo const& device)
+    winrt::Rinflow::PeerItem DeviceRow(DeviceInfo const& device)
     {
-        auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
+        auto row = make_self<winrt::Rinflow::implementation::PeerItem>(
             device.id, device.name, Detail(device), DeviceGlyph(device.platform));
         if (device.connected)
         {
@@ -265,18 +265,18 @@ namespace LinkCursorApp
         return *row;
     }
 
-    winrt::LinkCursor::PeerItem NearbyRow(DeviceInfo const& device)
+    winrt::Rinflow::PeerItem NearbyRow(DeviceInfo const& device)
     {
-        auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
+        auto row = make_self<winrt::Rinflow::implementation::PeerItem>(
             device.id, device.name, Detail(device), DeviceGlyph(device.platform));
         row->CanConnect(!device.connecting);
         row->StatusText(device.pairing ? Text(L"StatusPairing") : device.connecting ? Text(L"StatusConnecting") : hstring());
         return *row;
     }
 
-    winrt::LinkCursor::PeerItem LocalRow(hstring const& name)
+    winrt::Rinflow::PeerItem LocalRow(hstring const& name)
     {
-        auto row = make_self<winrt::LinkCursor::implementation::PeerItem>(
+        auto row = make_self<winrt::Rinflow::implementation::PeerItem>(
             L"", name, Text(L"ThisPC"), DeviceGlyph(L"windows"));
         row->StatusText(Text(L"ThisPC"));
         return *row;

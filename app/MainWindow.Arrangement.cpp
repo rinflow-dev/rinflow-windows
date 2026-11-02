@@ -29,7 +29,7 @@ using winrt::Windows::Foundation::Point;
 
 namespace
 {
-    using LayoutRect = winrt::LinkCursor::implementation::MainWindow::LayoutRect;
+    using LayoutRect = winrt::Rinflow::implementation::MainWindow::LayoutRect;
 
     // Room around the drawing for the chips (top) and the hint (bottom).
     constexpr double PadSide = 24;
@@ -159,7 +159,7 @@ namespace
     }
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void MainWindow::SetupArrangement()
     {
@@ -349,8 +349,8 @@ namespace winrt::LinkCursor::implementation
             auto screen = Screen(L"LocalScreenTemplate", display.width * m_layoutScale, display.height * m_layoutScale,
                 ScreenInsets(m_localDisplays, i), ScreenCorners(m_localDisplays, i),
                 main ? L"\xE7F4" : L"",
-                main ? m_localName : LinkCursorApp::Format(L"DisplayNumber", number),
-                main ? LinkCursorApp::Text(L"ThisPC") : hstring());
+                main ? m_localName : RinflowApp::Format(L"DisplayNumber", number),
+                main ? RinflowApp::Text(L"ThisPC") : hstring());
             if (!main) ++number;
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);
@@ -385,7 +385,7 @@ namespace winrt::LinkCursor::implementation
             bool mine = device.remembered || m_connectedPeerIds.contains(id);
             if (device.offset || !mine || !m_onlinePeerIds.contains(id)) continue;
             auto chip = Root().Resources().Lookup(box_value(L"ChipTemplate")).as<DataTemplate>().LoadContent().as<Border>();
-            chip.FindName(L"Icon").as<FontIcon>().Glyph(LinkCursorApp::DeviceGlyph(device.platform));
+            chip.FindName(L"Icon").as<FontIcon>().Glyph(RinflowApp::DeviceGlyph(device.platform));
             chip.FindName(L"Title").as<TextBlock>().Text(device.name);
             // No tooltip: it would pop up over the device being dragged.
             auto peerId = device.peerId;
@@ -433,8 +433,8 @@ namespace winrt::LinkCursor::implementation
         }
         UnplacedPanel().Visibility(chips.Children().Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
         ArrangementHint().Text(anyPlaced || chips.Children().Size() > 0
-            ? LinkCursorApp::Text(L"ArrangementHintDrag")
-            : LinkCursorApp::Text(L"ArrangementHintEmpty"));
+            ? RinflowApp::Text(L"ArrangementHintDrag")
+            : RinflowApp::Text(L"ArrangementHintEmpty"));
     }
 
     FrameworkElement MainWindow::DeviceElement(LayoutDevice const& device, bool ghost)
@@ -458,12 +458,12 @@ namespace winrt::LinkCursor::implementation
             hstring subtitle;
             if (main)
             {
-                subtitle = LinkCursorApp::PlatformLabel(device.platform);
-                if (!connected) subtitle = subtitle + LinkCursorApp::Text(online ? L"SuffixNotConnected" : L"SuffixOffline");
+                subtitle = RinflowApp::PlatformLabel(device.platform);
+                if (!connected) subtitle = subtitle + RinflowApp::Text(online ? L"SuffixNotConnected" : L"SuffixOffline");
             }
             auto screen = Screen(L"PeerScreenTemplate", display.width * scale, display.height * scale,
                 ScreenInsets(device.displays, i), ScreenCorners(device.displays, i),
-                main ? LinkCursorApp::DeviceGlyph(device.platform) : hstring(),
+                main ? RinflowApp::DeviceGlyph(device.platform) : hstring(),
                 main ? device.name : hstring(), subtitle);
             screen.HorizontalAlignment(HorizontalAlignment::Left);
             screen.VerticalAlignment(VerticalAlignment::Top);

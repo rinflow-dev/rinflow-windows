@@ -30,8 +30,8 @@ use crate::overlay::{Command, ENTRY_INSET, Edge, EdgePoint, OverlayHandle};
 use crate::settings::{Hotkey, MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, Settings, SettingsStore};
 use crate::state::{DemoSide, SharedState};
 use crate::win::wide;
-use linkcursor_core::Core;
-use linkcursor_core::layout::Side;
+use rinflow_core::Core;
+use rinflow_core::layout::Side;
 use std::cell::RefCell;
 use std::io;
 use std::ptr::{null, null_mut};
@@ -237,7 +237,7 @@ impl EdgeThread {
     ) -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
-            .name("linkcursor-edge".to_owned())
+            .name("rinflow-edge".to_owned())
             .spawn(move || {
                 // SAFETY: creates the message queue before publishing the id.
                 let thread_id = unsafe {
@@ -1064,7 +1064,7 @@ fn cursor_position() -> POINT {
 }
 
 fn create_input_window() -> io::Result<HWND> {
-    let class_name = wide("LinkCursorEdge");
+    let class_name = wide("RinflowEdge");
     // SAFETY: hidden window on this thread, registered for raw mouse input
     // even while other applications have focus. A message-only window
     // (HWND_MESSAGE) does not receive background raw input.

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The agent's log: `%LOCALAPPDATA%\LinkCursor\logs\agent.log`, for finding
+//! The agent's log: `%LOCALAPPDATA%\Rinflow\logs\agent.log`, for finding
 //! out what happened when something went wrong ("打开日志文件夹" in the
 //! settings app). Release builds have no console, so without it nothing
 //! the agent noticed would be kept.
@@ -56,7 +56,7 @@ pub fn init() {
         default_hook(info);
     }));
     write_line(&format!(
-        "LinkCursor agent {} started (pid {})",
+        "Rinflow agent {} started (pid {})",
         env!("CARGO_PKG_VERSION"),
         std::process::id()
     ));
@@ -79,7 +79,7 @@ fn open(log: &mut Log) {
 /// Writes one line (use [`log!`](crate::log)).
 pub fn write_line(message: &str) {
     if cfg!(debug_assertions) {
-        eprintln!("linkcursor-agent: {message}");
+        eprintln!("rinflow-agent: {message}");
     }
     let Ok(mut log) = LOG.lock() else {
         return;

@@ -15,7 +15,7 @@
 //!   went (Wi-Fi joined, DHCP, a VPN, a cable). Such changes come in bursts,
 //!   so the core hears about them once things have been quiet for a moment.
 
-use linkcursor_core::Core;
+use rinflow_core::Core;
 use std::ffi::c_void;
 use std::sync::Weak;
 use std::sync::mpsc;
@@ -63,7 +63,7 @@ impl PowerWatch {
         let (changes, settled) = mpsc::channel::<()>();
         let settle_core = core.clone();
         let settle = std::thread::Builder::new()
-            .name("linkcursor-network".to_owned())
+            .name("rinflow-network".to_owned())
             .spawn(move || {
                 // Ends when the watch is dropped (the sender goes with it).
                 while settled.recv().is_ok() {

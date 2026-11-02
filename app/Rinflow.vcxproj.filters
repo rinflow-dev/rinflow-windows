@@ -42,7 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
-    <ResourceCompile Include="LinkCursor.rc" />
+    <ResourceCompile Include="Rinflow.rc" />
     <Content Include="Assets\*.svg;Assets\*.ico" />
   </ItemGroup>
   <ItemGroup>

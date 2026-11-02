@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `linkcursor-input`: plays the agent's input on whichever desktop has
+//! `rinflow-input`: plays the agent's input on whichever desktop has
 //! input, as LocalSystem in the user's session (see the crate docs).
 //!
-//! - A pipe server takes one client at a time: `linkcursor-agent` from this
+//! - A pipe server takes one client at a time: `rinflow-agent` from this
 //!   folder, in this session. The pipe's ACL lets in LocalSystem and the
 //!   session's user, never remote clients.
 //! - A watcher checks every 200 ms which desktop has input (`Default`, or
@@ -19,8 +19,8 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use linkcursor_input::win::{self, SecurityAttributes, is_sibling_process};
-use linkcursor_input::{
+use rinflow_input::win::{self, SecurityAttributes, is_sibling_process};
+use rinflow_input::{
     AGENT_EXE, ClientMessage, PROTOCOL_VERSION, RawInput, ServerMessage, VirtualDesktop, log,
     pipe_name, read_frame,
 };

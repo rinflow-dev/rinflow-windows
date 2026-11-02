@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="LinkCursor.Agent" version="0.1.0.0" />
+  <assemblyIdentity type="win32" name="Rinflow.Agent" version="0.1.0.0" />
   <!-- LoadIconMetric is exported by Common Controls v6, not the legacy DLL. -->
   <dependency>
     <dependentAssembly>

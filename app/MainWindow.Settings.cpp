@@ -90,7 +90,7 @@ namespace
         {
             toggle.IsOn(on);
         }
-        state.Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
+        state.Text(RinflowApp::Text(on ? L"On" : L"Off"));
     }
 
     // "3fa27c…" (64 hex digits) as "3F:A2:7C:…", the way certificate
@@ -125,7 +125,7 @@ namespace
         if (target == L"super") return L"Win";
         if (target == L"alt") return L"Alt";
         if (target == L"shift") return L"Shift";
-        return LinkCursorApp::Text(L"ModifierNone");
+        return RinflowApp::Text(L"ModifierNone");
     }
 
     int ModifierTargetIndex(std::wstring_view target)
@@ -147,7 +147,7 @@ namespace
     }
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void MainWindow::SetupSettingsPage()
     {
@@ -159,7 +159,7 @@ namespace winrt::LinkCursor::implementation
             {
                 auto self = weak.get();
                 if (!self) return;
-                state.Text(LinkCursorApp::Text(toggle.IsOn() ? L"On" : L"Off"));
+                state.Text(RinflowApp::Text(toggle.IsOn() ? L"On" : L"Off"));
                 if (!self->m_applying)
                 {
                     self->m_agent->UpdateSetting(key, JsonValue::CreateBooleanValue(toggle.IsOn()));
@@ -182,7 +182,7 @@ namespace winrt::LinkCursor::implementation
         {
             auto folder = wil::TryGetEnvironmentVariableW(L"LOCALAPPDATA");
             if (!folder) return;
-            std::wstring path = std::wstring(folder.get()) + L"\\LinkCursor\\logs";
+            std::wstring path = std::wstring(folder.get()) + L"\\Rinflow\\logs";
             CreateDirectoryW(path.c_str(), nullptr);
             ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
         });
@@ -227,7 +227,7 @@ namespace winrt::LinkCursor::implementation
                 // The choices start from the map in use; nothing changes yet.
                 self->m_modifierCustom = true;
                 self->ModifierCustomPanel().Visibility(Visibility::Visible);
-                self->ModifierMapDescription().Text(LinkCursorApp::Text(L"ModifierCustomDescription"));
+                self->ModifierMapDescription().Text(RinflowApp::Text(L"ModifierCustomDescription"));
                 return;
             }
             self->m_modifierCustom = false;
@@ -261,7 +261,7 @@ namespace winrt::LinkCursor::implementation
             // language, as the agent may not have saved it yet.
             self->DispatcherQueue().TryEnqueue([language]
             {
-                LinkCursorApp::RelaunchApp(language);
+                RinflowApp::RelaunchApp(language);
             });
         });
 
@@ -332,7 +332,7 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self || self->m_applying || self->m_elevatedPending) return;
             bool on = self->ElevatedInputToggle().IsOn();
-            self->ElevatedInputState().Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
+            self->ElevatedInputState().Text(RinflowApp::Text(on ? L"On" : L"Off"));
             self->ElevatedInputToggle().IsEnabled(false);
             // Snapshots leave the switch alone until this is over: it would
             // flip back while UAC asks.
@@ -347,7 +347,7 @@ namespace winrt::LinkCursor::implementation
                 auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
                 std::wstring service = exe.get();
                 service.resize(service.find_last_of(L'\\') + 1);
-                service += L"linkcursor-service.exe";
+                service += L"rinflow-service.exe";
                 SHELLEXECUTEINFOW info{ sizeof(info) };
                 info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
                 info.lpVerb = L"runas";
@@ -387,7 +387,7 @@ namespace winrt::LinkCursor::implementation
                 Windows::ApplicationModel::DataTransfer::DataPackage package;
                 package.SetText(self->m_fingerprint);
                 Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
-                // Still there after LinkCursor closes.
+                // Still there after Rinflow closes.
                 Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
             }
             catch (hresult_error const&)
@@ -444,7 +444,7 @@ namespace winrt::LinkCursor::implementation
             {
                 ModifierPresetCombo().SelectedIndex(presetIndex);
             }
-            ModifierMapDescription().Text(LinkCursorApp::Text(m_modifierCustom ? L"ModifierCustomDescription"
+            ModifierMapDescription().Text(RinflowApp::Text(m_modifierCustom ? L"ModifierCustomDescription"
                 : mac ? L"ModifierMacDescription" : L"ModifierKeepDescription"));
             ModifierCustomPanel().Visibility(m_modifierCustom ? Visibility::Visible : Visibility::Collapsed);
             for (auto const& [combo, target] : { std::pair{ ModifierSuperCombo(), super },
@@ -464,8 +464,8 @@ namespace winrt::LinkCursor::implementation
         bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
         SetSwitch(TlsToggle(), TlsState(), encrypted);
         TlsDescription().Text(encrypted
-            ? LinkCursorApp::Text(L"TlsOn")
-            : LinkCursorApp::Text(L"TlsOff"));
+            ? RinflowApp::Text(L"TlsOn")
+            : RinflowApp::Text(L"TlsOff"));
 
         auto theme = settings.GetNamedString(L"theme", L"system");
         int themeIndex = theme == L"light" ? 1 : theme == L"dark" ? 2 : 0;
@@ -500,7 +500,7 @@ namespace winrt::LinkCursor::implementation
             hotkeyText += (hotkeyText.empty() ? L"" : L"+") + std::wstring(part);
         }
         bool locked = state.GetNamedBoolean(L"locked", false);
-        LockBar().Message(LinkCursorApp::Format(L"LockBarMessage", hotkeyText));
+        LockBar().Message(RinflowApp::Format(L"LockBarMessage", hotkeyText));
         LockBar().IsOpen(locked);
 
         auto running = static_cast<uint32_t>(state.GetNamedNumber(L"control_port", 0));
@@ -513,8 +513,8 @@ namespace winrt::LinkCursor::implementation
             PortBox().Value(configured);
         }
         PortHint().Text(configured != running
-            ? LinkCursorApp::Format(L"PortPending", configured, running)
-            : LinkCursorApp::Text(L"PortHint"));
+            ? RinflowApp::Format(L"PortPending", configured, running)
+            : RinflowApp::Text(L"PortHint"));
 
         // The input service: running while the feature is on. Installed with
         // setup, the switch can add it; a portable copy cannot.
@@ -533,10 +533,10 @@ namespace winrt::LinkCursor::implementation
             ElevatedInputToggle().IsEnabled(elevatedAvailable || elevatedInstallable);
         }
         ElevatedInputDescription().Text(elevatedOn
-            ? LinkCursorApp::Text(L"ElevatedOn")
+            ? RinflowApp::Text(L"ElevatedOn")
             : elevatedAvailable || elevatedInstallable
-            ? LinkCursorApp::Text(L"ElevatedRecommended")
-            : LinkCursorApp::Text(L"ElevatedOff"));
+            ? RinflowApp::Text(L"ElevatedRecommended")
+            : RinflowApp::Text(L"ElevatedOff"));
 
         // The first four and last three bytes; the tooltip and 复制 give all 32.
         m_fingerprint = encrypted ? hstring(ColonHex(fingerprint.GetString())) : hstring();
@@ -546,7 +546,7 @@ namespace winrt::LinkCursor::implementation
             : hstring(full.empty() ? L"—" : full));
         ToolTipService::SetToolTip(DeviceIdText(), full.empty() ? nullptr : box_value(m_fingerprint));
         CopyIdButton().IsEnabled(!full.empty());
-        VersionText().Text(LinkCursorApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
+        VersionText().Text(RinflowApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
 
         m_applying = false;
     }
@@ -600,7 +600,7 @@ namespace winrt::LinkCursor::implementation
             self->ShowHotkeyKeys(self->HotkeyPreview(), modifiers, key);
             bool valid = IsValidHotkey(modifiers, key);
             self->HotkeyDialog().IsPrimaryButtonEnabled(valid);
-            self->HotkeyHint().Text(valid || key == 0 ? hstring() : LinkCursorApp::Text(L"HotkeyNeedsModifier"));
+            self->HotkeyHint().Text(valid || key == 0 ? hstring() : RinflowApp::Text(L"HotkeyNeedsModifier"));
         });
 
         auto result = ContentDialogResult::None;

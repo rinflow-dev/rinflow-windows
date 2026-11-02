@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Application
-    x:Class="LinkCursor.App"
+    x:Class="Rinflow.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:LinkCursor">
+    xmlns:local="using:Rinflow">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -12,10 +12,10 @@
 
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/LinkCursor.svg" />
+                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/Rinflow.svg" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Default">
-                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/LinkCursor.Dark.svg" />
+                    <SvgImageSource x:Key="AppLogo" UriSource="ms-appx:///Assets/Rinflow.Dark.svg" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 

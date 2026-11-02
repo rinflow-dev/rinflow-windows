@@ -8,7 +8,7 @@
 #include "AgentClient.h"
 #include "DeviceModel.h"
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     struct MainWindow : MainWindowT<MainWindow>
     {
@@ -88,12 +88,12 @@ namespace winrt::LinkCursor::implementation
         void ApplyTheme(hstring const& theme);
         void SetAgentLinked(bool linked);
         // Says why the background service is not running, with a retry.
-        void ShowAgentProblem(::LinkCursorApp::AgentProblem problem, uint32_t code);
+        void ShowAgentProblem(::RinflowApp::AgentProblem problem, uint32_t code);
         // `fromAgent`: the agent's last_error, which closing the bar clears.
         void ShowError(hstring const& message, bool fromAgent);
         void SetupDevicesPage();
         void ShowAddDevice();
-        Microsoft::UI::Xaml::Controls::MenuFlyout DeviceMenu(LinkCursorApp::DeviceInfo const& device);
+        Microsoft::UI::Xaml::Controls::MenuFlyout DeviceMenu(RinflowApp::DeviceInfo const& device);
 
         // ---- Arrangement (MainWindow.Arrangement.cpp) ----------------------
         void SetupArrangement();
@@ -176,7 +176,7 @@ namespace winrt::LinkCursor::implementation
         void OnEffectEdited();
         void UpdateEffectLabels();
 
-        std::unique_ptr<::LinkCursorApp::AgentClient> m_agent;
+        std::unique_ptr<::RinflowApp::AgentClient> m_agent;
         // Set once the window closed: messages still queued are dropped.
         bool m_closed{ false };
         // The agent's last_error as last seen; shown when it changes, so a
@@ -192,7 +192,7 @@ namespace winrt::LinkCursor::implementation
         bool m_elevatedTarget{ false };
         uint32_t m_elevatedRequest{ 0 };
         Page m_page{ Page::Devices };
-        LinkCursorApp::DeviceModel m_model;
+        RinflowApp::DeviceModel m_model;
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{
             single_threaded_observable_vector<Windows::Foundation::IInspectable>()
         };
@@ -246,7 +246,7 @@ namespace winrt::LinkCursor::implementation
     };
 }
 
-namespace winrt::LinkCursor::factory_implementation
+namespace winrt::Rinflow::factory_implementation
 {
     struct MainWindow : MainWindowT<MainWindow, implementation::MainWindow>
     {

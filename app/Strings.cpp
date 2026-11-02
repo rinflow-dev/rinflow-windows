@@ -10,7 +10,7 @@
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
 #include <winrt/Microsoft.Windows.Globalization.h>
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
     void ApplyLanguageSetting()
     {
@@ -25,7 +25,7 @@ namespace LinkCursorApp
         }
         else if (auto folder = wil::TryGetEnvironmentVariableW(L"LOCALAPPDATA"))
         {
-            std::ifstream file(std::wstring(folder.get()) + L"\\LinkCursor\\settings.json", std::ios::binary);
+            std::ifstream file(std::wstring(folder.get()) + L"\\Rinflow\\settings.json", std::ios::binary);
             std::stringstream text;
             text << file.rdbuf();
             winrt::Windows::Data::Json::JsonObject settings{ nullptr };

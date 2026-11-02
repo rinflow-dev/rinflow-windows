@@ -5,7 +5,7 @@
 //! The Windows clipboard, shared with peers through the core.
 //!
 //! The core moves clipboards between devices as control moves (see
-//! linkcursor-core/docs/clipboard-and-files.md). This module is the Windows
+//! rinflow-core/docs/clipboard-and-files.md). This module is the Windows
 //! end: it reports every change of the system clipboard and writes what
 //! peers send. Text, HTML and images travel as UTF-8 text, a UTF-8 HTML
 //! fragment and PNG. Contents a password manager marks as private are never
@@ -20,7 +20,7 @@
 mod virtual_files;
 
 use crate::win::wide;
-use linkcursor_core::{Clipboard, ClipboardFormat, Core, MIME_HTML, MIME_PNG, MIME_TEXT};
+use rinflow_core::{Clipboard, ClipboardFormat, Core, MIME_HTML, MIME_PNG, MIME_TEXT};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::io;
@@ -89,7 +89,7 @@ struct Shared {
 enum IncomingContent {
     Clipboard(Clipboard),
     Files {
-        manifest: linkcursor_core::FileManifest,
+        manifest: rinflow_core::FileManifest,
         peer: String,
     },
     Unavailable(String),
@@ -119,7 +119,7 @@ pub fn files_not_shared_text(event: &Value) -> String {
     }
 }
 
-/// The core's download folder, Downloads\LinkCursor. Files are not
+/// The core's download folder, Downloads\Rinflow. Files are not
 /// downloaded any more (peers' files are pulled on demand), but the core
 /// still plans an old-protocol offer there before it is declined.
 pub fn download_directory() -> PathBuf {
@@ -144,7 +144,7 @@ pub fn download_directory() -> PathBuf {
             std::env::var_os("USERPROFILE").map(|home| PathBuf::from(home).join("Downloads"))
         })
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("LinkCursor")
+        .join("Rinflow")
 }
 
 impl ClipboardHandle {
@@ -197,7 +197,7 @@ impl ClipboardHandle {
             ),
             Some("files_available") if self.enabled() => {
                 if let (Ok(manifest), Some(peer)) = (
-                    serde_json::from_value::<linkcursor_core::FileManifest>(
+                    serde_json::from_value::<rinflow_core::FileManifest>(
                         event["manifest"].clone(),
                     ),
                     event["peer_id"].as_str(),
@@ -241,8 +241,8 @@ impl ClipboardHandle {
             crate::tray::notify(
                 crate::i18n::tr("无法接收文件", "Can't receive the files"),
                 crate::i18n::tr(
-                    "对方设备上的 LinkCursor 版本太旧，请更新后再复制文件。",
-                    "LinkCursor on the other device is too old to send files. Update it, then copy the files again.",
+                    "对方设备上的 Rinflow 版本太旧，请更新后再复制文件。",
+                    "Rinflow on the other device is too old to send files. Update it, then copy the files again.",
                 ),
             );
         }
@@ -302,7 +302,7 @@ impl ClipboardThread {
         let shutdown_core = core.clone();
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
-            .name("linkcursor-clipboard".to_owned())
+            .name("rinflow-clipboard".to_owned())
             .spawn(move || {
                 // OLE's clipboard owner must keep a pumping STA alive.
                 if let Err(error) = unsafe { windows::Win32::System::Ole::OleInitialize(None) } {
@@ -595,7 +595,7 @@ unsafe extern "system" fn window_proc(
 }
 
 fn create_window() -> io::Result<HWND> {
-    let class_name = wide("LinkCursorClipboard");
+    let class_name = wide("RinflowClipboard");
     // SAFETY: a message-only window on this thread, listening for clipboard
     // changes (message-only windows receive WM_CLIPBOARDUPDATE).
     unsafe {

@@ -11,8 +11,8 @@
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
     <MinimalCoreWin>true</MinimalCoreWin>
     <ProjectGuid>{6B3C2E8A-4F1D-4C55-9A2E-8D7B1F0C3A91}</ProjectGuid>
-    <ProjectName>LinkCursor</ProjectName>
-    <RootNamespace>LinkCursor</RootNamespace>
+    <ProjectName>Rinflow</ProjectName>
+    <RootNamespace>Rinflow</RootNamespace>
     <TargetName>$(RootNamespace)</TargetName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
@@ -25,7 +25,7 @@
     <WinUISDKReferences>false</WinUISDKReferences>
     <!--
       Unpackaged and self-contained: the Windows App Runtime ships next to
-      the app (installer\LinkCursor.iss copies the whole folder), so a PC
+      the app (installer\Rinflow.iss copies the whole folder), so a PC
       without the runtime installed runs it too.
     -->
     <AppxPackage>false</AppxPackage>
@@ -107,7 +107,7 @@
   <!--
     Release links the Visual C++ runtime statically (the "hybrid CRT", as the
     Windows App SDK's own DLLs do): vcruntime and the C++ library go into
-    LinkCursor.exe, the Universal CRT stays the one Windows ships. Setup then
+    Rinflow.exe, the Universal CRT stays the one Windows ships. Setup then
     needs no VC++ Redistributable. Debug keeps the debug DLLs, which only a
     development PC has anyway.
   -->
@@ -125,7 +125,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Manifest Include="app.manifest" />
-    <ResourceCompile Include="LinkCursor.rc" />
+    <ResourceCompile Include="Rinflow.rc" />
     <Content Include="Assets\*.svg;Assets\*.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -207,8 +207,8 @@
   </ItemGroup>
 
   <!--
-    Build the Rust agent with Cargo and place linkcursor-agent.exe next to
-    LinkCursor.exe, which is where the app looks for it. Pass
+    Build the Rust agent with Cargo and place rinflow-agent.exe next to
+    Rinflow.exe, which is where the app looks for it. Pass
     -p:SkipAgentBuild=true to build the app alone. The input helper and its
     service (..\input) go to the same folder: each checks that the other is
     its sibling there.
@@ -222,14 +222,14 @@
     <AgentCargoProfile Condition="'$(AgentCargoProfile)'==''">debug</AgentCargoProfile>
     <AgentCargoFlags Condition="'$(Configuration)'=='Release'">--release</AgentCargoFlags>
   </PropertyGroup>
-  <Target Name="BuildLinkCursorAgent" AfterTargets="Build" Condition="'$(SkipAgentBuild)'!='true'">
+  <Target Name="BuildRinflowAgent" AfterTargets="Build" Condition="'$(SkipAgentBuild)'!='true'">
     <!-- Cargo and rustc always write UTF-8, whatever the console code page. -->
     <!-- Run from each crate's folder: Cargo reads ..\.cargo\config.toml (the
          static VC++ runtime) from where it runs. -->
     <Exec Command="cargo build --manifest-path &quot;$(AgentDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" WorkingDirectory="$(AgentDir)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
-    <Copy SourceFiles="$(AgentDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-agent.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(AgentDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\rinflow-agent.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
     <Exec Command="cargo build --manifest-path &quot;$(InputDir)Cargo.toml&quot; --target $(AgentRustTarget) $(AgentCargoFlags)" WorkingDirectory="$(InputDir)" IgnoreStandardErrorWarningFormat="true" StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
-    <Copy SourceFiles="$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-input.exe;$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\linkcursor-service.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\rinflow-input.exe;$(InputDir)target\$(AgentRustTarget)\$(AgentCargoProfile)\rinflow-service.exe" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

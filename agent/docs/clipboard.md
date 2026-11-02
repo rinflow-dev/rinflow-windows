@@ -45,7 +45,7 @@ Windows receives files only through file streams (capability bit 12). A
 peer without it offers files in the original FileRequest/FileChunk
 protocol; Windows declines that offer at once (`files_offered` →
 `cancel_files`), downloads nothing, shows no transfer card, and tells the
-user once per run to update LinkCursor on that device. A peer's
+user once per run to update Rinflow on that device. A peer's
 `text/uri-list` is never written to the clipboard as files.
 
 ## Source enumeration and compatibility
@@ -82,10 +82,10 @@ an active stream. The default run does not replace the user's system clipboard.
 
 A manual Explorer paste smoke test on 2026-10-27 successfully materialized
 the same files/folders directly in its destination. To reproduce with the
-test harness, opt in with `LINKCURSOR_TEST_CLIPBOARD=1` and set
-`LINKCURSOR_TEST_DESTINATION_FILE` to a writable path receiving the test's
+test harness, opt in with `RINFLOW_TEST_CLIPBOARD=1` and set
+`RINFLOW_TEST_DESTINATION_FILE` to a writable path receiving the test's
 destination path. Open that directory and paste within 120 seconds. The
 harness restores the previous clipboard if the test object still owns it.
 
-Run `cargo test` in both `linkcursor-core` and `linkcursor-windows/agent`, then
-build the WinUI app with `linkcursor-windows/build.ps1`.
+Run `cargo test` in both `rinflow-core` and `rinflow-windows/agent`, then
+build the WinUI app with `rinflow-windows/build.ps1`.

@@ -190,7 +190,7 @@ impl Overlay {
         let sleeping = Arc::new(AtomicBool::new(false));
         let thread_sleeping = sleeping.clone();
         let join = std::thread::Builder::new()
-            .name("linkcursor-overlay".to_owned())
+            .name("rinflow-overlay".to_owned())
             .spawn(move || {
                 // SAFETY: creates this thread's message queue before its id is
                 // published, so PostThreadMessageW cannot fail with no queue.
@@ -1050,7 +1050,7 @@ fn create_window() -> Result<HWND> {
     // SAFETY: registers a class and creates a hidden popup on this thread.
     unsafe {
         let instance = GetModuleHandleW(None)?;
-        let class_name = w!("LinkCursorEdgeOverlay");
+        let class_name = w!("RinflowEdgeOverlay");
         let class = WNDCLASSW {
             lpfnWndProc: Some(window_proc),
             hInstance: instance.into(),
@@ -1068,7 +1068,7 @@ fn create_window() -> Result<HWND> {
                 | WS_EX_TOOLWINDOW
                 | WS_EX_NOACTIVATE,
             class_name,
-            w!("LinkCursor edge effect"),
+            w!("Rinflow edge effect"),
             WS_POPUP,
             0,
             0,

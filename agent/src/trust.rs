@@ -2,16 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Paired peers, saved to `%LOCALAPPDATA%\LinkCursor\trusted.json`.
+//! Paired peers, saved to `%LOCALAPPDATA%\Rinflow\trusted.json`.
 //!
-//! The core decides who is trusted (see linkcursor-core's
+//! The core decides who is trusted (see rinflow-core's
 //! `runtime/trust.rs`); this keeps what it reports across restarts: each
 //! `paired` event adds the peer's certificate fingerprint, `unpaired`
 //! removes it, and the list goes back to the core as
 //! `CoreConfig::trusted_peers`.
 
 use crate::identity;
-use linkcursor_core::TrustedPeer;
+use rinflow_core::TrustedPeer;
 use serde_json::Value;
 use std::sync::Mutex;
 

@@ -1,8 +1,8 @@
 [package]
-name = "linkcursor-input"
+name = "rinflow-input"
 version = "0.1.0"
 edition = "2024"
-description = "Input for LinkCursor on Windows beyond a normal process: elevated windows, UAC prompts and the lock screen (an input helper and the service that starts it)"
+description = "Input for Rinflow on Windows beyond a normal process: elevated windows, UAC prompts and the lock screen (an input helper and the service that starts it)"
 license = "MPL-2.0"
 repository = "https://github.com/rinflow-dev/rinflow-windows"
 publish = false
@@ -11,11 +11,11 @@ publish = false
 path = "src/lib.rs"
 
 [[bin]]
-name = "linkcursor-input"
+name = "rinflow-input"
 path = "src/bin/input.rs"
 
 [[bin]]
-name = "linkcursor-service"
+name = "rinflow-service"
 path = "src/bin/service.rs"
 
 [dependencies]

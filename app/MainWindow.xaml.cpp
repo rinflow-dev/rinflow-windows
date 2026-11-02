@@ -34,7 +34,7 @@ namespace
 
     // What a row shows, to skip rebuilding rows that did not change. The
     // latency changes all the time and is updated in place instead.
-    std::wstring RowSignature(LinkCursor::PeerItem const& row)
+    std::wstring RowSignature(Rinflow::PeerItem const& row)
     {
         std::wstring signature;
         for (auto const& part : { row.Id(), row.Name(), row.Detail(), row.Glyph(), row.StatusText() })
@@ -51,18 +51,18 @@ namespace
     // Updates `target` to `rows`, replacing only the rows that changed when
     // the devices are the same, so the list does not flicker every second.
     void UpdateRows(Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> const& target,
-        std::vector<LinkCursor::PeerItem> const& rows)
+        std::vector<Rinflow::PeerItem> const& rows)
     {
         bool sameIds = target.Size() == rows.size();
         for (uint32_t i = 0; sameIds && i < rows.size(); ++i)
         {
-            sameIds = target.GetAt(i).as<LinkCursor::PeerItem>().Id() == rows[i].Id();
+            sameIds = target.GetAt(i).as<Rinflow::PeerItem>().Id() == rows[i].Id();
         }
         if (sameIds)
         {
             for (uint32_t i = 0; i < rows.size(); ++i)
             {
-                auto current = target.GetAt(i).as<LinkCursor::PeerItem>();
+                auto current = target.GetAt(i).as<Rinflow::PeerItem>();
                 if (RowSignature(current) != RowSignature(rows[i]))
                 {
                     target.SetAt(i, rows[i]);
@@ -80,7 +80,7 @@ namespace
     }
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void MainWindow::InitializeComponent()
     {
@@ -93,7 +93,7 @@ namespace winrt::LinkCursor::implementation
         // (the one it was launched from), shrunk to fit a small screen.
         HWND hwnd{};
         check_hresult(m_inner.as<::IWindowNative>()->get_WindowHandle(&hwnd));
-        ::LinkCursorApp::KeepWindowIconThemed(hwnd, AppWindow());
+        ::RinflowApp::KeepWindowIconThemed(hwnd, AppWindow());
         auto monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(info) };
         GetMonitorInfoW(monitor, &info);
@@ -109,7 +109,7 @@ namespace winrt::LinkCursor::implementation
 
         auto dispatcher = DispatcherQueue();
         auto weak = get_weak();
-        m_agent = std::make_unique<::LinkCursorApp::AgentClient>();
+        m_agent = std::make_unique<::RinflowApp::AgentClient>();
         m_agent->Start(
             [dispatcher, weak](JsonObject const& message)
             {
@@ -125,7 +125,7 @@ namespace winrt::LinkCursor::implementation
                     if (auto self = weak.get(); self && !self->m_closed) self->SetAgentLinked(linked);
                 });
             },
-            [dispatcher, weak](::LinkCursorApp::AgentProblem problem, uint32_t code)
+            [dispatcher, weak](::RinflowApp::AgentProblem problem, uint32_t code)
             {
                 dispatcher.TryEnqueue([weak, problem, code]
                 {
@@ -174,8 +174,8 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self) return;
             self->m_closed = true;
-            // 关闭窗口时保留在托盘 off: closing the window quits LinkCursor.
-            if (!self->m_keepInTray && !LinkCursorApp::IsRelaunching())
+            // 关闭窗口时保留在托盘 off: closing the window quits Rinflow.
+            if (!self->m_keepInTray && !RinflowApp::IsRelaunching())
             {
                 self->m_agent->Quit();
             }
@@ -208,7 +208,7 @@ namespace winrt::LinkCursor::implementation
             auto self = weak.get();
             if (!self) return;
             bool on = self->SharingToggle().IsOn();
-            self->SharingState().Text(LinkCursorApp::Text(on ? L"On" : L"Off"));
+            self->SharingState().Text(RinflowApp::Text(on ? L"On" : L"Off"));
             if (!self->m_applying)
             {
                 self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(on));
@@ -270,7 +270,7 @@ namespace winrt::LinkCursor::implementation
         }
     }
 
-    MenuFlyout MainWindow::DeviceMenu(LinkCursorApp::DeviceInfo const& device)
+    MenuFlyout MainWindow::DeviceMenu(RinflowApp::DeviceInfo const& device)
     {
         MenuFlyout menu;
         auto weak = get_weak();
@@ -294,36 +294,36 @@ namespace winrt::LinkCursor::implementation
 
         if (device.connected)
         {
-            add(LinkCursorApp::Text(L"MenuDisconnect"), L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });
+            add(RinflowApp::Text(L"MenuDisconnect"), L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });
         }
         else if (device.online && !device.connecting)
         {
-            add(LinkCursorApp::Text(L"MenuConnect"), L"\xE8CE", [peerId](MainWindow& self) { self.m_agent->Connect(peerId); });
+            add(RinflowApp::Text(L"MenuConnect"), L"\xE8CE", [peerId](MainWindow& self) { self.m_agent->Connect(peerId); });
         }
         if (menu.Items().Size() > 0)
         {
             menu.Items().Append(MenuFlyoutSeparator());
         }
-        add(LinkCursorApp::Text(L"MenuPlaceLeft"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"left"); });
-        add(LinkCursorApp::Text(L"MenuPlaceRight"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"right"); });
-        add(LinkCursorApp::Text(L"MenuPlaceTop"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"top"); });
-        add(LinkCursorApp::Text(L"MenuPlaceBottom"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"bottom"); });
+        add(RinflowApp::Text(L"MenuPlaceLeft"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"left"); });
+        add(RinflowApp::Text(L"MenuPlaceRight"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"right"); });
+        add(RinflowApp::Text(L"MenuPlaceTop"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"top"); });
+        add(RinflowApp::Text(L"MenuPlaceBottom"), nullptr, [peerId](MainWindow& self) { self.m_agent->PlaceBeside(peerId, L"bottom"); });
         if (device.placed)
         {
-            add(LinkCursorApp::Text(L"MenuUnplace"), nullptr, [peerId](MainWindow& self) { self.m_agent->RemovePlacement(peerId); });
+            add(RinflowApp::Text(L"MenuUnplace"), nullptr, [peerId](MainWindow& self) { self.m_agent->RemovePlacement(peerId); });
         }
         menu.Items().Append(MenuFlyoutSeparator());
         auto deviceName = device.name;
-        add(LinkCursorApp::Text(L"MenuPeerInput"), L"\xE962", [peerId, deviceName](MainWindow& self) { self.EditPeerInput(peerId, deviceName); });
+        add(RinflowApp::Text(L"MenuPeerInput"), L"\xE962", [peerId, deviceName](MainWindow& self) { self.EditPeerInput(peerId, deviceName); });
         auto name = device.name;
-        add(LinkCursorApp::Text(L"MenuForget"), L"\xE74D", [peerId, name](MainWindow& self)
+        add(RinflowApp::Text(L"MenuForget"), L"\xE74D", [peerId, name](MainWindow& self)
         {
             ContentDialog confirm;
             confirm.XamlRoot(self.Root().XamlRoot());
-            confirm.Title(box_value(LinkCursorApp::Format(L"ForgetTitle", std::wstring(name))));
-            confirm.Content(box_value(LinkCursorApp::Text(L"ForgetContent")));
-            confirm.PrimaryButtonText(LinkCursorApp::Text(L"ForgetConfirm"));
-            confirm.CloseButtonText(LinkCursorApp::Text(L"Cancel"));
+            confirm.Title(box_value(RinflowApp::Format(L"ForgetTitle", std::wstring(name))));
+            confirm.Content(box_value(RinflowApp::Text(L"ForgetContent")));
+            confirm.PrimaryButtonText(RinflowApp::Text(L"ForgetConfirm"));
+            confirm.CloseButtonText(RinflowApp::Text(L"Cancel"));
             confirm.DefaultButton(ContentDialogButton::Close);
             auto weak = self.get_weak();
             try
@@ -363,13 +363,13 @@ namespace winrt::LinkCursor::implementation
 
     void MainWindow::ApplyState(JsonObject const& state)
     {
-        // The user quit LinkCursor (the agent's tray): every window goes too.
+        // The user quit Rinflow (the agent's tray): every window goes too.
         if (state.GetNamedBoolean(L"quitting", false))
         {
-            LinkCursorApp::QuitApp();
+            RinflowApp::QuitApp();
             return;
         }
-        m_localName = state.GetNamedString(L"device_name", L"LinkCursor");
+        m_localName = state.GetNamedString(L"device_name", L"Rinflow");
         m_deviceId = state.GetNamedString(L"device_id", L"");
         auto error = state.GetNamedString(L"last_error", L"");
         if (error != m_agentError)
@@ -390,7 +390,7 @@ namespace winrt::LinkCursor::implementation
 
     void MainWindow::ApplyDevices(JsonObject const& state)
     {
-        m_model = LinkCursorApp::DeviceModel::FromState(state);
+        m_model = RinflowApp::DeviceModel::FromState(state);
         m_connectedPeerIds.clear();
         hstring controller;
         size_t connected = 0;
@@ -406,29 +406,29 @@ namespace winrt::LinkCursor::implementation
             connecting = connecting || device.connecting;
         }
 
-        std::vector<LinkCursor::PeerItem> rows;
-        for (auto const& device : m_model.mine) rows.push_back(LinkCursorApp::DeviceRow(device));
+        std::vector<Rinflow::PeerItem> rows;
+        for (auto const& device : m_model.mine) rows.push_back(RinflowApp::DeviceRow(device));
         UpdateRows(m_devices, rows);
         DevicesEmptyText().Visibility(rows.empty() ? Visibility::Visible : Visibility::Collapsed);
 
-        std::vector<LinkCursor::PeerItem> nearby;
-        for (auto const& device : m_model.nearby) nearby.push_back(LinkCursorApp::NearbyRow(device));
+        std::vector<Rinflow::PeerItem> nearby;
+        for (auto const& device : m_model.nearby) nearby.push_back(RinflowApp::NearbyRow(device));
         UpdateRows(m_nearby, nearby);
         NearbyEmptyPanel().Visibility(nearby.empty() ? Visibility::Visible : Visibility::Collapsed);
 
         // The dot by 添加设备: green while connected; the tooltip says more.
         StatusDotConnected().Visibility(connected > 0 ? Visibility::Visible : Visibility::Collapsed);
         hstring status;
-        if (!controller.empty()) status = LinkCursorApp::Format(L"StatusControlledBy", std::wstring(controller));
-        else if (connected == 1) status = LinkCursorApp::Text(L"StatusOneConnected");
-        else if (connected > 1) status = LinkCursorApp::Format(L"StatusManyConnected", connected);
-        else if (connecting) status = LinkCursorApp::Text(L"StatusConnecting");
+        if (!controller.empty()) status = RinflowApp::Format(L"StatusControlledBy", std::wstring(controller));
+        else if (connected == 1) status = RinflowApp::Text(L"StatusOneConnected");
+        else if (connected > 1) status = RinflowApp::Format(L"StatusManyConnected", connected);
+        else if (connecting) status = RinflowApp::Text(L"StatusConnecting");
         else
         {
             auto core = state.GetNamedString(L"core", L"starting");
-            status = core == L"running" ? LinkCursorApp::Text(L"StatusSearching")
-                : core == L"stopped" ? LinkCursorApp::Text(L"StatusCoreStopped")
-                : LinkCursorApp::Text(L"StatusStarting");
+            status = core == L"running" ? RinflowApp::Text(L"StatusSearching")
+                : core == L"stopped" ? RinflowApp::Text(L"StatusCoreStopped")
+                : RinflowApp::Text(L"StatusStarting");
         }
         ToolTipService::SetToolTip(StatusIndicator(), box_value(status));
     }
@@ -456,7 +456,7 @@ namespace winrt::LinkCursor::implementation
     {
         if (!linked)
         {
-            ToolTipService::SetToolTip(StatusIndicator(), box_value(LinkCursorApp::Text(L"StatusAgentConnecting")));
+            ToolTipService::SetToolTip(StatusIndicator(), box_value(RinflowApp::Text(L"StatusAgentConnecting")));
             StatusDotConnected().Visibility(Visibility::Collapsed);
             m_devices.Clear();
             m_nearby.Clear();
@@ -476,9 +476,9 @@ namespace winrt::LinkCursor::implementation
         }
     }
 
-    void MainWindow::ShowAgentProblem(::LinkCursorApp::AgentProblem problem, uint32_t code)
+    void MainWindow::ShowAgentProblem(::RinflowApp::AgentProblem problem, uint32_t code)
     {
-        using ::LinkCursorApp::AgentProblem;
+        using ::RinflowApp::AgentProblem;
         if (problem == AgentProblem::None)
         {
             AgentBar().IsOpen(false);
@@ -488,11 +488,11 @@ namespace winrt::LinkCursor::implementation
         // missing DLL), Win32 errors in decimal (2: file not found).
         auto hex = std::format(L"0x{:X}", code);
         hstring message = problem == AgentProblem::CannotStart
-            ? LinkCursorApp::Format(L"AgentCannotStart", std::to_wstring(code))
+            ? RinflowApp::Format(L"AgentCannotStart", std::to_wstring(code))
             : problem == AgentProblem::Exited
-            ? LinkCursorApp::Format(L"AgentExited", hex)
-            : LinkCursorApp::Text(L"AgentNoAnswer");
-        AgentBar().Title(LinkCursorApp::Text(L"AgentProblemTitle"));
+            ? RinflowApp::Format(L"AgentExited", hex)
+            : RinflowApp::Text(L"AgentNoAnswer");
+        AgentBar().Title(RinflowApp::Text(L"AgentProblemTitle"));
         AgentBar().Message(message);
         AgentBar().IsOpen(true);
         // Not "no devices yet": the devices are unknown while it is down.

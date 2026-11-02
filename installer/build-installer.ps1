@@ -4,12 +4,12 @@
 
 <#
 .SYNOPSIS
-Builds the LinkCursor setup program: the Release build, then Inno Setup.
+Builds the Rinflow setup program: the Release build, then Inno Setup.
 
 .DESCRIPTION
-Runs build.ps1 -Configuration Release, then compiles LinkCursor.iss with
+Runs build.ps1 -Configuration Release, then compiles Rinflow.iss with
 ISCC.exe (Inno Setup 6). The version comes from agent\Cargo.toml. The
-result is installer\output\LinkCursor-Setup-<version>-x64.exe.
+result is installer\output\Rinflow-Setup-<version>-x64.exe.
 Keep this file ASCII-only: Windows PowerShell 5.1 reads scripts without a
 BOM in the system code page.
 
@@ -19,7 +19,7 @@ BOM in the system code page.
 #>
 [CmdletBinding()]
 param(
-    # Package what is already in app\x64\Release\LinkCursor.
+    # Package what is already in app\x64\Release\Rinflow.
     [switch]$SkipBuild
 )
 
@@ -47,15 +47,15 @@ if ($cargo -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
     throw 'No version in agent\Cargo.toml.'
 }
 $version = $Matches[1]
-$source = Join-Path $root 'app\x64\Release\LinkCursor'
-foreach ($exe in 'LinkCursor.exe', 'linkcursor-agent.exe', 'linkcursor-input.exe', 'linkcursor-service.exe') {
+$source = Join-Path $root 'app\x64\Release\Rinflow'
+foreach ($exe in 'Rinflow.exe', 'rinflow-agent.exe', 'rinflow-input.exe', 'rinflow-service.exe') {
     if (-not (Test-Path (Join-Path $source $exe))) {
         throw "$exe is missing from $source."
     }
 }
 
-& $iscc "/DAppVersion=$version" "/DSourceDir=$source" (Join-Path $PSScriptRoot 'LinkCursor.iss')
+& $iscc "/DAppVersion=$version" "/DSourceDir=$source" (Join-Path $PSScriptRoot 'Rinflow.iss')
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed ($LASTEXITCODE)."
 }
-Get-Item (Join-Path $PSScriptRoot "output\LinkCursor-Setup-$version-x64.exe")
+Get-Item (Join-Path $PSScriptRoot "output\Rinflow-Setup-$version-x64.exe")

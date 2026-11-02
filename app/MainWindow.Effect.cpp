@@ -15,7 +15,7 @@ using namespace winrt::Microsoft::UI::Xaml;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
 using namespace winrt::Windows::Data::Json;
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void MainWindow::SetupEffectPage()
     {

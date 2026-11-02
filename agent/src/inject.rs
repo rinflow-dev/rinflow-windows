@@ -6,7 +6,7 @@
 //!
 //! Runs on its own thread so the core's network threads never wait on the
 //! window manager. Received events follow the wire conventions documented on
-//! `LcInputEvent` in linkcursor-core: deltas and scroll amounts in logical
+//! `LcInputEvent` in rinflow-core: deltas and scroll amounts in logical
 //! points, keys as USB HID usages already translated for this platform's
 //! shortcut convention.
 //!
@@ -32,13 +32,13 @@
 use crate::displays;
 use crate::elevated;
 use crate::keymap::{WinKey, windows_key};
-use linkcursor_core::Core;
-use linkcursor_core::{
+use rinflow_core::Core;
+use rinflow_core::{
     LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_PRECISE_SCROLL, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
     LC_INPUT_SCROLL, LcInputEvent,
 };
-use linkcursor_input::VirtualDesktop;
+use rinflow_input::VirtualDesktop;
 use std::collections::HashSet;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -67,7 +67,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 /// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
 /// own low-level hooks can tell played input from the user's hardware.
-pub use linkcursor_input::INJECTED_MARKER;
+pub use rinflow_input::INJECTED_MARKER;
 
 /// Windows apps such as Chrome and Edge scroll 100 DIPs per wheel notch of
 /// 120 units, so this keeps trackpad distances the same as on the sender.
@@ -133,7 +133,7 @@ impl Injector {
     pub fn spawn() -> io::Result<Self> {
         let (sender, receiver) = mpsc::channel();
         let join = std::thread::Builder::new()
-            .name("linkcursor-inject".to_owned())
+            .name("rinflow-inject".to_owned())
             .spawn(move || {
                 let mut player = Player::default();
                 // Jobs arrive in order, so the key-ups the core sends when a
@@ -550,7 +550,7 @@ fn tell_refused() {
     use crate::i18n::tr;
     // Installed with setup: the settings switch adds the service (setup
     // leaves it out while the setting is off).
-    let installed = elevated::available() || linkcursor_input::win::service_installable();
+    let installed = elevated::available() || rinflow_input::win::service_installable();
     log!(
         "a UAC prompt or the lock screen has input: Windows refuses this process's input there; {}",
         if installed {
@@ -561,13 +561,13 @@ fn tell_refused() {
     );
     let text = if installed {
         tr(
-            "在 LinkCursor 设置里打开“被控时可操作管理员窗口、UAC 和锁屏”后，其他设备就能在锁屏和 UAC 窗口里输入。",
-            "Turn on \"Admin windows, UAC and the lock screen while controlled\" in LinkCursor's settings to let other devices type there.",
+            "在 Rinflow 设置里打开“被控时可操作管理员窗口、UAC 和锁屏”后，其他设备就能在锁屏和 UAC 窗口里输入。",
+            "Turn on \"Admin windows, UAC and the lock screen while controlled\" in Rinflow's settings to let other devices type there.",
         )
     } else {
         tr(
-            "要在锁屏和 UAC 窗口里用其他设备的键盘鼠标，请用安装包安装 LinkCursor，它会装上所需的输入服务。",
-            "To use another device's keyboard and mouse on the lock screen and in UAC prompts, install LinkCursor with its setup program, which adds the input service this needs.",
+            "要在锁屏和 UAC 窗口里用其他设备的键盘鼠标，请用安装包安装 Rinflow，它会装上所需的输入服务。",
+            "To use another device's keyboard and mouse on the lock screen and in UAC prompts, install Rinflow with its setup program, which adds the input service this needs.",
         )
     };
     crate::tray::notify(
@@ -620,7 +620,7 @@ mod tests {
     use super::{
         WHEEL_UNITS_PER_LINE_POINT, WHEEL_UNITS_PER_POINT, confined, scaled_step, wheel_step,
     };
-    use linkcursor_input::VirtualDesktop;
+    use rinflow_input::VirtualDesktop;
     use windows_sys::Win32::Foundation::RECT;
 
     #[test]

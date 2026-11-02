@@ -5,9 +5,9 @@
 #pragma once
 
 #include "App.xaml.g.h"
-#include <winrt/LinkCursor.h>
+#include <winrt/Rinflow.h>
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     struct App : AppT<App>
     {
@@ -36,8 +36,8 @@ namespace winrt::LinkCursor::implementation
         // Stops taking requests, lets go of the instance and exits.
         void Shutdown();
 
-        winrt::LinkCursor::MainWindow m_main{ nullptr };
-        winrt::LinkCursor::TrayWindow m_tray{ nullptr };
+        winrt::Rinflow::MainWindow m_main{ nullptr };
+        winrt::Rinflow::TrayWindow m_tray{ nullptr };
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_exitTimer{ nullptr };
         HWND m_activationWindow{ nullptr };
         // When the tray panel last closed: a click on the tray icon closes

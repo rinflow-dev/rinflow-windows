@@ -224,7 +224,7 @@ impl Hider {
     pub fn start(settings: Arc<SettingsStore>) -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
-            .name("linkcursor-hider".to_owned())
+            .name("rinflow-hider".to_owned())
             .spawn(move || {
                 let window = match create_window() {
                     Ok(window) => window,
@@ -483,7 +483,7 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
 }
 
 fn create_window() -> io::Result<HWND> {
-    let class_name = wide("LinkCursorHiddenPointer");
+    let class_name = wide("RinflowHiddenPointer");
     // SAFETY: registers the class and creates a hidden window on this thread.
     unsafe {
         let instance = GetModuleHandleW(null());

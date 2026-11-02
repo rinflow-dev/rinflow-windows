@@ -6,7 +6,7 @@
 
 #include <commctrl.h>
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
     // The window icon appears on the taskbar and in Alt+Tab, which are drawn in
     // the Windows theme. That can differ from the app theme and from the
@@ -30,7 +30,7 @@ namespace LinkCursorApp
         if (!length || length >= path.size()) winrt::throw_last_error();
         path.resize(length);
         path.resize(path.find_last_of(L"\\/") + 1);
-        path += SystemThemeIsDark() ? L"Assets\\LinkCursor.Dark.ico" : L"Assets\\LinkCursor.ico";
+        path += SystemThemeIsDark() ? L"Assets\\Rinflow.Dark.ico" : L"Assets\\Rinflow.ico";
         window.SetIcon(path);
     }
 

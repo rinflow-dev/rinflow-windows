@@ -15,7 +15,7 @@ using namespace winrt::Microsoft::UI::Xaml;
 
 namespace
 {
-    winrt::LinkCursor::implementation::App* s_app = nullptr;
+    winrt::Rinflow::implementation::App* s_app = nullptr;
     wil::unique_mutex s_instanceMutex;
     bool s_relaunching = false;
 
@@ -40,7 +40,7 @@ namespace
         if (message == WM_COPYDATA)
         {
             auto data = reinterpret_cast<COPYDATASTRUCT const*>(lparam);
-            if (!s_app || !data || data->dwData != LinkCursorApp::ActivationRequest || data->cbData < sizeof(wchar_t))
+            if (!s_app || !data || data->dwData != RinflowApp::ActivationRequest || data->cbData < sizeof(wchar_t))
             {
                 return 0;
             }
@@ -63,7 +63,7 @@ namespace
     }
 }
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
     void KeepInstanceMutex(HANDLE mutex) { s_instanceMutex.reset(mutex); }
     void ShowMainWindow(bool settings) { if (s_app) s_app->ShowMain(settings); }
@@ -73,7 +73,7 @@ namespace LinkCursorApp
     bool IsRelaunching() { return s_relaunching; }
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     App::App()
     {
@@ -99,14 +99,14 @@ namespace winrt::LinkCursor::implementation
         // tray panel must not end it while a request is on its way.
         DispatcherShutdownMode(Microsoft::UI::Xaml::DispatcherShutdownMode::OnExplicitShutdown);
         // The language the user chose, before any window loads its strings.
-        LinkCursorApp::ApplyLanguageSetting();
+        RinflowApp::ApplyLanguageSetting();
 
         WNDCLASSW windowClass{};
         windowClass.lpfnWndProc = ActivationProc;
         windowClass.hInstance = GetModuleHandleW(nullptr);
-        windowClass.lpszClassName = LinkCursorApp::ActivationWindowClass;
+        windowClass.lpszClassName = RinflowApp::ActivationWindowClass;
         RegisterClassW(&windowClass);
-        m_activationWindow = CreateWindowExW(0, LinkCursorApp::ActivationWindowClass, L"", 0, 0, 0, 0, 0,
+        m_activationWindow = CreateWindowExW(0, RinflowApp::ActivationWindowClass, L"", 0, 0, 0, 0, 0,
             HWND_MESSAGE, nullptr, windowClass.hInstance, nullptr);
 
         m_exitTimer = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();

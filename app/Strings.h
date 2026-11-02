@@ -7,7 +7,7 @@
 // Text shown in code, in the user's language: Strings\<language>\Resources.resw,
 // the same resources XAML takes through x:Uid. English is the default;
 // Chinese (Simplified) is used when Windows runs in Chinese.
-namespace LinkCursorApp
+namespace RinflowApp
 {
     // The string `key` (a name without a dot, e.g. "TransferCancel").
     winrt::hstring Text(std::wstring_view key);

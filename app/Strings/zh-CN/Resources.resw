@@ -31,13 +31,13 @@
   <data name="PairingTitle" xml:space="preserve"><value>配对 {0}</value></data>
   <data name="PairingInstruction" xml:space="preserve"><value>两台设备上都点“配对”后完成。</value></data>
   <data name="TlsOn" xml:space="preserve"><value>所有连接都用 TLS 1.3 加密，并核对对方的证书。</value></data>
-  <data name="TlsOff" xml:space="preserve"><value>LinkCursor 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。</value></data>
+  <data name="TlsOff" xml:space="preserve"><value>Rinflow 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>光标不会切换到其他设备。按 {0} 解除。</value></data>
-  <data name="PortPending" xml:space="preserve"><value>重新启动 LinkCursor 后改用 {0}；现在使用 {1}。</value></data>
-  <data name="PortHint" xml:space="preserve"><value>其他设备通过这个端口连接本机。修改后需要重新启动 LinkCursor。</value></data>
+  <data name="PortPending" xml:space="preserve"><value>重新启动 Rinflow 后改用 {0}；现在使用 {1}。</value></data>
+  <data name="PortHint" xml:space="preserve"><value>其他设备通过这个端口连接本机。修改后需要重新启动 Rinflow。</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。更改需要管理员确认。</value></data>
-  <data name="ElevatedOff" xml:space="preserve"><value>需要用安装包安装 LinkCursor：由随附的输入服务完成。</value></data>
-  <data name="ElevatedRecommended" xml:space="preserve"><value>建议打开：其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。打开时需要管理员确认，并会安装 LinkCursor 输入服务。</value></data>
+  <data name="ElevatedOff" xml:space="preserve"><value>需要用安装包安装 Rinflow：由随附的输入服务完成。</value></data>
+  <data name="ElevatedRecommended" xml:space="preserve"><value>建议打开：其他设备控制本机时，也能操作以管理员身份运行的程序、UAC 确认窗口和锁屏。打开时需要管理员确认，并会安装 Rinflow 输入服务。</value></data>
   <data name="Version" xml:space="preserve"><value>版本 {0}</value></data>
   <data name="HotkeyNeedsModifier" xml:space="preserve"><value>需要包含 Ctrl、Alt 或 Win</value></data>
   <data name="MenuDisconnect" xml:space="preserve"><value>断开连接</value></data>
@@ -60,7 +60,7 @@
   <data name="StatusStarting" xml:space="preserve"><value>正在启动…</value></data>
   <data name="StatusAgentConnecting" xml:space="preserve"><value>正在连接后台服务…</value></data>
   <data name="AgentProblemTitle" xml:space="preserve"><value>后台服务没有运行</value></data>
-  <data name="AgentCannotStart" xml:space="preserve"><value>无法启动 linkcursor-agent.exe（错误 {0}）。它可能被杀毒软件拦截或被删除了，重新安装 LinkCursor 通常可以解决。</value></data>
+  <data name="AgentCannotStart" xml:space="preserve"><value>无法启动 rinflow-agent.exe（错误 {0}）。它可能被杀毒软件拦截或被删除了，重新安装 Rinflow 通常可以解决。</value></data>
   <data name="AgentExited" xml:space="preserve"><value>后台服务启动后立即退出了（代码 {0}）。原因记录在日志里：设置 → 打开日志文件夹。</value></data>
   <data name="AgentNoAnswer" xml:space="preserve"><value>后台服务已经启动，但一直没有响应。</value></data>
   <data name="AgentRetryButton.Content" xml:space="preserve"><value>重试</value></data>
@@ -73,7 +73,7 @@
   <data name="AddressDuplicate" xml:space="preserve"><value>已经添加过这个地址。</value></data>
   <data name="AddressTooMany" xml:space="preserve"><value>最多添加 32 个地址。</value></data>
   <data name="AddressFound" xml:space="preserve"><value>已找到 {0}</value></data>
-  <data name="AddressNoResponse" xml:space="preserve"><value>没有回应：请确认对方运行着 LinkCursor，并且防火墙允许它通信。</value></data>
+  <data name="AddressNoResponse" xml:space="preserve"><value>没有回应：请确认对方运行着 Rinflow，并且防火墙允许它通信。</value></data>
   <data name="AddressUnresolved" xml:space="preserve"><value>找不到这个名称（{0}）。</value></data>
   <data name="AddressSearching" xml:space="preserve"><value>正在查找…</value></data>
   <data name="AddressRemove" xml:space="preserve"><value>移除</value></data>
@@ -94,13 +94,13 @@
   <data name="RowConnect.Content" xml:space="preserve"><value>连接</value></data>
   <data name="RowMore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>更多操作</value></data>
   <data name="RowMore.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>更多操作</value></data>
-  <data name="DevicesEmpty.Text" xml:space="preserve"><value>还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。</value></data>
+  <data name="DevicesEmpty.Text" xml:space="preserve"><value>还没有设备。点“添加设备”连接同一网络中运行 Rinflow 的电脑；从其他设备连过来的也会出现在这里。</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>设置</value></data>
   <data name="GeneralHeader.Text" xml:space="preserve"><value>常规</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>开机时启动</value></data>
   <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>开机时启动</value></data>
   <data name="TrayTitle.Text" xml:space="preserve"><value>关闭窗口时保留在托盘</value></data>
-  <data name="TrayDescription.Text" xml:space="preserve"><value>关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。</value></data>
+  <data name="TrayDescription.Text" xml:space="preserve"><value>关闭后，关掉窗口会同时退出 Rinflow，键鼠共享也随之停止。</value></data>
   <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>关闭窗口时保留在托盘</value></data>
   <data name="ThemeTitle.Text" xml:space="preserve"><value>主题</value></data>
   <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>主题</value></data>
@@ -108,7 +108,7 @@
   <data name="ThemeLight.Content" xml:space="preserve"><value>浅色</value></data>
   <data name="ThemeDark.Content" xml:space="preserve"><value>深色</value></data>
   <data name="LanguageTitle.Text" xml:space="preserve"><value>语言</value></data>
-  <data name="LanguageDescription.Text" xml:space="preserve"><value>更改后 LinkCursor 窗口会重新打开。</value></data>
+  <data name="LanguageDescription.Text" xml:space="preserve"><value>更改后 Rinflow 窗口会重新打开。</value></data>
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>语言</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>跟随系统</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>屏幕切换</value></data>
@@ -151,7 +151,7 @@
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>一起锁定</value></data>
   <data name="ClipboardHeader.Text" xml:space="preserve"><value>剪贴板</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>同步剪贴板和文件</value></data>
-  <data name="ClipboardDescription.Text" xml:space="preserve"><value>控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。</value></data>
+  <data name="ClipboardDescription.Text" xml:space="preserve"><value>控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\Rinflow”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>同步剪贴板和文件</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>网络与安全</value></data>
   <data name="PortTitle.Text" xml:space="preserve"><value>端口</value></data>
@@ -174,7 +174,7 @@
   <data name="OpenLogsButton.Content" xml:space="preserve"><value>打开日志文件夹</value></data>
   <data name="AddDeviceDialog.Title" xml:space="preserve"><value>添加设备</value></data>
   <data name="AddDeviceDialog.CloseButtonText" xml:space="preserve"><value>关闭</value></data>
-  <data name="AddDeviceHint.Text" xml:space="preserve"><value>同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。</value></data>
+  <data name="AddDeviceHint.Text" xml:space="preserve"><value>同一网络中运行 Rinflow 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。</value></data>
   <data name="NearbyConnect.Content" xml:space="preserve"><value>连接</value></data>
   <data name="NearbySearching.Text" xml:space="preserve"><value>正在查找附近的设备…</value></data>
   <data name="AddressHeader.Text" xml:space="preserve"><value>通过地址添加</value></data>
@@ -206,6 +206,6 @@
   <data name="TrayOpenButton.Content" xml:space="preserve"><value>打开主窗口</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设置</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>设置</value></data>
-  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>退出 LinkCursor</value></data>
-  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>退出 LinkCursor</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>退出 Rinflow</value></data>
+  <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>退出 Rinflow</value></data>
 </root>

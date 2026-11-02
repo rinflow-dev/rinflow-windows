@@ -4,7 +4,7 @@
 
 <#
 .SYNOPSIS
-Builds, runs and stops LinkCursor for Windows while developing.
+Builds, runs and stops Rinflow for Windows while developing.
 
 .DESCRIPTION
 Run it directly (.\dev.ps1 run). A Makefile can call it too.
@@ -49,9 +49,9 @@ if ($env:PROCESSOR_ARCHITEW6432 -and -not [Environment]::Is64BitProcess) {
     exit $LASTEXITCODE
 }
 
-$output = Join-Path $PSScriptRoot "app\$Platform\$Configuration\LinkCursor"
+$output = Join-Path $PSScriptRoot "app\$Platform\$Configuration\Rinflow"
 
-Add-Type -Namespace LinkCursorDev -Name Win32 -MemberDefinition @'
+Add-Type -Namespace RinflowDev -Name Win32 -MemberDefinition @'
 [DllImport("user32.dll", CharSet = CharSet.Unicode)]
 public static extern IntPtr FindWindowW(string className, string windowName);
 [DllImport("user32.dll")]
@@ -71,9 +71,9 @@ function Wait-Exit($Processes, [int]$Seconds) {
     }
 }
 
-function Stop-LinkCursor {
+function Stop-Rinflow {
     # The settings window first: it would start a new agent otherwise.
-    $windows = @(Get-Process -Name 'LinkCursor' -ErrorAction SilentlyContinue)
+    $windows = @(Get-Process -Name 'Rinflow' -ErrorAction SilentlyContinue)
     foreach ($window in $windows) {
         Write-Host "Closing the settings window ($($window.Id))"
         $window.CloseMainWindow() | Out-Null
@@ -83,13 +83,13 @@ function Stop-LinkCursor {
     # One agent runs per session. Its hidden tray window takes WM_CLOSE like
     # the tray menu's Quit: the icon goes away and peers see a clean
     # disconnect, which killing it would not give.
-    $agents = @(Get-Process -Name 'linkcursor-agent' -ErrorAction SilentlyContinue)
+    $agents = @(Get-Process -Name 'rinflow-agent' -ErrorAction SilentlyContinue)
     if ($agents.Count -gt 0) {
-        Write-Host "Quitting linkcursor-agent ($(@($agents.Id) -join ', '))"
+        Write-Host "Quitting rinflow-agent ($(@($agents.Id) -join ', '))"
         # [NullString]: PowerShell would turn $null into "", a window title.
-        $tray = [LinkCursorDev.Win32]::FindWindowW('LinkCursorAgentTray', [NullString]::Value)
+        $tray = [RinflowDev.Win32]::FindWindowW('RinflowAgentTray', [NullString]::Value)
         if ($tray -ne [IntPtr]::Zero) {
-            [LinkCursorDev.Win32]::PostMessageW($tray, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+            [RinflowDev.Win32]::PostMessageW($tray, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
         }
     }
     Wait-Exit $agents 5
@@ -107,37 +107,37 @@ function Invoke-Build {
     }
 }
 
-function Start-LinkCursor {
-    $agent = Start-Process -FilePath (Join-Path $output 'linkcursor-agent.exe') `
+function Start-Rinflow {
+    $agent = Start-Process -FilePath (Join-Path $output 'rinflow-agent.exe') `
         -WorkingDirectory $output -NoNewWindow -PassThru
 
     # Open the settings window once the agent's pipe exists.
-    $pipe = '\\.\pipe\LinkCursor.Agent.' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $pipe = '\\.\pipe\Rinflow.Agent.' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     $deadline = (Get-Date).AddSeconds(10)
     while (-not $agent.HasExited -and (Get-Date) -lt $deadline -and
-        -not [LinkCursorDev.Win32]::WaitNamedPipeW($pipe, 1)) {
+        -not [RinflowDev.Win32]::WaitNamedPipeW($pipe, 1)) {
         Start-Sleep -Milliseconds 100
     }
     if ($agent.HasExited) {
-        Write-Host 'linkcursor-agent exited during start-up'
+        Write-Host 'rinflow-agent exited during start-up'
         exit 1
     }
     # The window starts an agent of its own when it loses this one. This
     # agent belongs to the terminal, so point that override at nothing.
-    $env:LINKCURSOR_AGENT_PATH = 'started-by-make-run'
-    Start-Process -FilePath (Join-Path $output 'LinkCursor.exe') -WorkingDirectory $output
-    Remove-Item Env:LINKCURSOR_AGENT_PATH
+    $env:RINFLOW_AGENT_PATH = 'started-by-make-run'
+    Start-Process -FilePath (Join-Path $output 'Rinflow.exe') -WorkingDirectory $output
+    Remove-Item Env:RINFLOW_AGENT_PATH
 
-    Write-Host 'linkcursor-agent is running; its log follows. Ctrl+C quits it.'
+    Write-Host 'rinflow-agent is running; its log follows. Ctrl+C quits it.'
     $agent.WaitForExit()
 }
 
 switch ($Action) {
     'build' { Invoke-Build }
-    'stop' { Stop-LinkCursor }
+    'stop' { Stop-Rinflow }
     'run' {
-        Stop-LinkCursor
+        Stop-Rinflow
         Invoke-Build
-        Start-LinkCursor
+        Start-Rinflow
     }
 }

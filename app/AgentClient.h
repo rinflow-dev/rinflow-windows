@@ -4,9 +4,9 @@
 
 #pragma once
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
-    // Talks to linkcursor-agent.exe over its per-user named pipe: one JSON
+    // Talks to rinflow-agent.exe over its per-user named pipe: one JSON
     // object per line in each direction. Starts the agent if it is not
     // running and reconnects if it goes away. Callbacks run on a background
     // thread; callers marshal to the UI thread themselves.

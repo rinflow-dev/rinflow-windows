@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // The tray panel: opened by clicking the agent's tray icon (the agent starts
-// LinkCursor.exe --tray, which a running app takes over). A small borderless
+// Rinflow.exe --tray, which a running app takes over). A small borderless
 // window by the notification area that closes as soon as it loses focus.
 
 #include "pch.h"
@@ -29,7 +29,7 @@ namespace
     constexpr size_t MaxRows = 8;
 }
 
-namespace winrt::LinkCursor::implementation
+namespace winrt::Rinflow::implementation
 {
     void TrayWindow::InitializeComponent()
     {
@@ -51,7 +51,7 @@ namespace winrt::LinkCursor::implementation
 
         auto dispatcher = DispatcherQueue();
         auto weak = get_weak();
-        m_agent = std::make_unique<::LinkCursorApp::AgentClient>();
+        m_agent = std::make_unique<::RinflowApp::AgentClient>();
         m_agent->Start(
             [dispatcher, weak](JsonObject const& message)
             {
@@ -77,7 +77,7 @@ namespace winrt::LinkCursor::implementation
         {
             auto self = weak.get();
             if (!self) return;
-            self->DispatcherQueue().TryEnqueue([settings] { LinkCursorApp::ShowMainWindow(settings); });
+            self->DispatcherQueue().TryEnqueue([settings] { RinflowApp::ShowMainWindow(settings); });
             self->Dismiss();
         };
         OpenButton().Click([openMain](auto&&, auto&&) { openMain(false); });
@@ -85,7 +85,7 @@ namespace winrt::LinkCursor::implementation
         QuitButton().Click([weak](auto&&, auto&&)
         {
             if (auto self = weak.get()) self->m_agent->Quit();
-            LinkCursorApp::QuitApp();
+            RinflowApp::QuitApp();
         });
 
         // Like any flyout: gone once something else is clicked, or on Esc.
@@ -116,7 +116,7 @@ namespace winrt::LinkCursor::implementation
                 self->m_closing = true;
                 self->m_agent->Stop();
             }
-            LinkCursorApp::TrayPanelClosed();
+            RinflowApp::TrayPanelClosed();
         });
     }
 
@@ -189,10 +189,10 @@ namespace winrt::LinkCursor::implementation
 
     void TrayWindow::ApplyState(JsonObject const& state)
     {
-        // The user quit LinkCursor (the agent's tray): every window goes too.
+        // The user quit Rinflow (the agent's tray): every window goes too.
         if (state.GetNamedBoolean(L"quitting", false))
         {
-            LinkCursorApp::QuitApp();
+            RinflowApp::QuitApp();
             return;
         }
         auto settings = state.GetNamedObject(L"settings", JsonObject{});
@@ -210,13 +210,13 @@ namespace winrt::LinkCursor::implementation
         if (SharingToggle().IsOn() != sharing) SharingToggle().IsOn(sharing);
         m_applying = false;
 
-        auto model = LinkCursorApp::DeviceModel::FromState(state);
+        auto model = RinflowApp::DeviceModel::FromState(state);
         auto before = m_devices.Size();
         m_devices.Clear();
-        m_devices.Append(LinkCursorApp::LocalRow(model.localName));
+        m_devices.Append(RinflowApp::LocalRow(model.localName));
         for (size_t i = 0; i < model.mine.size() && i < MaxRows; ++i)
         {
-            m_devices.Append(LinkCursorApp::DeviceRow(model.mine[i]));
+            m_devices.Append(RinflowApp::DeviceRow(model.mine[i]));
         }
         if (m_devices.Size() != before)
         {

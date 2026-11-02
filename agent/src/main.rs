@@ -33,11 +33,11 @@ mod tray;
 mod trust;
 mod win;
 
-use linkcursor_core::{Core, CoreConfig};
+use rinflow_core::{Core, CoreConfig};
 use services::Services;
 use std::sync::{Arc, OnceLock};
 
-const INSTANCE_MUTEX: &str = "Local\\LinkCursor.Agent";
+const INSTANCE_MUTEX: &str = "Local\\Rinflow.Agent";
 /// Pairing requests open the main window at most this often.
 const PAIRING_WINDOW_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -66,7 +66,7 @@ fn main() {
 
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
         // Not logged: the running instance owns the log file.
-        eprintln!("linkcursor-agent: another instance is already running in this session");
+        eprintln!("rinflow-agent: another instance is already running in this session");
         return;
     };
     log::init();
@@ -279,7 +279,7 @@ fn main() {
     // answered here.
     let elevated_state = state.clone();
     let elevated_edge = edge.handle();
-    let installable = linkcursor_input::win::service_installable();
+    let installable = rinflow_input::win::service_installable();
     elevated_state.set_elevated_input(state::ElevatedInputView {
         installable,
         ..Default::default()

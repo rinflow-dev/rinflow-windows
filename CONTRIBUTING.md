@@ -1,6 +1,6 @@
-# Contributing to LinkCursor for Windows
+# Contributing to Rinflow for Windows
 
-Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, into a folder named `linkcursor-core`, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
+Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, into a folder named `rinflow-core`, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
 
 ## Building and testing
 
@@ -30,11 +30,11 @@ If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOT
 
 ## Protocol and ABI changes
 
-The clients link `linkcursor-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the core README](https://github.com/rinflow-dev/rinflow-core#changing-the-protocol-or-abi) and update the clients in step.
+The clients link `rinflow-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the core README](https://github.com/rinflow-dev/rinflow-core#changing-the-protocol-or-abi) and update the clients in step.
 
 ## License
 
-LinkCursor is licensed under the [Mozilla Public License 2.0](LICENSE). Unless you state otherwise, your contribution is licensed the same way. New source files start with this notice, in the file's comment syntax:
+Rinflow is licensed under the [Mozilla Public License 2.0](LICENSE). Unless you state otherwise, your contribution is licensed the same way. New source files start with this notice, in the file's comment syntax:
 
 ```
 This Source Code Form is subject to the terms of the Mozilla Public

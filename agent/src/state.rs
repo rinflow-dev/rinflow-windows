@@ -5,7 +5,7 @@
 use crate::effect::EffectParams;
 use crate::i18n::tr;
 use crate::settings::Settings;
-use linkcursor_core::layout::{Display, Offset, Side};
+use rinflow_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
@@ -152,7 +152,7 @@ pub struct Snapshot {
     pub paired_peers: Vec<String>,
     /// The LocalSystem input helper (see `elevated.rs`).
     pub elevated_input: ElevatedInputView,
-    /// The user quit LinkCursor (tray 退出): the app quits too instead of
+    /// The user quit Rinflow (tray 退出): the app quits too instead of
     /// starting the agent again.
     pub quitting: bool,
     /// The addresses the user added and how each fares: the core's
@@ -325,7 +325,7 @@ impl SharedState {
             .send_modify(|snapshot| snapshot.last_error = Some(message));
     }
 
-    /// Folds one JSON event from `linkcursor_core::Core` into the snapshot.
+    /// Folds one JSON event from `rinflow_core::Core` into the snapshot.
     /// Runs on the core's threads.
     pub fn apply_core_event(&self, json: &str) {
         let Ok(event) = serde_json::from_str::<Value>(json) else {
@@ -672,7 +672,7 @@ fn disconnect_message(reason: &str) -> Option<String> {
         // core reconnects once it is back.
         "heartbeat timeout" => tr(
             "对方没有响应（可能睡眠了或断网），回来后会自动重新连接。",
-            "The other device stopped responding (it may be asleep or offline). LinkCursor reconnects when it's back.",
+            "The other device stopped responding (it may be asleep or offline). Rinflow reconnects when it's back.",
         )
         .to_owned(),
         "refused by the other device" => tr(

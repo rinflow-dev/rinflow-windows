@@ -6,7 +6,7 @@
 //! acquires a source lease and requests bounded network data.
 #![allow(non_snake_case)]
 use super::{ClipboardHandle, register};
-use linkcursor_core::{Core, FileManifest, MAX_READ_SIZE, RemoteFileLease};
+use rinflow_core::{Core, FileManifest, MAX_READ_SIZE, RemoteFileLease};
 use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
 use std::mem::{ManuallyDrop, size_of};
@@ -101,7 +101,7 @@ pub(super) fn data_object(
         descriptor: register("FileGroupDescriptorW") as u16,
         contents: register("FileContents") as u16,
         effect: register("Preferred DropEffect") as u16,
-        marker: register("LinkCursor Virtual Files") as u16,
+        marker: register("Rinflow Virtual Files") as u16,
     }
     .into())
 }
@@ -146,7 +146,7 @@ fn descriptors(manifest: &FileManifest) -> Result<Vec<u8>> {
 }
 
 /// Each entry's path as Explorer gets it: every name made valid on Windows
-/// (`linkcursor_core::sanitize_file_name`), and one that then equals an
+/// (`rinflow_core::sanitize_file_name`), and one that then equals an
 /// earlier name in its folder, ignoring case, numbered (`a (1).txt`), as
 /// two names a Mac tells apart can be one here ("a:b" and "a_b", or
 /// "Read" and "read" on a case-sensitive disk). A folder's new name carries
@@ -164,7 +164,7 @@ fn windows_paths(manifest: &FileManifest) -> Vec<String> {
             renamed.get(parent).cloned().unwrap_or_else(|| {
                 parent
                     .split('/')
-                    .map(linkcursor_core::sanitize_file_name)
+                    .map(rinflow_core::sanitize_file_name)
                     .collect::<Vec<_>>()
                     .join("\\")
             })
@@ -173,7 +173,7 @@ fn windows_paths(manifest: &FileManifest) -> Vec<String> {
             Some(parent) => format!("{parent}\\{name}"),
             None => name.to_owned(),
         };
-        let name = linkcursor_core::sanitize_file_name(name);
+        let name = rinflow_core::sanitize_file_name(name);
         let mut path = join(&name);
         let mut number = 1;
         while !taken.insert(path.to_lowercase()) {
@@ -624,7 +624,7 @@ impl IStream_Impl for RemoteStream_Impl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use linkcursor_core::{
+    use rinflow_core::{
         Clipboard, ClipboardFormat, CoreConfig, FileEntry, LC_INPUT_MOUSE_MOVE, LcInputEvent,
         MIME_TEXT, MIME_URI_LIST,
     };
@@ -748,7 +748,7 @@ mod tests {
 
     /// Exercises actual COM streams and Windows file storage with two encrypted
     /// cores. The normal run does not touch the system clipboard; the explicit
-    /// LINKCURSOR_TEST_CLIPBOARD opt-in supports a manual Explorer smoke test.
+    /// RINFLOW_TEST_CLIPBOARD opt-in supports a manual Explorer smoke test.
     #[test]
     fn virtual_file_streams_copy_and_survive_new_copies() {
         unsafe {
@@ -764,7 +764,7 @@ mod tests {
         }
         let _ole = Ole;
         let root = std::env::temp_dir().join(format!(
-            "linkcursor-virtual-test-{}-{}",
+            "rinflow-virtual-test-{}-{}",
             std::process::id(),
             port()
         ));
@@ -775,7 +775,7 @@ mod tests {
         std::fs::write(report.join("empty.txt"), []).unwrap();
         std::fs::write(root.join("note.txt"), b"note").unwrap();
         let cache = root.join("unused-cache");
-        let destination = std::env::var_os("LINKCURSOR_TEST_DESTINATION")
+        let destination = std::env::var_os("RINFLOW_TEST_DESTINATION")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| root.join("destination"));
         std::fs::create_dir_all(&destination).unwrap();
@@ -853,7 +853,7 @@ mod tests {
             ClipboardHandle::new(true),
         )
         .unwrap();
-        if std::env::var_os("LINKCURSOR_TEST_CLIPBOARD").is_some() {
+        if std::env::var_os("RINFLOW_TEST_CLIPBOARD").is_some() {
             use windows::Win32::System::Ole::{
                 OleGetClipboard, OleIsCurrentClipboard, OleSetClipboard,
             };
@@ -865,7 +865,7 @@ mod tests {
                 OleSetClipboard(&object).unwrap();
             }
             std::fs::write(
-                std::env::var("LINKCURSOR_TEST_DESTINATION_FILE").unwrap(),
+                std::env::var("RINFLOW_TEST_DESTINATION_FILE").unwrap(),
                 destination.to_string_lossy().as_bytes(),
             )
             .unwrap();
@@ -1046,8 +1046,8 @@ mod tests {
     /// ```text
     /// cargo test --release bench_many_small_files -- --ignored --nocapture
     /// ```
-    /// `LINKCURSOR_BENCH_SOURCE=<folder>` copies that folder (only read);
-    /// otherwise `LINKCURSOR_BENCH_FILES` files of `LINKCURSOR_BENCH_SIZE`
+    /// `RINFLOW_BENCH_SOURCE=<folder>` copies that folder (only read);
+    /// otherwise `RINFLOW_BENCH_FILES` files of `RINFLOW_BENCH_SIZE`
     /// bytes are made, 100 to a folder (default 9 900 × 4 KiB: under the
     /// 10 000 entries a manifest may hold, folders included).
     #[test]
@@ -1072,15 +1072,15 @@ mod tests {
                 .unwrap_or(default)
         };
         let root = std::env::temp_dir().join(format!(
-            "linkcursor-bench-{}-{}",
+            "rinflow-bench-{}-{}",
             std::process::id(),
             port()
         ));
-        let folder = match std::env::var_os("LINKCURSOR_BENCH_SOURCE") {
+        let folder = match std::env::var_os("RINFLOW_BENCH_SOURCE") {
             Some(source) => std::path::PathBuf::from(source),
             None => {
-                let count = number("LINKCURSOR_BENCH_FILES", 9_900);
-                let size = number("LINKCURSOR_BENCH_SIZE", 4096);
+                let count = number("RINFLOW_BENCH_FILES", 9_900);
+                let size = number("RINFLOW_BENCH_SIZE", 4096);
                 let folder = root.join("source").join("many");
                 let content: Vec<u8> = (0..size).map(|i| (i * 7) as u8).collect();
                 for i in 0..count {

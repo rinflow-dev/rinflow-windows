@@ -4,12 +4,12 @@
 
 //! This PC's monitors, in the two coordinate systems the agent needs.
 //!
-//! The arrangement (linkcursor-core `layout`) works in logical points, which
+//! The arrangement (rinflow-core `layout`) works in logical points, which
 //! makes sizes comparable across devices. Hooks, `SendInput` and the overlay
 //! work in physical pixels. Each monitor keeps both, so a point on a logical
 //! edge converts exactly through the monitor it belongs to.
 
-use linkcursor_core::layout::{Display, Portal, Side};
+use rinflow_core::layout::{Display, Portal, Side};
 use std::io;
 use std::ptr::{null, null_mut};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
@@ -248,7 +248,7 @@ pub fn physical_portal(
 /// that also catches changes some drivers do not announce.
 pub fn watch(changed: impl Fn(Vec<Monitor>) + Send + 'static) -> io::Result<()> {
     std::thread::Builder::new()
-        .name("linkcursor-displays".to_owned())
+        .name("rinflow-displays".to_owned())
         .spawn(move || {
             WATCH.with(|watch| {
                 *watch.borrow_mut() = Some(Watch {
@@ -256,7 +256,7 @@ pub fn watch(changed: impl Fn(Vec<Monitor>) + Send + 'static) -> io::Result<()> 
                     changed: Box::new(changed),
                 })
             });
-            let class_name = wide("LinkCursorDisplayWatch");
+            let class_name = wide("RinflowDisplayWatch");
             // SAFETY: a hidden top-level window (message-only windows do not
             // receive WM_DISPLAYCHANGE broadcasts) with a timer on this thread.
             unsafe {

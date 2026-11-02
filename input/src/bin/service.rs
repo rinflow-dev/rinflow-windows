@@ -2,28 +2,28 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `linkcursor-service`: the LinkCursorInput Windows service (LocalSystem,
-//! started automatically). It keeps one `linkcursor-input` running in the
+//! `rinflow-service`: the RinflowInput Windows service (LocalSystem,
+//! started automatically). It keeps one `rinflow-input` running in the
 //! session at the console, as LocalSystem: started when the service starts
 //! and whenever another session takes the console, restarted if it exits.
 //! The helper runs in a job object, so it ends with the service.
 //!
 //! Also a small command line for the installer and the settings page (both
 //! run it as an administrator):
-//! - `linkcursor-service --install` registers this executable as the
+//! - `rinflow-service --install` registers this executable as the
 //!   service (automatic start, restarted after a failure) and starts it; an
 //!   existing registration is updated. Only from Program Files: the service
 //!   trusts the programs beside it.
-//! - `linkcursor-service --uninstall` stops and removes it.
-//! - `linkcursor-service --elevated-input on|off` is the settings switch:
+//! - `rinflow-service --uninstall` stops and removes it.
+//! - `rinflow-service --elevated-input on|off` is the settings switch:
 //!   `on` installs the service and turns the machine-wide setting on, `off`
 //!   removes the service and turns it off. The service exists only while the
 //!   feature is on, so no LocalSystem process runs for a PC that left it off.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use linkcursor_input::win::{self, Handle, wide};
-use linkcursor_input::{INPUT_EXE, SERVICE_NAME, log};
+use rinflow_input::win::{self, Handle, wide};
+use rinflow_input::{INPUT_EXE, SERVICE_NAME, log};
 use std::ffi::OsString;
 use std::ptr::null_mut;
 use std::sync::mpsc;
@@ -68,7 +68,7 @@ fn main() {
         match result {
             Ok(()) => std::process::exit(0),
             Err(error) => {
-                eprintln!("linkcursor-service: {error}");
+                eprintln!("rinflow-service: {error}");
                 std::process::exit(1);
             }
         }
@@ -77,8 +77,8 @@ fn main() {
     if let Err(error) = service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
         log!("not started as a service: {error}");
         eprintln!(
-            "linkcursor-service runs as the {SERVICE_NAME} Windows service; \
-             or: linkcursor-service --elevated-input on|off"
+            "rinflow-service runs as the {SERVICE_NAME} Windows service; \
+             or: rinflow-service --elevated-input on|off"
         );
     }
 }
@@ -124,7 +124,7 @@ fn install() -> windows_service::Result<()> {
     )?;
     let info = ServiceInfo {
         name: SERVICE_NAME.into(),
-        display_name: linkcursor_input::SERVICE_DISPLAY_NAME.into(),
+        display_name: rinflow_input::SERVICE_DISPLAY_NAME.into(),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::AutoStart,
         error_control: ServiceErrorControl::Normal,
@@ -144,7 +144,7 @@ fn install() -> windows_service::Result<()> {
         Err(_) => manager.create_service(&info, access)?,
     };
     service.set_description(
-        "Lets devices that control this PC through LinkCursor operate windows of elevated \
+        "Lets devices that control this PC through Rinflow operate windows of elevated \
          programs, UAC prompts and the lock screen.",
     )?;
     let restart = ServiceAction {

@@ -10,9 +10,9 @@ const SIZES: &[u32] = &[16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256]
 
 fn main() -> Result<(), Box<dyn Error>> {
     let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/Assets");
-    // Each theme has its own supplied artwork: LinkCursor.svg for light
-    // surfaces, LinkCursor.Dark.svg for dark ones.
-    for name in ["LinkCursor", "LinkCursor.Dark"] {
+    // Each theme has its own supplied artwork: Rinflow.svg for light
+    // surfaces, Rinflow.Dark.svg for dark ones.
+    for name in ["Rinflow", "Rinflow.Dark"] {
         let svg = fs::read_to_string(assets.join(format!("{name}.svg")))?;
         let tree = usvg::Tree::from_str(&svg, &usvg::Options::default())?;
         let mut images = Vec::new();

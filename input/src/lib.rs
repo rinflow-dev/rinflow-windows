@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Input beyond a normal process, for LinkCursor on Windows.
+//! Input beyond a normal process, for Rinflow on Windows.
 //!
-//! `linkcursor-agent` runs as the signed-in user, and Windows keeps such a
+//! `rinflow-agent` runs as the signed-in user, and Windows keeps such a
 //! process from playing input into:
 //! - windows of elevated programs (Task Manager, installers): UIPI,
 //! - UAC prompts and the lock screen, which live on the Winlogon desktop.
@@ -14,14 +14,14 @@
 //! that privilege; the network, pairing, files and UI stay in the agent:
 //!
 //! ```text
-//! linkcursor-agent (user)  ── named pipe, this crate's protocol ──►  linkcursor-input (SYSTEM,
+//! rinflow-agent (user)  ── named pipe, this crate's protocol ──►  rinflow-input (SYSTEM,
 //!                                                                    in the user's session)
-//!                                                linkcursor-service (SYSTEM service) starts it
+//!                                                rinflow-service (SYSTEM service) starts it
 //! ```
 //!
-//! - `linkcursor-service` keeps one `linkcursor-input` running in the active
+//! - `rinflow-service` keeps one `rinflow-input` running in the active
 //!   console session and restarts it when the session changes or it exits.
-//! - `linkcursor-input` takes already computed input (`SendInput` values,
+//! - `rinflow-input` takes already computed input (`SendInput` values,
 //!   or a motion in pixels) from the agent of its own session, and plays it
 //!   on whichever desktop has input. It plays nothing unless the machine-wide
 //!   setting allows it ([`ELEVATED_INPUT_VALUE`], which only administrators
@@ -31,7 +31,7 @@
 //!   (a portable copy, or the setting is off).
 //!
 //! Both ends check who is at the other end of the pipe: its executable must
-//! be the other LinkCursor program in the same folder (Program Files when
+//! be the other Rinflow program in the same folder (Program Files when
 //! installed, where only administrators can write), in the same session.
 
 pub mod log;
@@ -53,23 +53,23 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 pub const INJECTED_MARKER: usize = 0x4C43_494E;
 
 /// The service's name (`sc.exe`, the installer).
-pub const SERVICE_NAME: &str = "LinkCursorInput";
-pub const SERVICE_DISPLAY_NAME: &str = "LinkCursor Input";
+pub const SERVICE_NAME: &str = "RinflowInput";
+pub const SERVICE_DISPLAY_NAME: &str = "Rinflow Input";
 
-/// `HKEY_LOCAL_MACHINE` key and DWORD value: 1 lets `linkcursor-input` play
+/// `HKEY_LOCAL_MACHINE` key and DWORD value: 1 lets `rinflow-input` play
 /// input (elevated windows, UAC prompts, the lock screen). Written by the
-/// installer and by `linkcursor-service --elevated-input on|off`, both
+/// installer and by `rinflow-service --elevated-input on|off`, both
 /// running as an administrator.
-pub const REGISTRY_KEY: &str = r"SOFTWARE\LinkCursor";
+pub const REGISTRY_KEY: &str = r"SOFTWARE\Rinflow";
 pub const ELEVATED_INPUT_VALUE: &str = "ElevatedInput";
 
-pub const AGENT_EXE: &str = "linkcursor-agent.exe";
-pub const INPUT_EXE: &str = "linkcursor-input.exe";
-pub const SERVICE_EXE: &str = "linkcursor-service.exe";
+pub const AGENT_EXE: &str = "rinflow-agent.exe";
+pub const INPUT_EXE: &str = "rinflow-input.exe";
+pub const SERVICE_EXE: &str = "rinflow-service.exe";
 
 /// The pipe of the input helper in a session.
 pub fn pipe_name(session: u32) -> String {
-    format!(r"\\.\pipe\LinkCursor.Input.{session}")
+    format!(r"\\.\pipe\Rinflow.Input.{session}")
 }
 
 /// Pipe protocol version, exchanged in `Hello`.
@@ -138,7 +138,7 @@ impl RawInput {
         }
     }
 
-    /// The `INPUT` to play, marked as LinkCursor's; `None` for flags this
+    /// The `INPUT` to play, marked as Rinflow's; `None` for flags this
     /// program never sends.
     pub fn to_input(self) -> Option<INPUT> {
         match self {

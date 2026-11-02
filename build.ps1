@@ -4,13 +4,13 @@
 
 <#
 .SYNOPSIS
-Builds LinkCursor for Windows: the WinUI settings app and the Rust agent.
+Builds Rinflow for Windows: the WinUI settings app and the Rust agent.
 
 .DESCRIPTION
 Works from any PowerShell window. Loads the Visual Studio developer
 environment, switches the console to UTF-8 so MSBuild, MSVC and Cargo output
 is decoded the same way whatever the system locale, and runs MSBuild on
-app\LinkCursor.vcxproj. Keep this file ASCII-only: Windows PowerShell 5.1 reads
+app\Rinflow.vcxproj. Keep this file ASCII-only: Windows PowerShell 5.1 reads
 scripts without a BOM in the system code page.
 
 .EXAMPLE
@@ -78,7 +78,7 @@ Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation `
 # but it lets them be renamed. Move those out of the way, so building never
 # has to stop a running agent or settings window; it keeps running from the
 # renamed files. dev.ps1 deletes the leftovers once it has stopped them.
-$output = Join-Path $PSScriptRoot "app\$Platform\$Configuration\LinkCursor"
+$output = Join-Path $PSScriptRoot "app\$Platform\$Configuration\Rinflow"
 if (Test-Path $output) {
     Get-ChildItem $output -Filter '*.old' -File | Remove-Item -ErrorAction SilentlyContinue
     foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Extension -ne '.old' }) {
@@ -92,7 +92,7 @@ if (Test-Path $output) {
 }
 
 $arguments = @(
-    (Join-Path $PSScriptRoot 'app\LinkCursor.vcxproj'),
+    (Join-Path $PSScriptRoot 'app\Rinflow.vcxproj'),
     '-restore',
     "-p:Configuration=$Configuration",
     "-p:Platform=$Platform",

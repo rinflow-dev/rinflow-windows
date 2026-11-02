@@ -11,8 +11,8 @@ use crate::effect::{EffectParams, EffectStore};
 use crate::overlay::{Command, OverlayHandle};
 use crate::settings::{SettingsStore, autostart};
 use crate::state::SharedState;
-use linkcursor_core::Core;
-use linkcursor_core::layout::Offset;
+use rinflow_core::Core;
+use rinflow_core::layout::Offset;
 use serde_json::{Map, Value};
 use std::sync::{Arc, Weak};
 
@@ -143,7 +143,7 @@ impl Services {
         let core = self
             .core
             .upgrade()
-            .ok_or("LinkCursor core is shutting down")?;
+            .ok_or("Rinflow core is shutting down")?;
         core.accept_pairing(peer_id)?;
         self.state.set_pairing_accepted(peer_id);
         Ok(())
@@ -153,7 +153,7 @@ impl Services {
         let core = self
             .core
             .upgrade()
-            .ok_or("LinkCursor core is shutting down")?;
+            .ok_or("Rinflow core is shutting down")?;
         core.reject_pairing(peer_id)
     }
 

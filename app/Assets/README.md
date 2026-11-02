@@ -1,4 +1,4 @@
-# LinkCursor logo
+# Rinflow logo
 
 Each theme has its own supplied artwork, the source of truth for the icons.
 Both share one geometry on a transparent 64 x 64 canvas, which includes the
@@ -6,8 +6,8 @@ intended padding:
 
 | File                  | For             | Original                      | Stem      | Cursor    |
 | --------------------- | --------------- | ----------------------------- | --------- | --------- |
-| `LinkCursor.svg`      | light surfaces  | `logo-warm-ink-black-512.svg` | `#D9D4D1` | `#181717` |
-| `LinkCursor.Dark.svg` | dark surfaces   | `logo-warm-ink-white-512.svg` | `#4A4746` | `#F5F2F0` |
+| `Rinflow.svg`      | light surfaces  | `logo-warm-ink-black-512.svg` | `#D9D4D1` | `#181717` |
+| `Rinflow.Dark.svg` | dark surfaces   | `logo-warm-ink-white-512.svg` | `#4A4746` | `#F5F2F0` |
 
 The cursor carries the contrast and the stem is deliberately quiet, so each
 variant is only legible on its own theme: the cursor measures 16:1 or more on
@@ -37,9 +37,9 @@ Integration, with the theme that selects the variant on each surface:
   (dark). The tray loads the system small-icon size with `LoadIconMetric`,
   follows `SystemUsesLightTheme`, and reloads after theme or display changes
   and Explorer restarts. Owned icon handles are released.
-- `app/LinkCursor.rc`: the EXE's icons, 101 (index 0, light) and 102 (index 1,
+- `app/Rinflow.rc`: the EXE's icons, 101 (index 0, light) and 102 (index 1,
   dark). Explorer always shows index 0 for the file itself.
-- `installer/LinkCursor.iss`: the setup program uses the light icon. Shortcuts
+- `installer/Rinflow.iss`: the setup program uses the light icon. Shortcuts
   and the uninstall entry use the EXE's icon for the Windows theme at install
   time; an upgrade picks again.
 

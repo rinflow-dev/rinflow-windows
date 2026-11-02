@@ -22,20 +22,20 @@ namespace
         auto user = wil::get_token_information<TOKEN_USER>();
         wil::unique_hlocal_string sid;
         THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(user->User.Sid, sid.put()));
-        return std::wstring(L"\\\\.\\pipe\\LinkCursor.Agent.") + sid.get();
+        return std::wstring(L"\\\\.\\pipe\\Rinflow.Agent.") + sid.get();
     }
 
-    // LINKCURSOR_AGENT_PATH, or linkcursor-agent.exe next to this executable.
+    // RINFLOW_AGENT_PATH, or rinflow-agent.exe next to this executable.
     std::wstring AgentExecutablePath()
     {
-        if (auto overridePath = wil::TryGetEnvironmentVariableW(L"LINKCURSOR_AGENT_PATH"))
+        if (auto overridePath = wil::TryGetEnvironmentVariableW(L"RINFLOW_AGENT_PATH"))
         {
             return overridePath.get();
         }
         auto exe = wil::GetModuleFileNameW<wil::unique_cotaskmem_string>(nullptr);
         std::wstring path = exe.get();
         path.resize(path.find_last_of(L'\\') + 1);
-        return path + L"linkcursor-agent.exe";
+        return path + L"rinflow-agent.exe";
     }
 
     JsonObject Request(std::wstring_view type)
@@ -46,7 +46,7 @@ namespace
     }
 }
 
-namespace LinkCursorApp
+namespace RinflowApp
 {
     AgentClient::~AgentClient()
     {
@@ -253,7 +253,7 @@ namespace LinkCursorApp
             wil::unique_hfile opened{ pipe };
             if (!IsAgentPipe(opened.get()))
             {
-                OutputDebugStringW(L"LinkCursor: the agent pipe belongs to another user; not using it\n");
+                OutputDebugStringW(L"Rinflow: the agent pipe belongs to another user; not using it\n");
                 WaitOrStop(2000);
                 return false;
             }
@@ -316,7 +316,7 @@ namespace LinkCursorApp
             nullptr, nullptr, &startup, &process))
         {
             auto error = GetLastError();
-            OutputDebugStringW((L"LinkCursor: cannot start agent at " + path + L"\n").c_str());
+            OutputDebugStringW((L"Rinflow: cannot start agent at " + path + L"\n").c_str());
             Report(AgentProblem::CannotStart, error);
             return;
         }
@@ -398,7 +398,7 @@ namespace LinkCursorApp
                 JsonObject message{ nullptr };
                 if (JsonObject::TryParse(winrt::to_hstring(std::string_view(buffer).substr(0, newline)), message))
                 {
-                    // The user quit LinkCursor: the agent is not started
+                    // The user quit Rinflow: the agent is not started
                     // again when its pipe closes in a moment.
                     if (message.GetNamedBoolean(L"quitting", false))
                     {

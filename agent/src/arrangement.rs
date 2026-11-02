@@ -4,17 +4,17 @@
 
 //! The arrangement of this PC and its peers, as the settings app shows it.
 //!
-//! linkcursor-core owns placements: it snaps them, syncs them with peers and
+//! rinflow-core owns placements: it snaps them, syncs them with peers and
 //! reports every change as `placement_changed`. This module saves those
-//! reports to `%LOCALAPPDATA%\LinkCursor\layout.json` (handed back to the core
+//! reports to `%LOCALAPPDATA%\Rinflow\layout.json` (handed back to the core
 //! at start-up), remembers peers' names and displays so placed devices still
 //! show while offline, and derives the view and the physical portals.
 
 use crate::displays::{self, Monitor, PhysicalPortal};
 use crate::identity;
 use crate::state::{DeviceView, LayoutView, SharedState};
-use linkcursor_core::PlacementRecord;
-use linkcursor_core::layout::{self, Display, Neighbor, Offset, Portal, Side};
+use rinflow_core::PlacementRecord;
+use rinflow_core::layout::{self, Display, Neighbor, Offset, Portal, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;

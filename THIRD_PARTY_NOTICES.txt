@@ -1,10 +1,10 @@
-LinkCursor for Windows
-Copyright (c) LinkCursor contributors
+Rinflow for Windows
+Copyright (c) Rinflow contributors
 Licensed under the Mozilla Public License 2.0; see LICENSE.txt.
 Source code: https://github.com/rinflow-dev/rinflow-windows
              https://github.com/rinflow-dev/rinflow-core
 
-LinkCursor includes the third-party software listed below.
+Rinflow includes the third-party software listed below.
 
 ==============================================================================
 Microsoft components

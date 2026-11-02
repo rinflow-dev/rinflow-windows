@@ -3,10 +3,10 @@
 # installs and starts as LocalSystem before anyone could notice a missing
 # VCRUNTIME140.dll). The "hybrid CRT": vcruntime goes into each executable,
 # the Universal CRT stays the one Windows 10 and later ship (ucrtbase.dll).
-# The app does the same (app\LinkCursor.vcxproj, RuntimeLibrary).
+# The app does the same (app\Rinflow.vcxproj, RuntimeLibrary).
 #
 # Cargo reads this file from the folder it runs in, not the manifest's:
-# app\LinkCursor.vcxproj runs it from agent\ and input\.
+# app\Rinflow.vcxproj runs it from agent\ and input\.
 [target.'cfg(all(target_os = "windows", target_env = "msvc"))']
 rustflags = [
     "-C", "target-feature=+crt-static",

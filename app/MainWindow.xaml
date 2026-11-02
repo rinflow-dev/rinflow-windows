@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Window
-    x:Class="LinkCursor.MainWindow"
+    x:Class="Rinflow.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:LinkCursor"
+    xmlns:local="using:Rinflow"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="LinkCursor">
+    Title="Rinflow">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -160,7 +160,7 @@
                     Grid.Column="1"
                     VerticalAlignment="Center"
                     Style="{StaticResource CaptionTextBlockStyle}"
-                    Text="LinkCursor" />
+                    Text="Rinflow" />
             </Grid>
         </Grid>
 
@@ -421,7 +421,7 @@
                     <TextBlock
                         x:Name="DevicesEmptyText"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        x:Uid="DevicesEmpty" Text="还没有设备。点“添加设备”连接同一网络中运行 LinkCursor 的电脑；从其他设备连过来的也会出现在这里。"
+                        x:Uid="DevicesEmpty" Text="还没有设备。点“添加设备”连接同一网络中运行 Rinflow 的电脑；从其他设备连过来的也会出现在这里。"
                         TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollView>
@@ -453,7 +453,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TrayTitle" Text="关闭窗口时保留在托盘" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="TrayDescription" Text="关闭后，关掉窗口会同时退出 LinkCursor，键鼠共享也随之停止。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="TrayDescription" Text="关闭后，关掉窗口会同时退出 Rinflow，键鼠共享也随之停止。" />
                         </StackPanel>
                         <TextBlock x:Name="TrayState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" x:Uid="TrayToggle" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
@@ -482,7 +482,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="LanguageTitle" Style="{StaticResource RowTitleStyle}" Text="语言" />
-                            <TextBlock x:Uid="LanguageDescription" Style="{StaticResource RowDescriptionStyle}" Text="更改后 LinkCursor 窗口会重新打开。" />
+                            <TextBlock x:Uid="LanguageDescription" Style="{StaticResource RowDescriptionStyle}" Text="更改后 Rinflow 窗口会重新打开。" />
                         </StackPanel>
                         <!-- Language names stay in their own language. -->
                         <ComboBox
@@ -705,7 +705,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ClipboardTitle" Text="同步剪贴板和文件" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="ClipboardDescription" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\LinkCursor”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="ClipboardDescription" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\Rinflow”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
                         </StackPanel>
                         <TextBlock x:Name="ClipboardState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" x:Uid="ClipboardToggle" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
@@ -807,7 +807,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="LinkCursor" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" Text="Rinflow" />
                             <TextBlock x:Name="VersionText" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
                         <Button
@@ -1055,7 +1055,7 @@
             <StackPanel MinWidth="420" Spacing="12">
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    x:Uid="AddDeviceHint" Text="同一网络中运行 LinkCursor 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
+                    x:Uid="AddDeviceHint" Text="同一网络中运行 Rinflow 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
                     TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{x:Bind Nearby}">
                     <ItemsControl.ItemsPanel>

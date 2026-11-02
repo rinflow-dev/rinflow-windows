@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Agent preferences other than the effect and the arrangement, saved to
-//! `%LOCALAPPDATA%\LinkCursor\settings.json`. Starting at login is not kept
+//! `%LOCALAPPDATA%\Rinflow\settings.json`. Starting at login is not kept
 //! here: the `Run` registry value is the truth (see [`autostart`]).
 
 use crate::i18n::{self, tr};
@@ -19,7 +19,7 @@ pub const MOD_CONTROL: u32 = 0x2;
 pub const MOD_SHIFT: u32 = 0x4;
 pub const MOD_WIN: u32 = 0x8;
 
-/// The discovery port of linkcursor-core; the control port must differ.
+/// The discovery port of rinflow-core; the control port must differ.
 const DISCOVERY_PORT: u16 = 42420;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -52,10 +52,10 @@ pub struct Settings {
     /// a code).
     pub paired_only: bool,
     /// What a Mac's modifier keys play as while it drives this PC (see
-    /// linkcursor-core `remap.rs`). By default Command and Control swap: ⌘C
+    /// rinflow-core `remap.rs`). By default Command and Control swap: ⌘C
     /// copies, and the Mac's Control is the Windows key. The settings page
     /// offers that, keeping keys where they are, or a choice per key.
-    pub modifier_map: linkcursor_core::ModifierMap,
+    pub modifier_map: rinflow_core::ModifierMap,
     /// When a peer that drove this PC moves its pointer away, this PC's
     /// cursor is hidden where it was left, until this PC's own mouse moves
     /// or a peer drives it again (see `hider.rs`).
@@ -79,7 +79,7 @@ pub struct Settings {
     pub manual_addresses: Vec<String>,
     /// How this PC's mouse feels on each peer it drives, by device ID.
     pub peer_input: BTreeMap<String, PeerInput>,
-    /// The language of LinkCursor's own text: `system` (Windows' display
+    /// The language of Rinflow's own text: `system` (Windows' display
     /// language: Simplified Chinese, or English for every other one),
     /// `zh-CN` or `en-US`. The settings app reads it at start-up too.
     pub language: String,
@@ -138,7 +138,7 @@ impl Default for Settings {
             lock_hotkey: Hotkey::default(),
             port: None,
             paired_only: true,
-            modifier_map: linkcursor_core::ModifierMap::SWAP,
+            modifier_map: rinflow_core::ModifierMap::SWAP,
             hide_cursor_on_leave: true,
             switch_hotkeys: true,
             switch_modifiers: MOD_CONTROL | MOD_ALT | MOD_SHIFT,
@@ -272,7 +272,7 @@ impl Settings {
         if let Some(bad) = merged
             .manual_addresses
             .iter()
-            .find(|address| linkcursor_core::parse_address(address, DISCOVERY_PORT).is_err())
+            .find(|address| rinflow_core::parse_address(address, DISCOVERY_PORT).is_err())
         {
             return Err(if i18n::chinese() {
                 format!("“{bad}”不是有效的地址：请输入 IP 地址或设备名称")
@@ -357,7 +357,7 @@ fn path() -> std::path::PathBuf {
     identity::data_directory().join("settings.json")
 }
 
-/// Starting the agent when the user signs in: the `LinkCursor` value under
+/// Starting the agent when the user signs in: the `Rinflow` value under
 /// `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 pub mod autostart {
     use crate::win::wide;
@@ -370,7 +370,7 @@ pub mod autostart {
     };
 
     const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-    const VALUE: &str = "LinkCursor";
+    const VALUE: &str = "Rinflow";
 
     fn open(access: u32) -> io::Result<HKEY> {
         let key = wide(RUN_KEY);
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn a_macs_modifier_keys_are_chosen_per_key() {
-        use linkcursor_core::{Modifier, ModifierMap};
+        use rinflow_core::{Modifier, ModifierMap};
         let settings = Settings::default();
         let kept = settings
             .merged(&values(json!({"modifier_map": {
@@ -529,7 +529,7 @@ mod tests {
     #[test]
     fn addresses_and_per_device_input_are_checked() {
         let settings = Settings::default();
-        assert_eq!(settings.modifier_map, linkcursor_core::ModifierMap::SWAP);
+        assert_eq!(settings.modifier_map, rinflow_core::ModifierMap::SWAP);
         assert!(settings.keep_awake && settings.hide_cursor_on_leave);
         assert!(settings.switch_hotkeys);
         assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT | MOD_SHIFT);

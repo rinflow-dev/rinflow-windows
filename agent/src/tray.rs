@@ -117,7 +117,7 @@ unsafe extern "system" fn console_control(event: u32) -> windows_sys::core::BOOL
 
 /// Creates the tray icon and runs the message loop until the user quits.
 pub fn run() -> io::Result<()> {
-    let class_name = wide("LinkCursorAgentTray");
+    let class_name = wide("RinflowAgentTray");
     let taskbar_created = wide("TaskbarCreated");
     // SAFETY: plain Win32 calls with valid, null-terminated strings. The
     // window is hidden; a top-level window is needed (rather than a
@@ -155,7 +155,7 @@ pub fn run() -> io::Result<()> {
             return Err(io::Error::last_os_error());
         }
         // Explorer may not take the icon yet (busy at sign-in, restarting):
-        // keep trying instead of giving up on LinkCursor altogether.
+        // keep trying instead of giving up on Rinflow altogether.
         if !add_icon(window) {
             log!(
                 "no tray icon yet ({}); trying again",
@@ -246,7 +246,7 @@ fn update_icon(window: HWND, operation: u32) -> bool {
     if data.hIcon.is_null() {
         return false;
     }
-    for (slot, unit) in data.szTip.iter_mut().zip("LinkCursor".encode_utf16()) {
+    for (slot, unit) in data.szTip.iter_mut().zip("Rinflow".encode_utf16()) {
         *slot = unit;
     }
     // SAFETY: `data` is fully initialised; both icons are owned by this thread.
@@ -295,7 +295,7 @@ fn load_tray_icon() -> HICON {
 }
 
 fn show_menu(window: HWND) {
-    let open = wide(crate::i18n::tr("打开主窗口", "Open LinkCursor"));
+    let open = wide(crate::i18n::tr("打开主窗口", "Open Rinflow"));
     let quit = wide(crate::i18n::tr("退出", "Quit"));
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
@@ -332,17 +332,17 @@ fn show_menu(window: HWND) {
     }
 }
 
-/// Launches the settings app: `LINKCURSOR_APP_PATH`, or `LinkCursor.exe`
+/// Launches the settings app: `RINFLOW_APP_PATH`, or `Rinflow.exe`
 /// next to the agent (the layout produced by the app's build). A running app
 /// takes the request over (it is single-instance) and shows the main window,
 /// or the tray panel with `--tray`.
 pub fn open_app(arguments: &[&str]) {
-    let path = std::env::var_os("LINKCURSOR_APP_PATH")
+    let path = std::env::var_os("RINFLOW_APP_PATH")
         .map(PathBuf::from)
         .or_else(|| {
             std::env::current_exe()
                 .ok()
-                .and_then(|exe| exe.parent().map(|dir| dir.join("LinkCursor.exe")))
+                .and_then(|exe| exe.parent().map(|dir| dir.join("Rinflow.exe")))
         });
     let Some(path) = path else { return };
     // The click gave this process the right to bring a window to the front;

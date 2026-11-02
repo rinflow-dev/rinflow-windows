@@ -39,8 +39,8 @@ use crate::keymap;
 use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, PeerInput, SettingsStore};
 use crate::state::SharedState;
 use crate::win::wide;
-use linkcursor_core::layout::{Motion, RemotePointer, Side};
-use linkcursor_core::{
+use rinflow_core::layout::{Motion, RemotePointer, Side};
+use rinflow_core::{
     Core, LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_KEY_REPEAT, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
     LC_INPUT_SCROLL, LC_MODIFIER_COMMAND, LC_MODIFIER_CONTROL, LC_MODIFIER_LEFT_COMMAND,
@@ -187,15 +187,15 @@ impl GiveBack {
             GiveBack::Elevated => {
                 log!("an elevated window came to the front; capture ended");
                 crate::i18n::tr(
-                    "以管理员身份运行的窗口到了前台，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
-                    "A window running as administrator came to the front, so LinkCursor can't take its keyboard input. Click another window first, then move to the other device.",
+                    "以管理员身份运行的窗口到了前台，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
+                    "A window running as administrator came to the front, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.",
                 )
             }
             GiveBack::HookLost(device) => {
                 log!("the {device:?} hook stopped seeing input; capture ended");
                 crate::i18n::tr(
-                    "Windows 暂停了 LinkCursor 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。",
-                    "Windows stopped LinkCursor from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.",
+                    "Windows 暂停了 Rinflow 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。",
+                    "Windows stopped Rinflow from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.",
                 )
             }
         };
@@ -368,8 +368,8 @@ fn can_take_keyboard() -> bool {
         crate::tray::notify(
             crate::i18n::tr("键盘和鼠标没有切换", "Keyboard and mouse didn't switch"),
             crate::i18n::tr(
-                "当前窗口以管理员身份运行，LinkCursor 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
-                "The window in front runs as administrator, so LinkCursor can't take its keyboard input. Click another window first, then move to the other device.",
+                "当前窗口以管理员身份运行，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
+                "The window in front runs as administrator, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.",
             ),
         );
         return false;
@@ -1231,7 +1231,7 @@ fn drained(info: &KBDLLHOOKSTRUCT) -> bool {
 /// cursor is none: Windows shows the cursor of the window under it, so this
 /// hides it without touching the system cursors.
 fn create_cursor_window(park: POINT) -> HWND {
-    let class_name = wide("LinkCursorHiddenCursor");
+    let class_name = wide("RinflowHiddenCursor");
     // SAFETY: registers the class (again is harmless) and creates the window
     // on this thread.
     unsafe {

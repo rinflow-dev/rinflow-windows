@@ -24,12 +24,12 @@ pub fn load() -> io::Result<Identity> {
     })
 }
 
-/// `%LOCALAPPDATA%\LinkCursor`, shared with the settings app.
+/// `%LOCALAPPDATA%\Rinflow`, shared with the settings app.
 pub fn data_directory() -> PathBuf {
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("LinkCursor")
+        .join("Rinflow")
 }
 
 /// Replaces a settings file without ever leaving it half written: a crash or

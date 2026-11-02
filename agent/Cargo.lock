@@ -382,12 +382,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
-name = "linkcursor-agent"
+name = "rinflow-agent"
 version = "0.1.0"
 dependencies = [
  "embed-resource",
- "linkcursor-core",
- "linkcursor-input",
+ "rinflow-core",
+ "rinflow-input",
  "png",
  "serde",
  "serde_json",
@@ -399,7 +399,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "linkcursor-core"
+name = "rinflow-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
@@ -417,7 +417,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "linkcursor-input"
+name = "rinflow-input"
 version = "0.1.0"
 dependencies = [
  "tokio",

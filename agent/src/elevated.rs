@@ -2,20 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The agent's end of `linkcursor-input` (see the `linkcursor-input` crate):
+//! The agent's end of `rinflow-input` (see the `rinflow-input` crate):
 //! the LocalSystem helper that plays input where this process cannot, in
 //! windows of elevated programs, UAC prompts and on the lock screen.
 //!
 //! A thread keeps a connection to the helper of this session when there is
 //! one (the service is installed), checking that the pipe belongs to
-//! `linkcursor-input.exe` from this folder. While connected and the
+//! `rinflow-input.exe` from this folder. While connected and the
 //! machine-wide setting is on, `inject.rs` hands every event to the helper
 //! instead of calling `SendInput` itself; otherwise it plays them as before.
 //! The helper says when a UAC prompt or the lock screen takes input; a peer
 //! this PC drives is then given back, so the user can answer it here.
 
-use linkcursor_input::win::is_sibling_process;
-use linkcursor_input::{
+use rinflow_input::win::is_sibling_process;
+use rinflow_input::{
     ClientMessage, INPUT_EXE, PROTOCOL_VERSION, RawInput, ServerMessage, pipe_name, read_frame,
 };
 use std::os::windows::io::AsRawHandle;
@@ -65,7 +65,7 @@ pub fn start(on_status: impl Fn(Status) + Send + 'static) {
         return;
     }
     let spawned = std::thread::Builder::new()
-        .name("linkcursor-elevated".to_owned())
+        .name("rinflow-elevated".to_owned())
         .spawn(move || {
             let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -134,7 +134,7 @@ async fn keep_connected(
     mut outgoing: mpsc::UnboundedReceiver<ClientMessage>,
     on_status: impl Fn(Status),
 ) {
-    let name = pipe_name(linkcursor_input::win::current_session());
+    let name = pipe_name(rinflow_input::win::current_session());
     let mut reported: Option<Status> = None;
     let mut report = |status: Status| {
         if reported != Some(status) {
@@ -148,7 +148,7 @@ async fn keep_connected(
             if is_helper(&pipe) {
                 serve(pipe, &mut outgoing, &mut report).await;
             } else {
-                log!("{name} is not LinkCursor's input helper");
+                log!("{name} is not Rinflow's input helper");
             }
         }
         let channel = CHANNEL.get().expect("started");
@@ -158,15 +158,15 @@ async fn keep_connected(
     }
 }
 
-/// The pipe belongs to LinkCursor's helper: it was created by LocalSystem
+/// The pipe belongs to Rinflow's helper: it was created by LocalSystem
 /// (its owner says so; only a system or elevated process can make that the
 /// owner), as the installed helper does. A development run of the helper,
-/// as this user, must be `linkcursor-input.exe` from this folder in this
+/// as this user, must be `rinflow-input.exe` from this folder in this
 /// session. (This process cannot look into a LocalSystem process, so the
 /// first check is the one that works when installed.)
 fn is_helper(pipe: &NamedPipeClient) -> bool {
-    if linkcursor_input::win::object_owner_sid(pipe)
-        .is_ok_and(|owner| linkcursor_input::win::is_privileged_owner(&owner))
+    if rinflow_input::win::object_owner_sid(pipe)
+        .is_ok_and(|owner| rinflow_input::win::is_privileged_owner(&owner))
     {
         return true;
     }

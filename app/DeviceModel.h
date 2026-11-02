@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include <winrt/LinkCursor.h>
+#include <winrt/Rinflow.h>
 
 // What the windows show about devices, read from the agent's state snapshot
 // (see agent/src/state.rs): the user's devices, nearby ones, and the rows
 // that list them.
-namespace LinkCursorApp
+namespace RinflowApp
 {
     struct DeviceInfo
     {
@@ -55,7 +55,7 @@ namespace LinkCursorApp
     // The main display's pixels: the one at the origin, else the first.
     winrt::hstring ResolutionOf(winrt::Windows::Data::Json::JsonArray const& displays);
 
-    winrt::LinkCursor::PeerItem DeviceRow(DeviceInfo const& device);
-    winrt::LinkCursor::PeerItem NearbyRow(DeviceInfo const& device);
-    winrt::LinkCursor::PeerItem LocalRow(winrt::hstring const& name);
+    winrt::Rinflow::PeerItem DeviceRow(DeviceInfo const& device);
+    winrt::Rinflow::PeerItem NearbyRow(DeviceInfo const& device);
+    winrt::Rinflow::PeerItem LocalRow(winrt::hstring const& name);
 }
