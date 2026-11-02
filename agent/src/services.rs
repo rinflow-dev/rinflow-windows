@@ -140,20 +140,14 @@ impl Services {
 
     /// The user checked the code shown for `peer_id` and accepts.
     pub fn accept_pairing(&self, peer_id: &str) -> Result<(), String> {
-        let core = self
-            .core
-            .upgrade()
-            .ok_or("Rinflow core is shutting down")?;
+        let core = self.core.upgrade().ok_or("Rinflow core is shutting down")?;
         core.accept_pairing(peer_id)?;
         self.state.set_pairing_accepted(peer_id);
         Ok(())
     }
 
     pub fn reject_pairing(&self, peer_id: &str) -> Result<(), String> {
-        let core = self
-            .core
-            .upgrade()
-            .ok_or("Rinflow core is shutting down")?;
+        let core = self.core.upgrade().ok_or("Rinflow core is shutting down")?;
         core.reject_pairing(peer_id)
     }
 

@@ -1071,11 +1071,8 @@ mod tests {
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(default)
         };
-        let root = std::env::temp_dir().join(format!(
-            "rinflow-bench-{}-{}",
-            std::process::id(),
-            port()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("rinflow-bench-{}-{}", std::process::id(), port()));
         let folder = match std::env::var_os("RINFLOW_BENCH_SOURCE") {
             Some(source) => std::path::PathBuf::from(source),
             None => {

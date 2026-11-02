@@ -197,9 +197,7 @@ impl ClipboardHandle {
             ),
             Some("files_available") if self.enabled() => {
                 if let (Ok(manifest), Some(peer)) = (
-                    serde_json::from_value::<rinflow_core::FileManifest>(
-                        event["manifest"].clone(),
-                    ),
+                    serde_json::from_value::<rinflow_core::FileManifest>(event["manifest"].clone()),
                     event["peer_id"].as_str(),
                 ) {
                     self.queue_incoming(

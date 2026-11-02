@@ -388,9 +388,7 @@ mod tests {
         // A folder whose name only starts the same is elsewhere.
         let mut lookalike = root.clone().into_os_string();
         lookalike.push(" Evil");
-        assert!(!in_program_files(
-            &PathBuf::from(lookalike).join("Rinflow")
-        ));
+        assert!(!in_program_files(&PathBuf::from(lookalike).join("Rinflow")));
         assert!(!in_program_files(Path::new(r"C:\Rinflow")));
     }
 }
