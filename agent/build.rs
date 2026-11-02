@@ -37,8 +37,11 @@ fn version_info() {
     let (major, minor, patch) = (number(), number(), number());
     // Numbers instead of winver.h names, so rc.exe needs no include path:
     // VOS_NT_WINDOWS32, VFT_APP; U.S. English, Unicode.
+    // Icons: Explorer shows the lowest ID, which cannot follow the theme, so it
+    // is plated. The tray picks 101 (light) or 102 (dark) itself.
     let script = format!(
         r#"#pragma code_page(65001)
+100 ICON "{shell_icon}"
 101 ICON "{icon}"
 102 ICON "{dark_icon}"
 1 VERSIONINFO
@@ -68,6 +71,7 @@ END
 "#,
         icon = icon_path("Rinflow.ico"),
         dark_icon = icon_path("Rinflow.Dark.ico"),
+        shell_icon = icon_path("Rinflow.Shell.ico"),
     );
     let path = PathBuf::from(std::env::var("OUT_DIR").expect("out dir")).join("version.rc");
     std::fs::write(&path, script).expect("write version.rc");

@@ -9,14 +9,19 @@ intended padding, and each is a single solid colour:
 | `Rinflow.svg`      | light surfaces | `logo-warm-ink-black-512.svg` | `#181717` |
 | `Rinflow.Dark.svg` | dark surfaces  | `logo-warm-ink-white-512.svg` | `#FEFFFF` |
 
+`Rinflow.Shell.svg` is the same mark in `#181717` on a `#F3F0EA` plate, for
+surfaces that cannot follow the theme. Its corners follow Microsoft's 2px radius
+at 48 x 48, and the plate is inset 1/16 so its edges land on whole pixels at the
+sizes that are multiples of 16.
+
 The black original is cropped tightly to 320 x 386. Here it sits on the same
 square canvas as the white one, because the generator scales to a square.
 
 Each variant measures 15:1 or more on its theme's surfaces and about 1.1:1 on
-the other's, so **the wrong variant leaves nothing visible**. Surfaces that
-cannot follow the theme are affected: see the list below.
+the other's, so **the wrong variant leaves nothing visible**. That is why every
+surface below either follows the theme or uses the plated icon.
 
-Regenerate both ICOs after editing either SVG:
+Regenerate the ICOs after editing any SVG:
 
 ```powershell
 cargo run --locked --manifest-path tools/icons/Cargo.toml
@@ -26,7 +31,7 @@ Run this from the repository root. Rust/resvg is needed only to regenerate;
 normal builds use the checked-in assets. Each frame is rendered directly from
 the vector at 16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96 and 256 pixels.
 Smaller frames use 32-bit BGRA DIBs with alpha and AND masks; 256px uses PNG.
-There is no added backplate, cropping or stretching.
+The themed icons have no added backplate, cropping or stretching.
 
 Integration, with the theme that selects the variant on each surface:
 
@@ -35,21 +40,20 @@ Integration, with the theme that selects the variant on each surface:
 - `app/AppIcon.h`: WinUI `AppWindow.SetIcon`, using an absolute path beside the
   executable. Appears on the taskbar and in Alt+Tab, so it follows the Windows
   theme (`SystemUsesLightTheme`) and reloads on `WM_SETTINGCHANGE`.
-- `agent/build.rs`: the same ICOs embedded as resources 101 (light) and 102
-  (dark). The tray loads the system small-icon size with `LoadIconMetric`,
+- `agent/build.rs`: the plated ICO as resource 100, which Explorer shows, and
+  the themed ICOs as 101 (light) and 102 (dark). The tray loads the system small-icon size with `LoadIconMetric`,
   follows `SystemUsesLightTheme`, and reloads after theme or display changes
   and Explorer restarts. Owned icon handles are released.
-- `app/Rinflow.rc`: the EXE's icons, 101 (index 0, light) and 102 (index 1,
-  dark). Explorer always shows index 0 for the file itself.
-- `installer/Rinflow.iss`: the setup program uses the light icon. Shortcuts
-  and the uninstall entry use the EXE's icon for the Windows theme at install
-  time; an upgrade picks again.
+- `app/Rinflow.rc`: the EXE's only icon, plated, shown by Explorer for the file
+  and read by shortcuts and the uninstall entry.
+- `installer/Rinflow.iss`: the setup program uses the plated icon. Shortcuts and
+  the uninstall entry use the EXE's.
 
 This is an unpackaged WinUI desktop application with an Inno Setup installer.
 MSIX tile/Store logo assets, including the `altform-lightunplated` theme
 variants, do not apply to the current distribution, so static shell icons
-cannot follow a later theme change: a shortcut keeps the variant it was given
-until the next install.
+cannot follow a theme change. Microsoft allows a plate when the theming has to
+be handled by the app; one that reads on both themes needs no per-theme choice.
 
 References:
 

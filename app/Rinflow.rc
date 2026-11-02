@@ -1,4 +1,3 @@
-// Keep the primary icon first so Explorer, shortcuts and setup agree.
-101 ICON "Assets\\Rinflow.ico"
-// Icon index 1: what setup points shortcuts at on a dark system.
-102 ICON "Assets\\Rinflow.Dark.ico"
+// What Explorer, shortcuts and the uninstall entry show. They cannot follow the
+// theme, so it is plated; the window sets its own themed icon (AppIcon.h).
+101 ICON "Assets\\Rinflow.Shell.ico"

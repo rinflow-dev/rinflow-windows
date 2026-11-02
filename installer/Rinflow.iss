@@ -51,11 +51,11 @@ OutputBaseFilename=Rinflow-Setup-{#AppVersion}-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=..\app\Assets\Rinflow.ico
+SetupIconFile=..\app\Assets\Rinflow.Shell.ico
 ; Closes Rinflow when it holds files being replaced.
 CloseApplications=force
 RestartApplications=no
-UninstallDisplayIcon={app}\Rinflow.exe,{code:ShellIconIndex}
+UninstallDisplayIcon={app}\Rinflow.exe
 UninstallDisplayName=Rinflow
 SetupLogging=yes
 ; Sign setup and uninstaller once there is a certificate, e.g.
@@ -103,12 +103,10 @@ Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreve
 Source: "..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-; An unpackaged app's shortcuts cannot follow the theme by themselves: they get
-; the logo for the Windows theme at install time (Rinflow.rc, icon index 1).
-Name: "{autoprograms}\Rinflow"; Filename: "{app}\Rinflow.exe"; Check: not SystemIsDark
-Name: "{autoprograms}\Rinflow"; Filename: "{app}\Rinflow.exe"; IconFilename: "{app}\Rinflow.exe"; IconIndex: 1; Check: SystemIsDark
-Name: "{autodesktop}\Rinflow"; Filename: "{app}\Rinflow.exe"; Tasks: desktopicon; Check: not SystemIsDark
-Name: "{autodesktop}\Rinflow"; Filename: "{app}\Rinflow.exe"; IconFilename: "{app}\Rinflow.exe"; IconIndex: 1; Tasks: desktopicon; Check: SystemIsDark
+; An unpackaged app's shortcuts cannot follow the theme, so they use the EXE's
+; plated icon, which is legible on both.
+Name: "{autoprograms}\Rinflow"; Filename: "{app}\Rinflow.exe"
+Name: "{autodesktop}\Rinflow"; Filename: "{app}\Rinflow.exe"; Tasks: desktopicon
 
 [Registry]
 Root: HKLM64; Subkey: "SOFTWARE\Rinflow"; ValueType: dword; ValueName: "ElevatedInput"; ValueData: "1"; Check: ElevatedChosen; Flags: uninsdeletekey
@@ -142,22 +140,6 @@ var
   // ElevatedInput as setup found it: -1 when not there (a first install,
   // or after an uninstall), else 0 or 1.
   PreviousElevated: Integer;
-
-function SystemIsDark(): Boolean;
-var
-  Light: Cardinal;
-begin
-  Result := RegQueryDWordValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
-    'SystemUsesLightTheme', Light) and (Light = 0);
-end;
-
-function ShellIconIndex(Param: String): String;
-begin
-  if SystemIsDark() then
-    Result := '1'
-  else
-    Result := '0';
-end;
 
 function InitializeSetup(): Boolean;
 var
