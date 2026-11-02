@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Input for LinkCursor on Windows beyond a normal process: elevated windows, UAC prompts and the lock screen (an input helper and the service that starts it)"
 license = "MPL-2.0"
-repository = "https://github.com/akarineren/linkcursor-windows"
+repository = "https://github.com/rinflow-dev/rinflow-windows"
 publish = false
 
 [lib]

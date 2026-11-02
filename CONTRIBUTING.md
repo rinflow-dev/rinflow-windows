@@ -1,6 +1,6 @@
 # Contributing to LinkCursor for Windows
 
-Thanks for your interest. Clone [linkcursor-core](https://github.com/akarineren/linkcursor-core) next to this repository, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
+Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, into a folder named `linkcursor-core`, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
 
 ## Building and testing
 
@@ -20,7 +20,7 @@ cargo test --locked
 
 UI text lives in `app/Strings`, in English and Chinese; add both. Keep `build.ps1` and `dev.ps1` ASCII-only, because Windows PowerShell 5.1 reads scripts without a BOM in the system code page.
 
-If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOTICES.txt` as shown in [its script](https://github.com/akarineren/linkcursor-core/blob/main/scripts/third-party-notices.ps1).
+If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOTICES.txt` as shown in [its script](https://github.com/rinflow-dev/rinflow-core/blob/main/scripts/third-party-notices.ps1).
 
 ## Commits and pull requests
 
@@ -30,7 +30,7 @@ If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOT
 
 ## Protocol and ABI changes
 
-The clients link `linkcursor-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the core README](https://github.com/akarineren/linkcursor-core#changing-the-protocol-or-abi) and update the clients in step.
+The clients link `linkcursor-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the core README](https://github.com/rinflow-dev/rinflow-core#changing-the-protocol-or-abi) and update the clients in step.
 
 ## License
 

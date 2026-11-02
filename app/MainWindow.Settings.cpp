@@ -27,7 +27,7 @@ namespace
     constexpr uint32_t DefaultModifiers = ModControl | ModAlt;
     constexpr uint32_t DefaultKey = 'L';
 
-    constexpr wchar_t ReleasesPage[] = L"https://github.com/akarineren/linkcursor-windows/releases";
+    constexpr wchar_t ReleasesPage[] = L"https://github.com/rinflow-dev/rinflow-windows/releases";
 
     bool IsModifierKey(uint32_t vk)
     {

@@ -25,7 +25,7 @@ jobs:
       # The agent builds the core from source, from a sibling folder.
       - uses: actions/checkout@v4
         with:
-          repository: akarineren/linkcursor-core
+          repository: rinflow-dev/rinflow-core
           path: linkcursor-core
       - run: rustup update stable; rustup default stable; rustup component add clippy rustfmt
       - run: cargo fmt --check

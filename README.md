@@ -1,6 +1,6 @@
 # LinkCursor for Windows
 
-[![CI](https://github.com/akarineren/linkcursor-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/akarineren/linkcursor-windows/actions/workflows/ci.yml)
+[![CI](https://github.com/rinflow-dev/rinflow-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/rinflow-dev/rinflow-windows/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](LICENSE)
 
 The Windows client for LinkCursor. It is two programs:
@@ -92,12 +92,11 @@ app/
   PeerItem.{idl,h,cpp}       row model for the device lists
 ```
 
-`linkcursor-core` must be checked out next to this repository, as for the macOS app:
+`rinflow-core` must be cloned next to this repository, into a folder named `linkcursor-core`, as for the macOS app:
 
-```
-workspace/
-  linkcursor-core/
-  linkcursor-windows/
+```sh
+git clone https://github.com/rinflow-dev/rinflow-core.git linkcursor-core
+git clone https://github.com/rinflow-dev/rinflow-windows.git linkcursor-windows
 ```
 
 ## Prerequisites
@@ -191,16 +190,16 @@ Installed with the setup program, the firewall is already set up. A build run fr
 
 ## Arranging devices
 
-The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](https://github.com/akarineren/linkcursor-core#arrangement).
+The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](https://github.com/rinflow-dev/rinflow-core#arrangement).
 
 - **The user's devices.** **我的设备** lists the devices this PC has been connected to (or placed), online or not, with their round-trip time. **添加设备** lists the other LinkCursor devices on the network; connecting one adds it. The **⋯** menu of a row connects or disconnects, places the device on a side, and **移除此设备** forgets it (disconnected, unplaced, unpaired; it shows up under 添加设备 again while online).
-- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
+- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core README](https://github.com/rinflow-dev/rinflow-core#how-it-works)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
 - **Sleep and network changes.** [power.rs](agent/src/power.rs) tells the core when this PC is about to sleep (`PowerRegisterSuspendResumeNotification`, `PBT_APMSUSPEND`): sessions end in order, so a Mac driving this PC gets control back at once. On waking, and when an IPv4 address comes or goes (`NotifyUnicastIpAddressChange`, after 0.8 s without further changes), the core finds and reconnects the devices right away. A device that vanishes without closing (it slept, or lost the network) shows **对方没有响应…** until it is back.
 - **Placing a device.** The user's online devices that are not placed yet wait as **未放置** chips at the top of the canvas. Drag one next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. This PC can be dragged too, once something is placed: that moves every placed peer the other way (each snapped back against this PC, the nearest one first). A press that does not move is not a drag. Screens are drawn to scale but inset by 3 pixels on sides facing another device, so devices that touch show a small gap; the monitors of one computer stay flush against each other, with square corners where they meet, and read as one shape.
 - **Quick placement.** The **⋯** menu puts a device on the left, right, top or bottom, centred on that side, or removes it (**取消放置**, the only way to unplace: a drop outside the canvas still places the device).
 - **Snapping.** While a device is dragged, a dashed outline shows where it will land: the agent answers `preview_placement` with the core's own snapping (`layout::snap_in_arrangement`, same displays and the other placed devices). The drop is then proposed to the core, which snaps it to that spot, and the canvas draws where it actually landed.
-- **Three or more devices.** A device may also be dropped against another placed device instead of this PC (a row of three, whichever has the keyboard). The pointer then crosses from one device straight into the next where they touch. Every placed device must connect to this PC through others; one left floating after a change is moved back against something. Such a chained placement is not synced to the device it does not touch (see the [core README](https://github.com/akarineren/linkcursor-core#arrangement)).
-- **Adding a device by address.** Where devices do not find each other (company or guest Wi-Fi, access points that keep clients apart, another subnet, a VPN), **添加设备** → **通过地址添加** takes an IP address or a device name. The core then sends its announcement straight there and the other device answers, so it shows up and connects as if it had been found ([manual.rs](https://github.com/akarineren/linkcursor-core/blob/main/src/runtime/manual.rs)); one of the two devices needing the other's address is enough. Each address shows **正在查找…**, **已找到 …**, **没有回应** or why the name could not be looked up. Saved as `manual_addresses`.
+- **Three or more devices.** A device may also be dropped against another placed device instead of this PC (a row of three, whichever has the keyboard). The pointer then crosses from one device straight into the next where they touch. Every placed device must connect to this PC through others; one left floating after a change is moved back against something. Such a chained placement is not synced to the device it does not touch (see the [core README](https://github.com/rinflow-dev/rinflow-core#arrangement)).
+- **Adding a device by address.** Where devices do not find each other (company or guest Wi-Fi, access points that keep clients apart, another subnet, a VPN), **添加设备** → **通过地址添加** takes an IP address or a device name. The core then sends its announcement straight there and the other device answers, so it shows up and connects as if it had been found ([manual.rs](https://github.com/rinflow-dev/rinflow-core/blob/main/src/runtime/manual.rs)); one of the two devices needing the other's address is enough. Each address shows **正在查找…**, **已找到 …**, **没有回应** or why the name could not be looked up. Saved as `manual_addresses`.
 - **Device states.** A peer that is discovered but not connected says **未连接** under its name. A placed device that is offline is dimmed, says **离线** and keeps its place.
 - **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
 - **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
@@ -209,7 +208,7 @@ The canvas on the **设备** page draws this PC's monitors (accent outline) and 
 
 ## Being controlled by another device
 
-When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The device list shows **正在控制本机** on that peer's row while that lasts (and the status dot's tooltip **正在被 … 控制键盘和鼠标**). Several peers can be connected at once (each row in the device list connects or disconnects one), but only one drives this PC at a time: when another peer starts driving it, the core tells the previous one to stop and ignores whatever that one still sends (see "One controller at a time" in the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)).
+When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The device list shows **正在控制本机** on that peer's row while that lasts (and the status dot's tooltip **正在被 … 控制键盘和鼠标**). Several peers can be connected at once (each row in the device list connects or disconnects one), but only one drives this PC at a time: when another peer starts driving it, the core tells the previous one to stop and ignores whatever that one still sends (see "One controller at a time" in the [core README](https://github.com/rinflow-dev/rinflow-core#how-it-works)).
 
 Core handles everything that is the same on every platform. The agent only translates core's events to Windows:
 
@@ -286,7 +285,7 @@ Not covered: the sign-in screen before anyone has signed in (the agent runs per 
 
 ## Clipboard
 
-Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then follows control, as in Deskflow. When this PC starts driving a peer, or a peer driving it gives control back, the peer gets this PC's clipboard. The other way round works the same. The core sends contents only if they changed since the last exchange with that peer, which also keeps them from echoing back. The whole design, including file transfer plans, is in [linkcursor-core/docs/clipboard-and-files.md](https://github.com/akarineren/linkcursor-core/blob/main/docs/clipboard-and-files.md).
+Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then follows control, as in Deskflow. When this PC starts driving a peer, or a peer driving it gives control back, the peer gets this PC's clipboard. The other way round works the same. The core sends contents only if they changed since the last exchange with that peer, which also keeps them from echoing back. The whole design, including file transfer plans, is in [linkcursor-core/docs/clipboard-and-files.md](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/clipboard-and-files.md).
 
 [clipboard.rs](agent/src/clipboard.rs) is the Windows end:
 
@@ -374,7 +373,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 
 ## Presence
 
-[presence.rs](agent/src/presence.rs), with the core's presence messages (see the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)):
+[presence.rs](agent/src/presence.rs), with the core's presence messages (see the [core README](https://github.com/rinflow-dev/rinflow-core#how-it-works)):
 
 | | What |
 | --- | --- |
@@ -388,7 +387,7 @@ The app's text lives in `app\Strings\en-US\Resources.resw` and `app\Strings\zh-C
 
 ## Pairing and encryption
 
-The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing code; see the [core README](https://github.com/akarineren/linkcursor-core#security)). The agent stores what it has to keep and the app asks the user.
+The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing code; see the [core README](https://github.com/rinflow-dev/rinflow-core#security)). The agent stores what it has to keep and the app asks the user.
 
 | | Where | What |
 | --- | --- | --- |

@@ -34,7 +34,7 @@ AppName=LinkCursor
 AppVersion={#AppVersion}
 AppVerName=LinkCursor {#AppVersion}
 AppPublisher=LinkCursor
-AppPublisherURL=https://github.com/akarineren/linkcursor-windows
+AppPublisherURL=https://github.com/rinflow-dev/rinflow-windows
 DefaultDirName={autopf}\LinkCursor
 DisableProgramGroupPage=yes
 ; Always Program Files: the service runs as LocalSystem and trusts the
