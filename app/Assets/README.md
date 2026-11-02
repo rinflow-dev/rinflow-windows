@@ -1,18 +1,20 @@
 # Rinflow logo
 
 Each theme has its own supplied artwork, the source of truth for the icons.
-Both share one geometry on a transparent 64 x 64 canvas, which includes the
-intended padding:
+Both share one geometry on a transparent 512 x 512 canvas, which includes the
+intended padding, and each is a single solid colour:
 
-| File                  | For             | Original                      | Stem      | Cursor    |
-| --------------------- | --------------- | ----------------------------- | --------- | --------- |
-| `Rinflow.svg`      | light surfaces  | `logo-warm-ink-black-512.svg` | `#D9D4D1` | `#181717` |
-| `Rinflow.Dark.svg` | dark surfaces   | `logo-warm-ink-white-512.svg` | `#4A4746` | `#F5F2F0` |
+| File               | For            | Original                      | Colour    |
+| ------------------ | -------------- | ----------------------------- | --------- |
+| `Rinflow.svg`      | light surfaces | `logo-warm-ink-black-512.svg` | `#181717` |
+| `Rinflow.Dark.svg` | dark surfaces  | `logo-warm-ink-white-512.svg` | `#FEFFFF` |
 
-The cursor carries the contrast and the stem is deliberately quiet, so each
-variant is only legible on its own theme: the cursor measures 16:1 or more on
-its theme's surfaces and about 1.1:1 on the other's. Choosing the wrong variant
-leaves only the stem visible.
+The black original is cropped tightly to 320 x 386. Here it sits on the same
+square canvas as the white one, because the generator scales to a square.
+
+Each variant measures 15:1 or more on its theme's surfaces and about 1.1:1 on
+the other's, so **the wrong variant leaves nothing visible**. Surfaces that
+cannot follow the theme are affected: see the list below.
 
 Regenerate both ICOs after editing either SVG:
 

@@ -10,8 +10,8 @@ namespace RinflowApp
 {
     // The window icon appears on the taskbar and in Alt+Tab, which are drawn in
     // the Windows theme. That can differ from the app theme and from the
-    // in-app theme setting, so it decides the variant here. Each variant's
-    // cursor is close to invisible on the other theme's surfaces.
+    // in-app theme setting, so it decides the variant here. Each variant is
+    // close to invisible on the other theme's surfaces.
     inline bool SystemThemeIsDark()
     {
         DWORD light = 1;
