@@ -1,6 +1,6 @@
 # LinkCursor logo
 
-Each theme has its own supplied artwork, kept unchanged as the source of truth.
+Each theme has its own supplied artwork, the source of truth for the icons.
 Both share one geometry on a transparent 64 x 64 canvas, which includes the
 intended padding:
 

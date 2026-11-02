@@ -1,5 +1,8 @@
 # LinkCursor for Windows
 
+[![CI](https://github.com/akarineren/linkcursor-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/akarineren/linkcursor-windows/actions/workflows/ci.yml)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](LICENSE)
+
 The Windows client for LinkCursor. It is two programs:
 
 | Program | Language | Role |
@@ -14,7 +17,7 @@ The Windows client for LinkCursor. It is two programs:
                                                             ├ edge effect overlay (Direct2D + DirectComposition)
                                                             ├ linkcursor-core ── UDP 42420 / QUIC 42421 ──► other devices
                                                             ├ input injection (SendInput)
-                                                            └ (next) hooks to capture local input
+                                                            └ hooks to capture local input
 ```
 
 Status:
@@ -145,7 +148,7 @@ Build messages are in Chinese by default. Pass `-Language en-US` (or another cul
 
 Inside a Developer PowerShell you can also call MSBuild directly: `msbuild app\LinkCursor.vcxproj -restore -p:Configuration=Debug -p:Platform=x64`.
 
-For a debugging loop, use `make build`, `make run` and `make stop` from the workspace root (see [Make shortcuts](../README.md#make-shortcuts)). They call [dev.ps1](dev.ps1). Building never stops a running copy: [build.ps1](build.ps1) renames the files it holds open to `*.old` (Windows refuses to overwrite them but allows the rename), so `.\build.cmd` also works while LinkCursor runs. `make run` builds first, then stops the old copy, deletes the `*.old` files and starts the new build, keeping the agent in your terminal with its log. The settings window it opens does not start an agent of its own, so the terminal stays in charge of the agent. Ctrl+C, or closing a debug agent's console, quits the agent the same way as the tray's 退出: the tray icon goes away and peers see a clean disconnect.
+For a debugging loop, use [dev.ps1](dev.ps1): `.\dev.ps1 build`, `.\dev.ps1 run` and `.\dev.ps1 stop`. Building never stops a running copy: [build.ps1](build.ps1) renames the files it holds open to `*.old` (Windows refuses to overwrite them but allows the rename), so `.\build.cmd` also works while LinkCursor runs. `make run` builds first, then stops the old copy, deletes the `*.old` files and starts the new build, keeping the agent in your terminal with its log. The settings window it opens does not start an agent of its own, so the terminal stays in charge of the agent. Ctrl+C, or closing a debug agent's console, quits the agent the same way as the tray's 退出: the tray icon goes away and peers see a clean disconnect.
 
 A Release x64 build is about 64 MB of files, most of it the Windows App Runtime it carries; the setup program is about 16 MB. The agent is 5 MB, `LinkCursor.exe` 1 MB, the input helper 1 MB and the service 0.4 MB. The WebView2 DLL that the WinUI package brings in is not used and is left out of the setup program. At run time the agent uses about 13 MB of memory and no CPU while idle; the settings window uses about 120 MB, but only while it is open.
 
@@ -188,16 +191,16 @@ Installed with the setup program, the firewall is already set up. A build run fr
 
 ## Arranging devices
 
-The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](../README.md#arrangement).
+The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core README](https://github.com/akarineren/linkcursor-core#arrangement).
 
 - **The user's devices.** **我的设备** lists the devices this PC has been connected to (or placed), online or not, with their round-trip time. **添加设备** lists the other LinkCursor devices on the network; connecting one adds it. The **⋯** menu of a row connects or disconnects, places the device on a side, and **移除此设备** forgets it (disconnected, unplaced, unpaired; it shows up under 添加设备 again while online).
-- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core README](../README.md#how-it-works)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
+- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
 - **Sleep and network changes.** [power.rs](agent/src/power.rs) tells the core when this PC is about to sleep (`PowerRegisterSuspendResumeNotification`, `PBT_APMSUSPEND`): sessions end in order, so a Mac driving this PC gets control back at once. On waking, and when an IPv4 address comes or goes (`NotifyUnicastIpAddressChange`, after 0.8 s without further changes), the core finds and reconnects the devices right away. A device that vanishes without closing (it slept, or lost the network) shows **对方没有响应…** until it is back.
 - **Placing a device.** The user's online devices that are not placed yet wait as **未放置** chips at the top of the canvas. Drag one next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. This PC can be dragged too, once something is placed: that moves every placed peer the other way (each snapped back against this PC, the nearest one first). A press that does not move is not a drag. Screens are drawn to scale but inset by 3 pixels on sides facing another device, so devices that touch show a small gap; the monitors of one computer stay flush against each other, with square corners where they meet, and read as one shape.
 - **Quick placement.** The **⋯** menu puts a device on the left, right, top or bottom, centred on that side, or removes it (**取消放置**, the only way to unplace: a drop outside the canvas still places the device).
 - **Snapping.** While a device is dragged, a dashed outline shows where it will land: the agent answers `preview_placement` with the core's own snapping (`layout::snap_in_arrangement`, same displays and the other placed devices). The drop is then proposed to the core, which snaps it to that spot, and the canvas draws where it actually landed.
-- **Three or more devices.** A device may also be dropped against another placed device instead of this PC (a row of three, whichever has the keyboard). The pointer then crosses from one device straight into the next where they touch. Every placed device must connect to this PC through others; one left floating after a change is moved back against something. Such a chained placement is not synced to the device it does not touch (see the [core README](../README.md#arrangement)).
-- **Adding a device by address.** Where devices do not find each other (company or guest Wi-Fi, access points that keep clients apart, another subnet, a VPN), **添加设备** → **通过地址添加** takes an IP address or a device name. The core then sends its announcement straight there and the other device answers, so it shows up and connects as if it had been found ([manual.rs](../linkcursor-core/src/runtime/manual.rs)); one of the two devices needing the other's address is enough. Each address shows **正在查找…**, **已找到 …**, **没有回应** or why the name could not be looked up. Saved as `manual_addresses`.
+- **Three or more devices.** A device may also be dropped against another placed device instead of this PC (a row of three, whichever has the keyboard). The pointer then crosses from one device straight into the next where they touch. Every placed device must connect to this PC through others; one left floating after a change is moved back against something. Such a chained placement is not synced to the device it does not touch (see the [core README](https://github.com/akarineren/linkcursor-core#arrangement)).
+- **Adding a device by address.** Where devices do not find each other (company or guest Wi-Fi, access points that keep clients apart, another subnet, a VPN), **添加设备** → **通过地址添加** takes an IP address or a device name. The core then sends its announcement straight there and the other device answers, so it shows up and connects as if it had been found ([manual.rs](https://github.com/akarineren/linkcursor-core/blob/main/src/runtime/manual.rs)); one of the two devices needing the other's address is enough. Each address shows **正在查找…**, **已找到 …**, **没有回应** or why the name could not be looked up. Saved as `manual_addresses`.
 - **Device states.** A peer that is discovered but not connected says **未连接** under its name. A placed device that is offline is dimmed, says **离线** and keeps its place.
 - **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
 - **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
@@ -206,7 +209,7 @@ The canvas on the **设备** page draws this PC's monitors (accent outline) and 
 
 ## Being controlled by another device
 
-When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The device list shows **正在控制本机** on that peer's row while that lasts (and the status dot's tooltip **正在被 … 控制键盘和鼠标**). Several peers can be connected at once (each row in the device list connects or disconnects one), but only one drives this PC at a time: when another peer starts driving it, the core tells the previous one to stop and ignores whatever that one still sends (see "One controller at a time" in the [core README](../README.md#how-it-works)).
+When a connected peer (for example a Mac) moves its cursor over to this PC, the agent plays that peer's input with `SendInput` ([inject.rs](agent/src/inject.rs)). The device list shows **正在控制本机** on that peer's row while that lasts (and the status dot's tooltip **正在被 … 控制键盘和鼠标**). Several peers can be connected at once (each row in the device list connects or disconnects one), but only one drives this PC at a time: when another peer starts driving it, the core tells the previous one to stop and ignores whatever that one still sends (see "One controller at a time" in the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)).
 
 Core handles everything that is the same on every platform. The agent only translates core's events to Windows:
 
@@ -283,7 +286,7 @@ Not covered: the sign-in screen before anyone has signed in (the agent runs per 
 
 ## Clipboard
 
-Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then follows control, as in Deskflow. When this PC starts driving a peer, or a peer driving it gives control back, the peer gets this PC's clipboard. The other way round works the same. The core sends contents only if they changed since the last exchange with that peer, which also keeps them from echoing back. The whole design, including file transfer plans, is in [linkcursor-core/docs/clipboard-and-files.md](../linkcursor-core/docs/clipboard-and-files.md).
+Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then follows control, as in Deskflow. When this PC starts driving a peer, or a peer driving it gives control back, the peer gets this PC's clipboard. The other way round works the same. The core sends contents only if they changed since the last exchange with that peer, which also keeps them from echoing back. The whole design, including file transfer plans, is in [linkcursor-core/docs/clipboard-and-files.md](https://github.com/akarineren/linkcursor-core/blob/main/docs/clipboard-and-files.md).
 
 [clipboard.rs](agent/src/clipboard.rs) is the Windows end:
 
@@ -371,7 +374,7 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\LinkCursor\settings.jso
 
 ## Presence
 
-[presence.rs](agent/src/presence.rs), with the core's presence messages (see the [core README](../README.md#how-it-works)):
+[presence.rs](agent/src/presence.rs), with the core's presence messages (see the [core README](https://github.com/akarineren/linkcursor-core#how-it-works)):
 
 | | What |
 | --- | --- |
@@ -385,7 +388,7 @@ The app's text lives in `app\Strings\en-US\Resources.resw` and `app\Strings\zh-C
 
 ## Pairing and encryption
 
-The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing code; see the [core README](../README.md#security)). The agent stores what it has to keep and the app asks the user.
+The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing code; see the [core README](https://github.com/akarineren/linkcursor-core#security)). The agent stores what it has to keep and the app asks the user.
 
 | | Where | What |
 | --- | --- | --- |
@@ -479,7 +482,7 @@ The agent sends whole snapshots instead of individual events, so the app never h
 ## Next steps
 
 1. **Receive input (M1):** done; see [Being controlled by another device](#being-controlled-by-another-device). It still needs a pass with a real Mac for scroll speed and function keys.
-2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app uses it with a side menu; it has no drag canvas yet.
+2. **Arrangement:** done; see [Arranging devices](#arranging-devices). The macOS app has its own drag canvas.
 3. **Send input (M2):** done; see [Controlling another device](#controlling-another-device). It still needs a pass with the real Mac for pointer speed and keys.
 4. **Edge effect with a real peer (M3):** the renderer, tuning, screen info and portals exist. What remains in the core is `EdgeApproach` progress, `Enter` with the entry position on the portal, and `Return` when the cursor is pushed back. That lets the controlling device's push draw the approach on the target's edge. The same effect also has to be built on macOS from the shared parameters.
 5. **Productize (M4):** the setup program, the self-contained runtime, firewall rules and the input service for elevated windows, UAC prompts and the lock screen are done (see [Setup program](#setup-program)). The agent's log file is done (see [Settings](#settings), 诊断日志). Remaining: code signing, Ctrl+Alt+Del through the service (`SendSAS`), and updates.
@@ -488,3 +491,11 @@ The agent sends whole snapshots instead of individual events, so the app never h
 ## Security
 
 All traffic between devices is encrypted with TLS 1.3, and each side knows the other's certificate. With **仅允许已配对设备** on (the default), only devices the user paired can connect. With it off, any LinkCursor device on the network can connect: encrypted, but nobody checked who it is. The pipe between the app and the agent is local to the signed-in user (see [Agent IPC protocol](#agent-ipc-protocol)).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+LinkCursor is licensed under the [Mozilla Public License 2.0](LICENSE). The third-party software it includes is listed in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).

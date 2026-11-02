@@ -7,7 +7,7 @@
 Builds, runs and stops LinkCursor for Windows while developing.
 
 .DESCRIPTION
-Used by the workspace Makefile (make build / make run / make stop).
+Run it directly (.\dev.ps1 run). A Makefile can call it too.
 
   build  Builds only (build.ps1). A running agent or settings window keeps
          running: files it holds open are moved aside, not overwritten.
