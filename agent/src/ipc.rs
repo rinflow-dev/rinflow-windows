@@ -6,7 +6,7 @@
 //!
 //! Each message is one UTF-8 JSON object per line. The app sends requests
 //! (`hello`, `connect`, `set_effect`, …); the agent answers `hello` and then
-//! pushes a full `state` snapshot whenever anything changes. See the README
+//! pushes a full `state` snapshot whenever anything changes. See docs/design.md
 //! for the message shapes.
 
 use crate::effect::EffectParams;

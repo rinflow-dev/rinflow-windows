@@ -1,6 +1,6 @@
 # Contributing to Rinflow for Windows
 
-Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, because the agent builds it from source, and see the [prerequisites](README.md#prerequisites).
+Thanks for your interest. Clone [rinflow-core](https://github.com/rinflow-dev/rinflow-core) next to this repository, because the agent builds it from source, and see the [prerequisites](docs/building.md#prerequisites).
 
 ## Building and testing
 
@@ -30,7 +30,7 @@ If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOT
 
 ## Protocol and ABI changes
 
-The clients link `rinflow-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the core README](https://github.com/rinflow-dev/rinflow-core#changing-the-protocol-or-abi) and update the clients in step.
+The clients link `rinflow-core` from source. A change to the wire protocol or the C ABI affects every client, so bump the versions as described in [the protocol documentation](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/protocol.md#changing-the-protocol-or-abi) and update the clients in step.
 
 ## License
 

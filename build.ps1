@@ -28,7 +28,7 @@ param(
 
     # Language of MSBuild and compiler messages, such as zh-CN or en-US.
     # MSBuild includes most languages. The C++ compiler only speaks the
-    # Visual Studio language packs that are installed (see README.md).
+    # Visual Studio language packs that are installed (see docs/building.md).
     [string]$Language = 'zh-CN',
 
     [switch]$SkipAgent
@@ -51,11 +51,11 @@ $env:VSLANG = [System.Globalization.CultureInfo]::GetCultureInfo($Language).LCID
 $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
 $vswhere = Join-Path $installer 'vswhere.exe'
 if (-not (Test-Path $vswhere)) {
-    throw 'Visual Studio Installer was not found. See README.md for the prerequisites.'
+    throw 'Visual Studio Installer was not found. See docs/building.md for the prerequisites.'
 }
 $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vsPath) {
-    throw 'No Visual Studio or Build Tools installation with the C++ tools was found. See README.md.'
+    throw 'No Visual Studio or Build Tools installation with the C++ tools was found. See docs/building.md.'
 }
 
 # VsDevCmd.bat runs vswhere.exe from the installer folder by name. With
