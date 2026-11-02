@@ -31,10 +31,12 @@ namespace
 {
     using LayoutRect = winrt::Rinflow::implementation::MainWindow::LayoutRect;
 
-    // Room around the drawing for the chips (top) and the hint (bottom).
+    // The strip under the canvas (its height in MainWindow.xaml), and room
+    // around the drawing.
+    constexpr double StripHeight = 40;
     constexpr double PadSide = 24;
-    constexpr double PadTop = 52;
-    constexpr double PadBottom = 48;
+    constexpr double PadTop = 14;
+    constexpr double PadBottom = StripHeight + 14;
     constexpr double DotSpacing = 22;
     // A press that moves less than this is a click, not a drag.
     constexpr double DragThreshold = 6;
@@ -255,7 +257,7 @@ namespace winrt::Rinflow::implementation
             return;
         }
         GeometryGroup dots;
-        for (double y = DotSpacing / 2; y < height; y += DotSpacing)
+        for (double y = DotSpacing / 2; y < height - StripHeight; y += DotSpacing)
         {
             for (double x = DotSpacing / 2; x < width; x += DotSpacing)
             {
@@ -431,10 +433,19 @@ namespace winrt::Rinflow::implementation
             });
             chips.Children().Append(chip);
         }
-        UnplacedPanel().Visibility(chips.Children().Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
-        ArrangementHint().Text(anyPlaced || chips.Children().Size() > 0
-            ? RinflowApp::Text(L"ArrangementHintDrag")
-            : RinflowApp::Text(L"ArrangementHintEmpty"));
+        UpdateStrip();
+    }
+
+    void MainWindow::UpdateStrip()
+    {
+        bool unplacing = m_drag && m_drag->overStrip && !m_drag->fromChip;
+        bool anyPlaced = std::any_of(m_layoutDevices.begin(), m_layoutDevices.end(),
+            [](LayoutDevice const& device) { return device.offset.has_value(); });
+        StripHighlight().Visibility(unplacing ? Visibility::Visible : Visibility::Collapsed);
+        StripHint().Text(RinflowApp::Text(unplacing ? L"StripReleaseToUnplace"
+            : anyPlaced ? L"StripDropToUnplace" : L"ArrangementHintEmpty"));
+        StripHint().Visibility(unplacing || UnplacedChips().Children().Size() == 0
+            ? Visibility::Visible : Visibility::Collapsed);
     }
 
     FrameworkElement MainWindow::DeviceElement(LayoutDevice const& device, bool ghost)
@@ -534,9 +545,24 @@ namespace winrt::Rinflow::implementation
             m_drag->element.Visibility(Visibility::Visible);
         }
         m_drag->free = Point{ position.X - m_drag->grab.X, position.Y - m_drag->grab.Y };
+        // Over the strip a device does not land anywhere. This PC cannot be
+        // unplaced, so it keeps moving as usual.
+        double width = ArrangementHost().ActualWidth(), height = ArrangementHost().ActualHeight();
+        bool overStrip = moved && !m_drag->local && position.X >= 0 && position.X <= width
+            && position.Y >= height - StripHeight && position.Y <= height;
+        if (overStrip != m_drag->overStrip)
+        {
+            m_drag->overStrip = overStrip;
+            if (overStrip)
+            {
+                m_drag->landing.reset();
+                ClearPreview();
+            }
+            UpdateStrip();
+        }
         PlaceDragged();
         args.Handled(true);
-        if (moved)
+        if (moved && !overStrip)
         {
             RequestPreview();
         }
@@ -641,6 +667,12 @@ namespace winrt::Rinflow::implementation
         {
             return;
         }
+        if (m_drag->overStrip)
+        {
+            // Asked before it reached the strip.
+            m_previewQueued = false;
+            return;
+        }
         if (std::exchange(m_previewQueued, false))
         {
             RequestPreview();
@@ -741,6 +773,11 @@ namespace winrt::Rinflow::implementation
                 m_agent->SetPlacement(device->peerId, device->offset->first - dx, device->offset->second - dy);
             }
         }
+        else if (moved && m_drag->overStrip)
+        {
+            // A placed device is unplaced; one from a chip just goes back.
+            if (!m_drag->fromChip) m_agent->RemovePlacement(m_drag->peerId);
+        }
         else if (moved && FindLayoutDevice(m_drag->peerId))
         {
             // Propose where it was dropped, even outside the canvas; the core
@@ -753,6 +790,7 @@ namespace winrt::Rinflow::implementation
         auto landing = m_drag->landing;
         m_drag.reset();
         ClearPreview();
+        UpdateStrip();
         // The next drag asks afresh, whether or not this answer still comes.
         m_previewPending = false;
         m_previewQueued = false;

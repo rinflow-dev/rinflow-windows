@@ -23,8 +23,9 @@
   <data name="StatusNotConnected" xml:space="preserve"><value>未连接</value></data>
   <data name="ThisPC" xml:space="preserve"><value>本机</value></data>
   <data name="DisplayNumber" xml:space="preserve"><value>显示器 {0}</value></data>
-  <data name="ArrangementHintDrag" xml:space="preserve"><value>拖动以调整屏幕位置</value></data>
   <data name="ArrangementHintEmpty" xml:space="preserve"><value>连接设备后，可以在这里把它拖到屏幕旁边</value></data>
+  <data name="StripDropToUnplace" xml:space="preserve"><value>拖到这里可取消放置</value></data>
+  <data name="StripReleaseToUnplace" xml:space="preserve"><value>松开以取消放置</value></data>
   <data name="SuffixNotConnected" xml:space="preserve"><value> · 未连接</value></data>
   <data name="SuffixOffline" xml:space="preserve"><value> · 离线</value></data>
   <data name="PairingWaiting" xml:space="preserve"><value>等待对方确认…</value></data>
@@ -88,8 +89,6 @@
   <data name="LockBar.Title" xml:space="preserve"><value>已锁定到当前屏幕</value></data>
   <data name="SharingTitle.Text" xml:space="preserve"><value>共享键盘和鼠标</value></data>
   <data name="SharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>共享键盘和鼠标</value></data>
-  <data name="UnplacedLabel.Text" xml:space="preserve"><value>未放置：</value></data>
-  <data name="ArrangementHint.Text" xml:space="preserve"><value>拖动以调整屏幕位置</value></data>
   <data name="MyDevicesHeader.Text" xml:space="preserve"><value>我的设备</value></data>
   <data name="RowConnect.Content" xml:space="preserve"><value>连接</value></data>
   <data name="RowMore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>更多操作</value></data>

@@ -78,6 +78,8 @@ namespace winrt::Rinflow::implementation
             std::optional<Windows::Foundation::Point> landing;
             // Held at `landing` by the magnet, not following the pointer.
             bool snapped{ false };
+            // Over the strip under the canvas: it lands nowhere.
+            bool overStrip{ false };
         };
 
     private:
@@ -100,6 +102,7 @@ namespace winrt::Rinflow::implementation
         void ApplyLayout(Windows::Data::Json::JsonObject const& state);
         void RenderArrangement();
         void RenderDots();
+        void UpdateStrip();
         // One screen card; `insets` draw it inside its to-scale bounds.
         Microsoft::UI::Xaml::FrameworkElement Screen(hstring const& templateKey, double width, double height,
             Microsoft::UI::Xaml::Thickness const& insets, Microsoft::UI::Xaml::CornerRadius const& corners,
