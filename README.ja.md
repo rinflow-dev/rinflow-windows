@@ -19,7 +19,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-ja-JP-dark.png">
-    <img src="docs/images/devices-ja-JP-light.png" width="600" alt="デバイス画面：Mac mini をこの PC の上に配置し、接続済み">
+    <img src="docs/images/devices-ja-JP-light.png" width="640" alt="デバイス画面：MacBook Pro をこの PC の左に配置し、接続済み">
   </picture>
 </p>
 

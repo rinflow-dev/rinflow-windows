@@ -19,7 +19,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-en-US-dark.png">
-    <img src="docs/images/devices-en-US-light.png" width="600" alt="The Devices page: a Mac mini placed above this PC and connected">
+    <img src="docs/images/devices-en-US-light.png" width="640" alt="The Devices page: a MacBook Pro placed to the left of this PC and connected">
   </picture>
 </p>
 

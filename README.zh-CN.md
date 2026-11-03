@@ -19,7 +19,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-zh-CN-dark.png">
-    <img src="docs/images/devices-zh-CN-light.png" width="600" alt="设备页面：Mac mini 放在本机上方，已连接">
+    <img src="docs/images/devices-zh-CN-light.png" width="640" alt="设备页面：MacBook Pro 放在本机左侧，已连接">
   </picture>
 </p>
 
