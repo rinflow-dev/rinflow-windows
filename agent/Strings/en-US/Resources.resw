@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- The strings the agent shows itself. build.rs compiles them into the program and fails if a language lacks a string. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="TrayOpen" xml:space="preserve"><value>Open Rinflow</value></data>
+  <data name="TrayQuit" xml:space="preserve"><value>Quit</value></data>
+  <data name="ControlBackTitle" xml:space="preserve"><value>Keyboard and mouse are back on this PC</value></data>
+  <data name="ControlBackElevated" xml:space="preserve"><value>A window running as administrator came to the front, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.</value></data>
+  <data name="ControlBackHooksRemoved" xml:space="preserve"><value>Windows stopped Rinflow from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.</value></data>
+  <data name="SwitchFailedTitle" xml:space="preserve"><value>Keyboard and mouse didn't switch</value></data>
+  <data name="SwitchFailedElevated" xml:space="preserve"><value>The window in front runs as administrator, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.</value></data>
+  <data name="FilesNotSharedTitle" xml:space="preserve"><value>Can't share the copied files</value></data>
+  <data name="FilesTooDeep" xml:space="preserve"><value>The folders are nested more than {0} levels deep to share. Zip them into one file, then copy that.</value></data>
+  <data name="FilesTooMany" xml:space="preserve"><value>More than {0} files and folders were copied, too many to share. Zip them into one file, then copy that.</value></data>
+  <data name="FilesNotReceivedTitle" xml:space="preserve"><value>Can't receive the files</value></data>
+  <data name="PeerTooOldForFiles" xml:space="preserve"><value>Rinflow on the other device is too old to send files. Update it, then copy the files again.</value></data>
+  <data name="FilesNotPublishedTitle" xml:space="preserve"><value>Cannot share these files</value></data>
+  <data name="ElevatedRefusedTitle" xml:space="preserve"><value>The lock screen or UAC prompt didn't get the input</value></data>
+  <data name="ElevatedTurnOnHint" xml:space="preserve"><value>Turn on "Admin windows, UAC and the lock screen while controlled" in Rinflow's settings to let other devices type there.</value></data>
+  <data name="ElevatedInstallHint" xml:space="preserve"><value>To use another device's keyboard and mouse on the lock screen and in UAC prompts, install Rinflow with its setup program, which adds the input service this needs.</value></data>
+  <data name="LaunchValueInvalid" xml:space="preserve"><value>launch_at_login must be true or false</value></data>
+  <data name="LaunchChangeFailed" xml:space="preserve"><value>Couldn't change "Start when I sign in": {0}</value></data>
+  <data name="LockShortcutTaken" xml:space="preserve"><value>Another app is already using the lock shortcut {0}. Choose a different one in settings.</value></data>
+  <data name="SettingsUnreadable" xml:space="preserve"><value>Settings couldn't be read</value></data>
+  <data name="SettingUnknown" xml:space="preserve"><value>Unknown setting: {0}</value></data>
+  <data name="SettingInvalidValue" xml:space="preserve"><value>Invalid setting value: {0}</value></data>
+  <data name="ThemeInvalid" xml:space="preserve"><value>Theme must be system, light, or dark</value></data>
+  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>Switch shortcuts must be Ctrl+Alt+Shift or Ctrl+Alt with the arrow keys</value></data>
+  <data name="LockShortcutConflict" xml:space="preserve"><value>The lock shortcut is the same as a switch shortcut</value></data>
+  <data name="LanguageInvalid" xml:space="preserve"><value>Language must be system, Simplified Chinese, English, or Japanese</value></data>
+  <data name="SwitchDelayTooLong" xml:space="preserve"><value>Switch delay can be at most 1000 ms</value></data>
+  <data name="ShortcutInvalid" xml:space="preserve"><value>Shortcuts must include Ctrl, Alt, or Win, plus a regular key</value></data>
+  <data name="PortInvalid" xml:space="preserve"><value>Ports must be between 1024 and 65535 and not the discovery port {0}</value></data>
+  <data name="AddressesTooMany" xml:space="preserve"><value>You can add up to {0} addresses</value></data>
+  <data name="AddressNotValid" xml:space="preserve"><value>"{0}" isn't a valid address. Enter an IP address or a device name.</value></data>
+  <data name="PeerInputInvalid" xml:space="preserve"><value>Pointer speed must be between 0.25× and 4×, and scroll speed between 0.25× and 5×</value></data>
+  <data name="PeerProblem" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="TransferConnectionLost" xml:space="preserve"><value>the connection was lost</value></data>
+  <data name="ReceiveFilesFailed" xml:space="preserve"><value>Couldn't receive files: {0}</value></data>
+  <data name="SendFilesFailed" xml:space="preserve"><value>Couldn't send files: {0}</value></data>
+  <data name="PeerNotResponding" xml:space="preserve"><value>The other device stopped responding (it may be asleep or offline). Rinflow reconnects when it's back.</value></data>
+  <data name="PeerRefused" xml:space="preserve"><value>The other device refused the connection. It may have removed this PC, or it only allows paired devices. To pair again, select Connect in the device menu.</value></data>
+  <data name="PeerIdentityChanged" xml:space="preserve"><value>The device's identity certificate changed, so the connection was refused. If it was reinstalled, remove it in the device menu and pair again.</value></data>
+  <data name="PairingDeclined" xml:space="preserve"><value>The other device declined pairing.</value></data>
+  <data name="PairingTimedOut" xml:space="preserve"><value>Pairing timed out. It wasn't confirmed within two minutes.</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>An unpaired device was disconnected ("Only paired devices" is on).</value></data>
+  <data name="Unpaired" xml:space="preserve"><value>Unpaired.</value></data>
+</root>

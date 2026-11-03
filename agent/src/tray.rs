@@ -7,6 +7,7 @@
 //! it with `--tray`, which shows its tray panel (devices, the sharing switch,
 //! the way to the main window).
 
+use crate::i18n::{s, tr};
 use crate::win::wide;
 use std::io;
 use std::path::PathBuf;
@@ -295,8 +296,8 @@ fn load_tray_icon() -> HICON {
 }
 
 fn show_menu(window: HWND) {
-    let open = wide(crate::i18n::tr("打开主窗口", "Open Rinflow"));
-    let quit = wide(crate::i18n::tr("退出", "Quit"));
+    let open = wide(tr(s::TrayOpen));
+    let quit = wide(tr(s::TrayQuit));
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
         let menu = CreatePopupMenu();

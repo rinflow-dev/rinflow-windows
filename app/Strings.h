@@ -5,8 +5,8 @@
 #pragma once
 
 // Text shown in code, in the user's language: Strings\<language>\Resources.resw,
-// the same resources XAML takes through x:Uid. English is the default;
-// Chinese (Simplified) is used when Windows runs in Chinese.
+// the same resources XAML takes through x:Uid. English is the default, for any
+// language without its own file.
 namespace RinflowApp
 {
     // The string `key` (a name without a dot, e.g. "TransferCancel").
@@ -28,11 +28,13 @@ namespace RinflowApp
         }
     }
 
-    // The language the strings are in: "zh-CN" or "en-US".
-    bool IsChinese();
+    // The language the strings are in ("en-US", "zh-CN" or "ja-JP"). Windows set
+    // it as their Language: Chinese and Japanese share characters drawn
+    // differently, and text without it can get the other language's glyphs.
+    winrt::hstring LanguageTag();
 
     // The `language` setting the agent keeps in settings.json ("system",
-    // "zh-CN" or "en-US"), applied before the first window loads: resources
+    // "en-US", "zh-CN" or "ja-JP"), applied before the first window loads: resources
     // are picked by it from then on. Read from the file because the agent's
     // snapshot only arrives later.
     void ApplyLanguageSetting();

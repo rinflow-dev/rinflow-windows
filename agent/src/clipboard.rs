@@ -19,6 +19,7 @@
 
 mod virtual_files;
 
+use crate::i18n::{s, tr, trf};
 use crate::win::wide;
 use rinflow_core::{Clipboard, ClipboardFormat, Core, MIME_HTML, MIME_PNG, MIME_TEXT};
 use serde_json::Value;
@@ -103,20 +104,12 @@ struct Incoming {
 /// its limits), and what to do instead.
 pub fn files_not_shared_text(event: &Value) -> String {
     let limit = event["limit"].as_u64().unwrap_or(0);
-    match (event["reason"].as_str(), crate::i18n::chinese()) {
-        (Some("too_deep"), true) => {
-            format!("文件夹嵌套超过 {limit} 层，无法共享。请先压缩成一个 zip 文件再复制。")
-        }
-        (Some("too_deep"), false) => format!(
-            "The folders are nested more than {limit} levels deep to share. Zip them into one file, then copy that."
-        ),
-        (_, true) => {
-            format!("复制的文件和文件夹超过 {limit} 个，无法共享。请先压缩成一个 zip 文件再复制。")
-        }
-        (_, false) => format!(
-            "More than {limit} files and folders were copied, too many to share. Zip them into one file, then copy that."
-        ),
-    }
+    let message = if event["reason"].as_str() == Some("too_deep") {
+        s::FilesTooDeep
+    } else {
+        s::FilesTooMany
+    };
+    trf(message, &[&limit])
 }
 
 /// The core's download folder, Downloads\Rinflow. Files are not
@@ -191,10 +184,9 @@ impl ClipboardHandle {
             Some("clipboard") => self.peer_clipboard(&event),
             Some("files_offered") => self.files_offered(&event),
             // Said right when the user copied them, not only on the page.
-            Some("files_not_shared") => crate::tray::notify(
-                crate::i18n::tr("无法共享复制的文件", "Can't share the copied files"),
-                &files_not_shared_text(&event),
-            ),
+            Some("files_not_shared") => {
+                crate::tray::notify(tr(s::FilesNotSharedTitle), &files_not_shared_text(&event))
+            }
             Some("files_available") if self.enabled() => {
                 if let (Ok(manifest), Some(peer)) = (
                     serde_json::from_value::<rinflow_core::FileManifest>(event["manifest"].clone()),
@@ -236,13 +228,7 @@ impl ClipboardHandle {
             event["peer_id"].as_str().unwrap_or("?")
         );
         if self.enabled() && !self.0.outdated_told.swap(true, Ordering::Relaxed) {
-            crate::tray::notify(
-                crate::i18n::tr("无法接收文件", "Can't receive the files"),
-                crate::i18n::tr(
-                    "对方设备上的 Rinflow 版本太旧，请更新后再复制文件。",
-                    "Rinflow on the other device is too old to send files. Update it, then copy the files again.",
-                ),
-            );
+            crate::tray::notify(tr(s::FilesNotReceivedTitle), tr(s::PeerTooOldForFiles));
         }
     }
 
@@ -492,10 +478,7 @@ impl State {
                     }
                     Err(error) => {
                         log!("cannot publish virtual files: {error}");
-                        crate::tray::notify(
-                            crate::i18n::tr("无法共享这些文件", "Cannot share these files"),
-                            &error.to_string(),
-                        );
+                        crate::tray::notify(tr(s::FilesNotPublishedTitle), &error.to_string());
                         return;
                     }
                 }

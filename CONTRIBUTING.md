@@ -18,7 +18,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
 ```
 
-UI text lives in `app/Strings`, in English and Chinese; add both. Keep `build.ps1` and `dev.ps1` ASCII-only, because Windows PowerShell 5.1 reads scripts without a BOM in the system code page.
+UI text lives in `app/Strings` and `agent/Strings`, in English, Simplified Chinese and Japanese; add all three (see [Languages](docs/design.md#languages)). Keep `build.ps1` and `dev.ps1` ASCII-only, because Windows PowerShell 5.1 reads scripts without a BOM in the system code page.
 
 If `agent/Cargo.lock` or `input/Cargo.lock` changes, regenerate `THIRD_PARTY_NOTICES.txt` as shown in [its script](https://github.com/rinflow-dev/rinflow-core/blob/main/scripts/third-party-notices.ps1).
 

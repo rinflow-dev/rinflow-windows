@@ -8,6 +8,7 @@ use crate::arrangement::Arrangement;
 use crate::clipboard::ClipboardHandle;
 use crate::edge::EdgeHandle;
 use crate::effect::{EffectParams, EffectStore};
+use crate::i18n::{s, tr, trf};
 use crate::overlay::{Command, OverlayHandle};
 use crate::settings::{SettingsStore, autostart};
 use crate::state::SharedState;
@@ -62,17 +63,8 @@ impl Services {
     /// `launch_at_login`), applies them at once and remembers them.
     pub fn update_settings(&self, mut values: Map<String, Value>) -> Result<(), String> {
         if let Some(value) = values.remove("launch_at_login") {
-            let enabled = value.as_bool().ok_or(crate::i18n::tr(
-                "launch_at_login 需要 true 或 false",
-                "launch_at_login must be true or false",
-            ))?;
-            autostart::set(enabled).map_err(|error| {
-                if crate::i18n::chinese() {
-                    format!("无法设置开机启动：{error}")
-                } else {
-                    format!("Couldn't change \"Start when I sign in\": {error}")
-                }
-            })?;
+            let enabled = value.as_bool().ok_or(tr(s::LaunchValueInvalid))?;
+            autostart::set(enabled).map_err(|error| trf(s::LaunchChangeFailed, &[&error]))?;
             self.state.set_launch_at_login(autostart::enabled());
         }
         if values.is_empty() {

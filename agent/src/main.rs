@@ -25,6 +25,8 @@ mod keymap;
 mod overlay;
 mod power;
 mod presence;
+#[cfg(test)]
+mod resw;
 mod services;
 mod settings;
 mod spring;

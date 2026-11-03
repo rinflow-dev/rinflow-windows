@@ -474,7 +474,7 @@ namespace winrt::Rinflow::implementation
             ThemeCombo().SelectedIndex(themeIndex);
         }
         auto language = settings.GetNamedString(L"language", L"system");
-        int languageIndex = language == L"zh-CN" ? 1 : language == L"en-US" ? 2 : 0;
+        int languageIndex = language == L"zh-CN" ? 1 : language == L"en-US" ? 2 : language == L"ja-JP" ? 3 : 0;
         if (LanguageCombo().SelectedIndex() != languageIndex)
         {
             LanguageCombo().SelectedIndex(languageIndex);

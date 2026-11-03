@@ -34,9 +34,9 @@ namespace RinflowApp
                 language = settings.GetNamedString(L"language", L"system");
             }
         }
-        // Empty follows the user's Windows languages; anything else but
-        // Chinese falls back to English (the default language).
-        winrt::hstring chosen = language == L"zh-CN" || language == L"en-US" ? winrt::hstring(language) : winrt::hstring();
+        // Empty follows the user's Windows languages: the first one with
+        // resources, then English (the default language).
+        winrt::hstring chosen = language == L"en-US" || language == L"zh-CN" || language == L"ja-JP" ? winrt::hstring(language) : winrt::hstring();
         try
         {
             winrt::Microsoft::Windows::Globalization::ApplicationLanguages::PrimaryLanguageOverride(chosen);
@@ -63,9 +63,8 @@ namespace RinflowApp
         return winrt::hstring(key);
     }
 
-    bool IsChinese()
+    winrt::hstring LanguageTag()
     {
-        static bool chinese = Text(L"LanguageTag") == L"zh-CN";
-        return chinese;
+        return Text(L"LanguageTag");
     }
 }

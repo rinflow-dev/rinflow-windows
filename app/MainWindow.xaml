@@ -511,6 +511,7 @@
                             <ComboBoxItem x:Uid="LanguageSystem" Content="跟随系统" Tag="system" />
                             <ComboBoxItem Content="简体中文" Tag="zh-CN" />
                             <ComboBoxItem Content="English" Tag="en-US" />
+                            <ComboBoxItem Content="日本語" Tag="ja-JP" />
                         </ComboBox>
                     </Grid>
 

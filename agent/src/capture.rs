@@ -34,6 +34,7 @@
 use crate::arrangement::{Arrangement, Target};
 use crate::displays::{self, PhysicalPortal};
 use crate::edge;
+use crate::i18n::{s, tr};
 use crate::inject::INJECTED_MARKER;
 use crate::keymap;
 use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, PeerInput, SettingsStore};
@@ -179,24 +180,15 @@ enum GiveBack {
 
 impl GiveBack {
     fn tell(&self) {
-        let title = crate::i18n::tr(
-            "键盘和鼠标已回到这台电脑",
-            "Keyboard and mouse are back on this PC",
-        );
+        let title = tr(s::ControlBackTitle);
         let text = match self {
             GiveBack::Elevated => {
                 log!("an elevated window came to the front; capture ended");
-                crate::i18n::tr(
-                    "以管理员身份运行的窗口到了前台，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
-                    "A window running as administrator came to the front, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.",
-                )
+                tr(s::ControlBackElevated)
             }
             GiveBack::HookLost(device) => {
                 log!("the {device:?} hook stopped seeing input; capture ended");
-                crate::i18n::tr(
-                    "Windows 暂停了 Rinflow 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。",
-                    "Windows stopped Rinflow from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.",
-                )
+                tr(s::ControlBackHooksRemoved)
             }
         };
         crate::tray::notify(title, text);
@@ -365,13 +357,7 @@ pub fn begin_at(
 /// administrator's terminal, say). Not across, then, and say why.
 fn can_take_keyboard() -> bool {
     if crate::win::foreground_is_elevated() {
-        crate::tray::notify(
-            crate::i18n::tr("键盘和鼠标没有切换", "Keyboard and mouse didn't switch"),
-            crate::i18n::tr(
-                "当前窗口以管理员身份运行，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。",
-                "The window in front runs as administrator, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.",
-            ),
-        );
+        crate::tray::notify(tr(s::SwitchFailedTitle), tr(s::SwitchFailedElevated));
         return false;
     }
     true

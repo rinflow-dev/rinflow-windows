@@ -61,14 +61,15 @@ SetupLogging=yes
 ; Sign setup and uninstaller once there is a certificate, e.g.
 ; SignTool=signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f
 
-; English or Chinese, from the Windows display language like the app
-; (Chinese for any zh-*); setup asks only when neither matches.
+; English, Chinese or Japanese, from the Windows display language like the
+; app; setup asks only when none matches.
 ShowLanguageDialog=auto
 LanguageDetectionMethod=uilanguage
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 
 [CustomMessages]
 en.GroupControlled=While another device controls this PC:
@@ -89,6 +90,15 @@ chinesesimp.TaskDesktopIcon=创建桌面快捷方式
 chinesesimp.StatusFirewall=正在设置防火墙…
 chinesesimp.StatusService=正在安装输入服务…
 chinesesimp.RunApp=启动 Rinflow
+japanese.GroupControlled=他のデバイスがこの PC を操作しているとき:
+japanese.TaskElevatedInput=管理者ウィンドウ、UAC の確認画面、ロック画面も操作できるようにする (推奨)
+japanese.GroupStartup=起動:
+japanese.TaskAutostart=Windows へのサインイン時に Rinflow を起動する
+japanese.GroupShortcuts=ショートカット:
+japanese.TaskDesktopIcon=デスクトップにショートカットを作成する
+japanese.StatusFirewall=ファイアウォールを設定しています…
+japanese.StatusService=入力サービスをインストールしています…
+japanese.RunApp=Rinflow を起動する
 
 [Tasks]
 ; Asked on the first install only: later the settings switch decides, and

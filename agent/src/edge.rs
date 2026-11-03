@@ -26,6 +26,7 @@ use crate::arrangement::Arrangement;
 use crate::capture::{self, WM_END_CAPTURE};
 use crate::displays::PhysicalPortal;
 use crate::effect::{EffectParams, EffectStore};
+use crate::i18n::{s, trf};
 use crate::overlay::{Command, ENTRY_INSET, Edge, EdgePoint, OverlayHandle};
 use crate::settings::{Hotkey, MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, Settings, SettingsStore};
 use crate::state::{DemoSide, SharedState};
@@ -532,13 +533,8 @@ impl Tracker {
         };
         if !registered {
             let shortcut = describe_hotkey(hotkey);
-            self.state.set_error(if crate::i18n::chinese() {
-                format!("锁定快捷键 {shortcut} 已被其他程序占用，请在设置中换一个")
-            } else {
-                format!(
-                    "Another app is already using the lock shortcut {shortcut}. Choose a different one in settings."
-                )
-            });
+            self.state
+                .set_error(trf(s::LockShortcutTaken, &[&shortcut]));
         }
     }
 

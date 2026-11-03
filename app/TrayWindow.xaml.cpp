@@ -13,6 +13,7 @@
 #endif
 #include "AppShell.h"
 #include "DeviceModel.h"
+#include "Strings.h"
 
 // Fully qualified: WIL declares a global ::Microsoft namespace as well.
 using namespace winrt;
@@ -34,6 +35,7 @@ namespace winrt::Rinflow::implementation
     void TrayWindow::InitializeComponent()
     {
         TrayWindowT::InitializeComponent();
+        Root().Language(RinflowApp::LanguageTag());
 
         auto presenter = OverlappedPresenter::Create();
         presenter.SetBorderAndTitleBar(false, false);

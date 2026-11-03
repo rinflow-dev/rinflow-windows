@@ -155,6 +155,7 @@
     <Page Include="MainWindow.xaml" />
     <PRIResource Include="Strings\en-US\Resources.resw" />
     <PRIResource Include="Strings\zh-CN\Resources.resw" />
+    <PRIResource Include="Strings\ja-JP\Resources.resw" />
     <Page Include="TrayWindow.xaml" />
   </ItemGroup>
   <ItemGroup>

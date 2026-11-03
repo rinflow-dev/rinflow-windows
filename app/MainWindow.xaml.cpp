@@ -85,6 +85,7 @@ namespace winrt::Rinflow::implementation
     void MainWindow::InitializeComponent()
     {
         MainWindowT::InitializeComponent();
+        Root().Language(RinflowApp::LanguageTag());
 
         ExtendsContentIntoTitleBar(true);
         SetTitleBar(AppTitleBar());

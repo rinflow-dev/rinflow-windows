@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- The strings the agent shows itself. build.rs compiles them into the program and fails if a language lacks a string. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="TrayOpen" xml:space="preserve"><value>打开主窗口</value></data>
+  <data name="TrayQuit" xml:space="preserve"><value>退出</value></data>
+  <data name="ControlBackTitle" xml:space="preserve"><value>键盘和鼠标已回到这台电脑</value></data>
+  <data name="ControlBackElevated" xml:space="preserve"><value>以管理员身份运行的窗口到了前台，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。</value></data>
+  <data name="ControlBackHooksRemoved" xml:space="preserve"><value>Windows 暂停了 Rinflow 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。</value></data>
+  <data name="SwitchFailedTitle" xml:space="preserve"><value>键盘和鼠标没有切换</value></data>
+  <data name="SwitchFailedElevated" xml:space="preserve"><value>当前窗口以管理员身份运行，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。</value></data>
+  <data name="FilesNotSharedTitle" xml:space="preserve"><value>无法共享复制的文件</value></data>
+  <data name="FilesTooDeep" xml:space="preserve"><value>文件夹嵌套超过 {0} 层，无法共享。请先压缩成一个 zip 文件再复制。</value></data>
+  <data name="FilesTooMany" xml:space="preserve"><value>复制的文件和文件夹超过 {0} 个，无法共享。请先压缩成一个 zip 文件再复制。</value></data>
+  <data name="FilesNotReceivedTitle" xml:space="preserve"><value>无法接收文件</value></data>
+  <data name="PeerTooOldForFiles" xml:space="preserve"><value>对方设备上的 Rinflow 版本太旧，请更新后再复制文件。</value></data>
+  <data name="FilesNotPublishedTitle" xml:space="preserve"><value>无法共享这些文件</value></data>
+  <data name="ElevatedRefusedTitle" xml:space="preserve"><value>锁屏或 UAC 窗口收不到其他设备的输入</value></data>
+  <data name="ElevatedTurnOnHint" xml:space="preserve"><value>在 Rinflow 设置里打开“被控时可操作管理员窗口、UAC 和锁屏”后，其他设备就能在锁屏和 UAC 窗口里输入。</value></data>
+  <data name="ElevatedInstallHint" xml:space="preserve"><value>要在锁屏和 UAC 窗口里用其他设备的键盘鼠标，请用安装包安装 Rinflow，它会装上所需的输入服务。</value></data>
+  <data name="LaunchValueInvalid" xml:space="preserve"><value>launch_at_login 需要 true 或 false</value></data>
+  <data name="LaunchChangeFailed" xml:space="preserve"><value>无法设置开机启动：{0}</value></data>
+  <data name="LockShortcutTaken" xml:space="preserve"><value>锁定快捷键 {0} 已被其他程序占用，请在设置中换一个</value></data>
+  <data name="SettingsUnreadable" xml:space="preserve"><value>设置无法读取</value></data>
+  <data name="SettingUnknown" xml:space="preserve"><value>未知的设置项：{0}</value></data>
+  <data name="SettingInvalidValue" xml:space="preserve"><value>设置的值无效：{0}</value></data>
+  <data name="ThemeInvalid" xml:space="preserve"><value>主题只能是跟随系统、浅色或深色</value></data>
+  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>切换设备的快捷键只能是 Ctrl+Alt+Shift 或 Ctrl+Alt 加方向键</value></data>
+  <data name="LockShortcutConflict" xml:space="preserve"><value>锁定快捷键与切换设备的快捷键重复了</value></data>
+  <data name="LanguageInvalid" xml:space="preserve"><value>语言只能是跟随系统、简体中文、英语或日语</value></data>
+  <data name="SwitchDelayTooLong" xml:space="preserve"><value>切换延迟最长 1000 毫秒</value></data>
+  <data name="ShortcutInvalid" xml:space="preserve"><value>快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键</value></data>
+  <data name="PortInvalid" xml:space="preserve"><value>端口需在 1024–65535 之间，且不能是发现端口 {0}</value></data>
+  <data name="AddressesTooMany" xml:space="preserve"><value>最多添加 {0} 个地址</value></data>
+  <data name="AddressNotValid" xml:space="preserve"><value>“{0}”不是有效的地址：请输入 IP 地址或设备名称</value></data>
+  <data name="PeerInputInvalid" xml:space="preserve"><value>指针速度需在 0.25–4 倍之间，滚动速度在 0.25–5 倍之间</value></data>
+  <data name="PeerProblem" xml:space="preserve"><value>{0}：{1}</value></data>
+  <data name="TransferConnectionLost" xml:space="preserve"><value>连接断开了</value></data>
+  <data name="ReceiveFilesFailed" xml:space="preserve"><value>接收文件失败：{0}</value></data>
+  <data name="SendFilesFailed" xml:space="preserve"><value>发送文件失败：{0}</value></data>
+  <data name="PeerNotResponding" xml:space="preserve"><value>对方没有响应（可能睡眠了或断网），回来后会自动重新连接。</value></data>
+  <data name="PeerRefused" xml:space="preserve"><value>对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。</value></data>
+  <data name="PeerIdentityChanged" xml:space="preserve"><value>设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。</value></data>
+  <data name="PairingDeclined" xml:space="preserve"><value>对方拒绝了配对。</value></data>
+  <data name="PairingTimedOut" xml:space="preserve"><value>配对超时，没有在两分钟内确认。</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>未配对的设备已断开（已开启“仅允许已配对设备”）。</value></data>
+  <data name="Unpaired" xml:space="preserve"><value>已取消配对。</value></data>
+</root>

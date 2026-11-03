@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::effect::EffectParams;
-use crate::i18n::tr;
+use crate::i18n::{s, tr, trf};
 use crate::settings::Settings;
 use rinflow_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
@@ -480,11 +480,7 @@ impl SharedState {
                 }
                 let reason = event["reason"].as_str().unwrap_or("disconnected");
                 if let Some(message) = disconnect_message(reason) {
-                    snapshot.last_error = Some(if crate::i18n::chinese() {
-                        format!("{name}：{message}")
-                    } else {
-                        format!("{name}: {message}")
-                    });
+                    snapshot.last_error = Some(trf(s::PeerProblem, &[&name, &message]));
                 }
                 true
             }
@@ -516,15 +512,15 @@ impl SharedState {
                     | "files are no longer on the clipboard" => {
                         return removed;
                     }
-                    "connection lost" => tr("连接断开了", "the connection was lost"),
+                    "connection lost" => tr(s::TransferConnectionLost),
                     other => other,
                 };
-                snapshot.last_error = Some(match (direction, crate::i18n::chinese()) {
-                    ("receiving", true) => format!("接收文件失败：{reason}"),
-                    ("receiving", false) => format!("Couldn't receive files: {reason}"),
-                    (_, true) => format!("发送文件失败：{reason}"),
-                    (_, false) => format!("Couldn't send files: {reason}"),
-                });
+                let failed = if direction == "receiving" {
+                    s::ReceiveFilesFailed
+                } else {
+                    s::SendFilesFailed
+                };
+                snapshot.last_error = Some(trf(failed, &[&reason]));
                 true
             }
             // Files come only through file streams (`files_offered` and
@@ -670,35 +666,13 @@ fn disconnect_message(reason: &str) -> Option<String> {
         | "pairing declined" => return None,
         // The peer vanished without closing (slept, lost the network); the
         // core reconnects once it is back.
-        "heartbeat timeout" => tr(
-            "对方没有响应（可能睡眠了或断网），回来后会自动重新连接。",
-            "The other device stopped responding (it may be asleep or offline). Rinflow reconnects when it's back.",
-        )
-        .to_owned(),
-        "refused by the other device" => tr(
-            "对方拒绝了连接：对方可能移除了本机，或只允许已配对的设备。在设备菜单里点“连接”可以重新配对。",
-            "The other device refused the connection. It may have removed this PC, or it only allows paired devices. To pair again, select Connect in the device menu.",
-        )
-        .to_owned(),
-        "the device's identity changed" => tr(
-            "设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。",
-            "The device's identity certificate changed, so the connection was refused. If it was reinstalled, remove it in the device menu and pair again.",
-        )
-        .to_owned(),
-        "pairing declined on the other device" => {
-            tr("对方拒绝了配对。", "The other device declined pairing.").to_owned()
-        }
-        "pairing timed out" => tr(
-            "配对超时，没有在两分钟内确认。",
-            "Pairing timed out. It wasn't confirmed within two minutes.",
-        )
-        .to_owned(),
-        "pairing required" => tr(
-            "未配对的设备已断开（已开启“仅允许已配对设备”）。",
-            "An unpaired device was disconnected (\"Only paired devices\" is on).",
-        )
-        .to_owned(),
-        "unpaired" => tr("已取消配对。", "Unpaired.").to_owned(),
+        "heartbeat timeout" => tr(s::PeerNotResponding).to_owned(),
+        "refused by the other device" => tr(s::PeerRefused).to_owned(),
+        "the device's identity changed" => tr(s::PeerIdentityChanged).to_owned(),
+        "pairing declined on the other device" => tr(s::PairingDeclined).to_owned(),
+        "pairing timed out" => tr(s::PairingTimedOut).to_owned(),
+        "pairing required" => tr(s::UnpairedDisconnected).to_owned(),
+        "unpaired" => tr(s::Unpaired).to_owned(),
         other => other.to_owned(),
     })
 }

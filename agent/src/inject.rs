@@ -31,6 +31,7 @@
 
 use crate::displays;
 use crate::elevated;
+use crate::i18n::{s, tr};
 use crate::keymap::{WinKey, windows_key};
 use rinflow_core::Core;
 use rinflow_core::{
@@ -547,7 +548,6 @@ fn send(input: INPUT) {
 /// Says once why a peer's keys and clicks do nothing on a UAC prompt or
 /// the lock screen, and what makes them work.
 fn tell_refused() {
-    use crate::i18n::tr;
     // Installed with setup: the settings switch adds the service (setup
     // leaves it out while the setting is off).
     let installed = elevated::available() || rinflow_input::win::service_installable();
@@ -560,23 +560,11 @@ fn tell_refused() {
         }
     );
     let text = if installed {
-        tr(
-            "在 Rinflow 设置里打开“被控时可操作管理员窗口、UAC 和锁屏”后，其他设备就能在锁屏和 UAC 窗口里输入。",
-            "Turn on \"Admin windows, UAC and the lock screen while controlled\" in Rinflow's settings to let other devices type there.",
-        )
+        tr(s::ElevatedTurnOnHint)
     } else {
-        tr(
-            "要在锁屏和 UAC 窗口里用其他设备的键盘鼠标，请用安装包安装 Rinflow，它会装上所需的输入服务。",
-            "To use another device's keyboard and mouse on the lock screen and in UAC prompts, install Rinflow with its setup program, which adds the input service this needs.",
-        )
+        tr(s::ElevatedInstallHint)
     };
-    crate::tray::notify(
-        tr(
-            "锁屏或 UAC 窗口收不到其他设备的输入",
-            "The lock screen or UAC prompt didn't get the input",
-        ),
-        text,
-    );
+    crate::tray::notify(tr(s::ElevatedRefusedTitle), text);
 }
 
 /// Windows hides the cursor on a PC with no mouse attached, even while input

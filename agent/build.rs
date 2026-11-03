@@ -2,7 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::path::PathBuf;
+#[path = "src/resw.rs"]
+mod resw;
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir"))
@@ -20,6 +24,7 @@ fn main() {
     }
 
     version_info();
+    strings();
 }
 
 /// The version resource: its FileDescription is the name Windows shows for
@@ -86,4 +91,49 @@ fn icon_path(name: &str) -> String {
         .join(name);
     println!("cargo:rerun-if-changed={}", path.display());
     path.to_string_lossy().replace('\\', "/")
+}
+
+/// Compiles `Strings\<language>\Resources.resw` into the `s` module of
+/// i18n.rs. A string missing from a language, or using other placeholders,
+/// stops the build rather than showing the wrong language to someone.
+fn strings() {
+    const LANGUAGES: [&str; 3] = ["en-US", "zh-CN", "ja-JP"]; // the order of i18n::Language
+    let folder =
+        Path::new(&std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir")).join("Strings");
+    let mut tables = Vec::new();
+    for language in LANGUAGES {
+        let path = folder.join(language).join("Resources.resw");
+        println!("cargo:rerun-if-changed={}", path.display());
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        tables.push(resw::parse(&text).into_iter().collect::<BTreeMap<_, _>>());
+    }
+    let mut code =
+        String::from("#[allow(non_upper_case_globals)]\npub mod s {\n    use super::Message;\n");
+    for (name, english) in &tables[0] {
+        let mut values = Vec::new();
+        for (language, table) in LANGUAGES.iter().zip(&tables) {
+            let value = table
+                .get(name)
+                .unwrap_or_else(|| panic!("{language} lacks the string {name}"));
+            assert_eq!(
+                resw::placeholders(english),
+                resw::placeholders(value),
+                "{language}: {name} uses other placeholders than English"
+            );
+            values.push(format!("{value:?}"));
+        }
+        code.push_str(&format!(
+            "    pub const {name}: Message = Message([{}]);\n",
+            values.join(", ")
+        ));
+    }
+    code.push_str("}\n");
+    for (language, table) in LANGUAGES.iter().zip(&tables) {
+        if let Some(extra) = table.keys().find(|name| !tables[0].contains_key(*name)) {
+            panic!("{language} has the string {extra}, which English lacks");
+        }
+    }
+    let out = PathBuf::from(std::env::var("OUT_DIR").expect("out dir")).join("strings.rs");
+    std::fs::write(out, code).expect("write strings.rs");
 }

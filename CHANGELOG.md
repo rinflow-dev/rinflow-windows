@@ -13,7 +13,7 @@ First public version.
 - Pairing with a six-digit code, and encrypted connections
 - Optional clipboard and file sync (off by default)
 - Input into elevated windows, UAC prompts and the lock screen through an optional service
-- English and Simplified Chinese interface, and light and dark themes
+- English, Simplified Chinese and Japanese interface, and light and dark themes
 - Setup program for x64
 
 ### Known issues

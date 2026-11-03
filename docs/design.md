@@ -269,7 +269,21 @@ The **设置** page. Preferences live in `%LOCALAPPDATA%\Rinflow\settings.json` 
 
 ## Languages
 
-The app's text lives in `app\Strings\en-US\Resources.resw` and `app\Strings\zh-CN\Resources.resw`: XAML takes it through `x:Uid`, code through `RinflowApp::Text` / `Format` ([Strings.h](../app/Strings.h)). English is the default language, so any language without its own file shows English. The agent keeps its few strings side by side in the code (`i18n::tr`, [i18n.rs](../agent/src/i18n.rs)). Both follow the `language` setting. The development-only animation page is not translated.
+Rinflow is available in English (the default), Simplified Chinese and Japanese. Text is kept out of the code, in `.resw` files, one folder per language:
+
+| Part | Files | How it is read |
+| --- | --- | --- |
+| Settings app | `app\Strings\<language>\Resources.resw` | MRT Core at run time: XAML through `x:Uid`, code through `RinflowApp::Text` / `Format` ([Strings.h](../app/Strings.h)) |
+| Agent (tray, notifications, errors) | `agent\Strings\<language>\Resources.resw` | Compiled into the program by [build.rs](../agent/build.rs); code uses `tr` / `trf` ([i18n.rs](../agent/src/i18n.rs)) |
+| Setup program | `installer\Rinflow.iss`, `[CustomMessages]` | Inno Setup |
+
+The `language` setting chooses `en-US`, `zh-CN` or `ja-JP`. Set to `system`, the first of the user's Windows languages that Rinflow has is used, then English; the app and the agent choose alike. Traditional Chinese does not match Simplified. Windows set `Language` on their root element, so that Chinese and Japanese each get their own forms of the characters they share.
+
+Strings with values use numbered placeholders (`{0}`, `{1}`), never concatenation, so each language can put them where its grammar needs them.
+
+To add a language, add a folder in `app\Strings` and in `agent\Strings`, list it in `app\Rinflow.vcxproj` (`PRIResource`), `Language` and `LANGUAGES` in the agent ([i18n.rs](../agent/src/i18n.rs), [build.rs](../agent/build.rs), [settings.rs](../agent/src/settings.rs)), `RinflowApp::ApplyLanguageSetting`, the language list in `MainWindow.xaml`, and `Rinflow.iss`. A build fails if the agent's strings differ between languages in names or placeholders, and `cargo test` checks the same for the app's.
+
+Error text from the core is in English. The development-only animation page is not translated.
 
 ## Pairing and encryption
 

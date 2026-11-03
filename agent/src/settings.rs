@@ -6,7 +6,7 @@
 //! `%LOCALAPPDATA%\Rinflow\settings.json`. Starting at login is not kept
 //! here: the `Run` registry value is the truth (see [`autostart`]).
 
-use crate::i18n::{self, tr};
+use crate::i18n::{s, tr, trf};
 use crate::identity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -79,14 +79,14 @@ pub struct Settings {
     pub manual_addresses: Vec<String>,
     /// How this PC's mouse feels on each peer it drives, by device ID.
     pub peer_input: BTreeMap<String, PeerInput>,
-    /// The language of Rinflow's own text: `system` (Windows' display
-    /// language: Simplified Chinese, or English for every other one),
-    /// `zh-CN` or `en-US`. The settings app reads it at start-up too.
+    /// The language of Rinflow's own text: `system` (the first of the user's
+    /// Windows languages that Rinflow has, or English), `en-US`, `zh-CN` or
+    /// `ja-JP`.
     pub language: String,
 }
 
 /// The values of [`Settings::language`].
-pub const LANGUAGES: [&str; 3] = ["system", "zh-CN", "en-US"];
+pub const LANGUAGES: [&str; 4] = ["system", "en-US", "zh-CN", "ja-JP"];
 
 /// Pointer and scrolling on one peer, applied by this PC as it drives it
 /// (it tracks the pointer there, so the peer must not change the motion).
@@ -188,104 +188,53 @@ impl Settings {
     pub fn merged(&self, values: &Map<String, Value>) -> Result<Self, String> {
         let mut object = match serde_json::to_value(self) {
             Ok(Value::Object(object)) => object,
-            _ => return Err(tr("设置无法读取", "Settings couldn't be read").to_owned()),
+            _ => return Err(tr(s::SettingsUnreadable).to_owned()),
         };
         for (key, value) in values {
             if !object.contains_key(key) {
-                return Err(if i18n::chinese() {
-                    format!("未知的设置项：{key}")
-                } else {
-                    format!("Unknown setting: {key}")
-                });
+                return Err(trf(s::SettingUnknown, &[key]));
             }
             object.insert(key.clone(), value.clone());
         }
-        let merged: Self = serde_json::from_value(Value::Object(object)).map_err(|error| {
-            if i18n::chinese() {
-                format!("设置的值无效：{error}")
-            } else {
-                format!("Invalid setting value: {error}")
-            }
-        })?;
+        let merged: Self = serde_json::from_value(Value::Object(object))
+            .map_err(|error| trf(s::SettingInvalidValue, &[&error]))?;
         if !matches!(merged.theme.as_str(), "system" | "light" | "dark") {
-            return Err(tr(
-                "主题只能是跟随系统、浅色或深色",
-                "Theme must be system, light, or dark",
-            )
-            .to_owned());
+            return Err(tr(s::ThemeInvalid).to_owned());
         }
         if !SWITCH_MODIFIER_CHOICES.contains(&merged.switch_modifiers) {
-            return Err(tr(
-                "切换设备的快捷键只能是 Ctrl+Alt+Shift 或 Ctrl+Alt 加方向键",
-                "Switch shortcuts must be Ctrl+Alt+Shift or Ctrl+Alt with the arrow keys",
-            )
-            .to_owned());
+            return Err(tr(s::SwitchModifiersInvalid).to_owned());
         }
         if merged.lock_hotkey.modifiers == merged.switch_modifiers
             && (0x25..=0x28).contains(&merged.lock_hotkey.key)
         {
-            return Err(tr(
-                "锁定快捷键与切换设备的快捷键重复了",
-                "The lock shortcut is the same as a switch shortcut",
-            )
-            .to_owned());
+            return Err(tr(s::LockShortcutConflict).to_owned());
         }
         if !LANGUAGES.contains(&merged.language.as_str()) {
-            return Err(tr(
-                "语言只能是跟随系统、简体中文或英语",
-                "Language must be system, Simplified Chinese, or English",
-            )
-            .to_owned());
+            return Err(tr(s::LanguageInvalid).to_owned());
         }
         if merged.switch_delay_ms > 1000 {
-            return Err(tr(
-                "切换延迟最长 1000 毫秒",
-                "Switch delay can be at most 1000 ms",
-            )
-            .to_owned());
+            return Err(tr(s::SwitchDelayTooLong).to_owned());
         }
         if !merged.lock_hotkey.is_valid() {
-            return Err(tr(
-                "快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键",
-                "Shortcuts must include Ctrl, Alt, or Win, plus a regular key",
-            )
-            .to_owned());
+            return Err(tr(s::ShortcutInvalid).to_owned());
         }
         if let Some(port) = merged.port
             && (port < 1024 || port == DISCOVERY_PORT)
         {
-            return Err(if i18n::chinese() {
-                format!("端口需在 1024–65535 之间，且不能是发现端口 {DISCOVERY_PORT}")
-            } else {
-                format!(
-                    "Ports must be between 1024 and 65535 and not the discovery port {DISCOVERY_PORT}"
-                )
-            });
+            return Err(trf(s::PortInvalid, &[&DISCOVERY_PORT]));
         }
         if merged.manual_addresses.len() > MAX_MANUAL_ADDRESSES {
-            return Err(if i18n::chinese() {
-                format!("最多添加 {MAX_MANUAL_ADDRESSES} 个地址")
-            } else {
-                format!("You can add up to {MAX_MANUAL_ADDRESSES} addresses")
-            });
+            return Err(trf(s::AddressesTooMany, &[&MAX_MANUAL_ADDRESSES]));
         }
         if let Some(bad) = merged
             .manual_addresses
             .iter()
             .find(|address| rinflow_core::parse_address(address, DISCOVERY_PORT).is_err())
         {
-            return Err(if i18n::chinese() {
-                format!("“{bad}”不是有效的地址：请输入 IP 地址或设备名称")
-            } else {
-                format!("“{bad}” isn't a valid address. Enter an IP address or a device name.")
-            });
+            return Err(trf(s::AddressNotValid, &[bad]));
         }
         if merged.peer_input.values().any(|input| !input.is_valid()) {
-            return Err(tr(
-                "指针速度需在 0.25–4 倍之间，滚动速度在 0.25–5 倍之间",
-                "Pointer speed must be between 0.25× and 4×, and scroll speed between 0.25× and 5×",
-            )
-            .to_owned());
+            return Err(tr(s::PeerInputInvalid).to_owned());
         }
         Ok(merged)
     }

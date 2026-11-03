@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- The strings the agent shows itself. build.rs compiles them into the program and fails if a language lacks a string. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="TrayOpen" xml:space="preserve"><value>Rinflow を開く</value></data>
+  <data name="TrayQuit" xml:space="preserve"><value>終了</value></data>
+  <data name="ControlBackTitle" xml:space="preserve"><value>キーボードとマウスがこの PC に戻りました</value></data>
+  <data name="ControlBackElevated" xml:space="preserve"><value>管理者として実行中のウィンドウが前面に表示されたため、Rinflow はそのキーボード入力を取得できません。別のウィンドウをクリックしてから、他のデバイスへ移動してください。</value></data>
+  <data name="ControlBackHooksRemoved" xml:space="preserve"><value>システムの負荷が高いときなどに、Windows が Rinflow によるキーボードとマウスの取得を停止しました。続けるには、もう一度他のデバイスへ移動してください。</value></data>
+  <data name="SwitchFailedTitle" xml:space="preserve"><value>キーボードとマウスを切り替えられませんでした</value></data>
+  <data name="SwitchFailedElevated" xml:space="preserve"><value>前面のウィンドウは管理者として実行されているため、Rinflow はそのキーボード入力を取得できません。別のウィンドウをクリックしてから、他のデバイスへ移動してください。</value></data>
+  <data name="FilesNotSharedTitle" xml:space="preserve"><value>コピーしたファイルを共有できません</value></data>
+  <data name="FilesTooDeep" xml:space="preserve"><value>フォルダーの階層が {0} を超えているため共有できません。1 つの zip ファイルに圧縮してからコピーしてください。</value></data>
+  <data name="FilesTooMany" xml:space="preserve"><value>コピーしたファイルとフォルダーが {0} 個を超えているため共有できません。1 つの zip ファイルに圧縮してからコピーしてください。</value></data>
+  <data name="FilesNotReceivedTitle" xml:space="preserve"><value>ファイルを受信できません</value></data>
+  <data name="PeerTooOldForFiles" xml:space="preserve"><value>相手のデバイスの Rinflow が古いため、ファイルを送信できません。更新してから、もう一度ファイルをコピーしてください。</value></data>
+  <data name="FilesNotPublishedTitle" xml:space="preserve"><value>これらのファイルを共有できません</value></data>
+  <data name="ElevatedRefusedTitle" xml:space="preserve"><value>ロック画面または UAC の確認画面に入力が届きませんでした</value></data>
+  <data name="ElevatedTurnOnHint" xml:space="preserve"><value>Rinflow の設定で「操作されているときの管理者ウィンドウ、UAC、ロック画面」をオンにすると、他のデバイスからそこに入力できます。</value></data>
+  <data name="ElevatedInstallHint" xml:space="preserve"><value>ロック画面や UAC の確認画面で他のデバイスのキーボードとマウスを使うには、セットアップ プログラムで Rinflow をインストールしてください。必要な入力サービスが追加されます。</value></data>
+  <data name="LaunchValueInvalid" xml:space="preserve"><value>launch_at_login は true または false にしてください</value></data>
+  <data name="LaunchChangeFailed" xml:space="preserve"><value>「サインイン時に起動」を変更できませんでした: {0}</value></data>
+  <data name="LockShortcutTaken" xml:space="preserve"><value>ロックのショートカット {0} は他のアプリで使用されています。設定で別のショートカットを選択してください。</value></data>
+  <data name="SettingsUnreadable" xml:space="preserve"><value>設定を読み取れませんでした</value></data>
+  <data name="SettingUnknown" xml:space="preserve"><value>不明な設定です: {0}</value></data>
+  <data name="SettingInvalidValue" xml:space="preserve"><value>設定の値が無効です: {0}</value></data>
+  <data name="ThemeInvalid" xml:space="preserve"><value>テーマはシステム設定、ライト、ダークのいずれかにしてください</value></data>
+  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>切り替えのショートカットは、Ctrl+Alt+Shift または Ctrl+Alt と方向キーの組み合わせにしてください</value></data>
+  <data name="LockShortcutConflict" xml:space="preserve"><value>ロックのショートカットが切り替えのショートカットと重複しています</value></data>
+  <data name="LanguageInvalid" xml:space="preserve"><value>言語はシステム設定、簡体字中国語、英語、日本語のいずれかにしてください</value></data>
+  <data name="SwitchDelayTooLong" xml:space="preserve"><value>切り替えの遅延は最大 1000 ミリ秒です</value></data>
+  <data name="ShortcutInvalid" xml:space="preserve"><value>ショートカットには Ctrl、Alt、Win のいずれかと、通常のキーを含めてください</value></data>
+  <data name="PortInvalid" xml:space="preserve"><value>ポートは 1024 ~ 65535 の範囲で、検出用ポート {0} 以外にしてください</value></data>
+  <data name="AddressesTooMany" xml:space="preserve"><value>追加できるアドレスは {0} 個までです</value></data>
+  <data name="AddressNotValid" xml:space="preserve"><value>「{0}」は有効なアドレスではありません。IP アドレスまたはデバイス名を入力してください。</value></data>
+  <data name="PeerInputInvalid" xml:space="preserve"><value>ポインターの速度は 0.25 ~ 4 倍、スクロールの速度は 0.25 ~ 5 倍の範囲にしてください</value></data>
+  <data name="PeerProblem" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="TransferConnectionLost" xml:space="preserve"><value>接続が切断されました</value></data>
+  <data name="ReceiveFilesFailed" xml:space="preserve"><value>ファイルを受信できませんでした: {0}</value></data>
+  <data name="SendFilesFailed" xml:space="preserve"><value>ファイルを送信できませんでした: {0}</value></data>
+  <data name="PeerNotResponding" xml:space="preserve"><value>相手のデバイスが応答しなくなりました (スリープ中またはオフラインの可能性があります)。復帰すると Rinflow が再接続します。</value></data>
+  <data name="PeerRefused" xml:space="preserve"><value>相手のデバイスが接続を拒否しました。この PC が削除されたか、ペアリング済みのデバイスのみ許可している可能性があります。もう一度ペアリングするには、デバイスのメニューで [接続] を選択してください。</value></data>
+  <data name="PeerIdentityChanged" xml:space="preserve"><value>デバイスの ID 証明書が変更されたため、接続を拒否しました。再インストールした場合は、デバイスのメニューで削除してからもう一度ペアリングしてください。</value></data>
+  <data name="PairingDeclined" xml:space="preserve"><value>相手のデバイスがペアリングを拒否しました。</value></data>
+  <data name="PairingTimedOut" xml:space="preserve"><value>ペアリングがタイムアウトしました。2 分以内に確認されませんでした。</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>ペアリングされていないデバイスを切断しました (「ペアリング済みのデバイスのみ」がオンです)。</value></data>
+  <data name="Unpaired" xml:space="preserve"><value>ペアリングを解除しました。</value></data>
+</root>

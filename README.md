@@ -15,6 +15,7 @@ This is the Windows client. It works with the [macOS client](https://github.com/
 - Encrypted connections, with six-digit pairing
 - Optional clipboard and file sync, off by default
 - Optional input into administrator windows, UAC prompts and the lock screen
+- English, Simplified Chinese and Japanese interface
 
 ## Building
 
