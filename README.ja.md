@@ -1,40 +1,65 @@
-# Rinflow for Windows
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="app/Assets/Rinflow.Dark.svg">
+    <img src="app/Assets/Rinflow.svg" width="80" alt="">
+  </picture>
+</p>
 
-[English](README.md) | [简体中文](README.zh-CN.md) | 日本語
+<h1 align="center">Rinflow for Windows</h1>
 
-Rinflow は、ローカルネットワーク上の複数のコンピューターで 1 組のキーボードとマウスを共有するソフトウェアです。ポインターを画面の端の外へ動かすと、隣のデバイスを操作できます。
+<p align="center">
+  Windows PC と Mac で、1 組のキーボードとマウスを共有します。<br>
+  ポインターを画面の端の外へ動かすと、そのまま隣のデバイスを操作できます。
+</p>
 
-これは Windows クライアントです。[macOS クライアント](https://github.com/rinflow-dev/rinflow-macos)と連携でき、[rinflow-core](https://github.com/rinflow-dev/rinflow-core) をベースにしています。
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <b>日本語</b>
+</p>
 
-**状態：** 開発初期の段階です。バイナリのリリースはまだありません。既知の問題は[変更履歴](CHANGELOG.md)をご覧ください。
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-ja-JP-dark.png">
+    <img src="docs/images/devices-ja-JP-light.png" width="600" alt="デバイス画面：Mac mini をこの PC の上に配置し、接続済み">
+  </picture>
+</p>
+
+> [!NOTE]
+> Rinflow は開発初期の段階です。バイナリのリリースはまだありません。既知の問題は[変更履歴](CHANGELOG.md)をご覧ください。
 
 ## 機能
 
-- 画面の端を越えて他のデバイスを操作でき、他のデバイスから操作されることも可能
-- デバイスをドラッグしてディスプレイの周囲に配置
-- 暗号化接続と 6 桁のコードによるペアリング
-- クリップボードとファイルの同期（任意、既定ではオフ）
-- 管理者ウィンドウ、UAC ダイアログ、ロック画面への入力（任意）
-- 英語、簡体字中国語、日本語のインターフェース
+- **画面の端で切り替え**：ポインターを画面の端の外へ押し出すと、隣のデバイスを操作できます。**Ctrl+Alt+Esc** で操作を戻せます。
+- **デバイスの配置**：Windows のディスプレイ設定と同じように、デバイスをディスプレイの周りへドラッグします。
+- **ペアリングと暗号化**：新しいデバイスは 6 桁のコードで確認し、すべての接続を TLS 1.3 で暗号化します。
+- **クリップボードとファイル**：テキスト、画像、コピーしたファイルがポインターと一緒に移動します。任意で、既定ではオフです。
+- **管理者ウィンドウとロック画面**：任意のサービスにより、操作側のデバイスから UAC の確認画面やロック画面も操作できます。
+- **言語**：英語、簡体字中国語、日本語。
 
-## ビルド
+[Rinflow for macOS](https://github.com/rinflow-dev/rinflow-macos) と連携でき、[rinflow-core](https://github.com/rinflow-dev/rinflow-core) をベースにしています。
 
-Windows 10 1809 以降、MSVC ツールチェーンの Rust、C++ と WinUI のワークロードを含む Visual Studio または Build Tools 2026 が必要です。詳しくは[ビルドと実行](docs/building.md)をご覧ください。
+## 動作環境
+
+- Windows 10 バージョン 1809 以降
+- 同じローカル ネットワーク上で Rinflow を実行している別のコンピューター
+
+## ソースからビルド
+
+MSVC ツールチェーンの Rust と、C++ と WinUI のワークロードを含む Visual Studio または Build Tools 2026 が必要です。セットアップ プログラムの作成には Inno Setup 6 も必要です。詳しくは[ビルドと実行](docs/building.md)をご覧ください。
 
 ```powershell
 git clone https://github.com/rinflow-dev/rinflow-core.git
 git clone https://github.com/rinflow-dev/rinflow-windows.git
 cd rinflow-windows
 .\build.cmd -Configuration Release
-.\installer\build-installer.ps1    # 任意：セットアップを作成（Inno Setup 6 が必要）
+.\installer\build-installer.ps1    # 任意：セットアップ プログラムを作成
 ```
 
-## 使い方
+## はじめに
 
-1. 同じネットワーク上の両方のデバイスで Rinflow を起動します。
-2. **デバイスを追加** をクリックし、両方のデバイスに同じ 6 桁のコードが表示されていることを確認します。
-3. デバイスを、実際に置かれている画面の側へドラッグします。
-4. ポインターをその端の外へ押し出します。**Ctrl+Alt+Esc** で操作を戻せます。
+1. 両方のコンピューターで Rinflow を起動します。
+2. **デバイスを追加** を選択し、両方のコンピューターに同じ 6 桁のコードが表示されていることを確認します。
+3. もう一方のコンピューターを、実際に置かれている画面の側へドラッグします。
+4. ポインターをその端の外へ押し出します。
 
 ## ドキュメント（英語）
 

@@ -1,40 +1,65 @@
-# Rinflow for Windows
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="app/Assets/Rinflow.Dark.svg">
+    <img src="app/Assets/Rinflow.svg" width="80" alt="">
+  </picture>
+</p>
 
-[English](README.md) | 简体中文 | [日本語](README.ja.md)
+<h1 align="center">Rinflow for Windows</h1>
 
-Rinflow 让局域网内的多台电脑共用一套键盘和鼠标：把指针移过屏幕边缘，就能控制下一台设备。
+<p align="center">
+  让 Windows 电脑和 Mac 共用一套键盘和鼠标。<br>
+  把指针移过屏幕边缘，就能接着操作下一台设备。
+</p>
 
-这是 Windows 客户端，可与 [macOS 客户端](https://github.com/rinflow-dev/rinflow-macos)配合使用，基于 [rinflow-core](https://github.com/rinflow-dev/rinflow-core) 构建。
+<p align="center">
+  <a href="README.md">English</a> · <b>简体中文</b> · <a href="README.ja.md">日本語</a>
+</p>
 
-**状态：** 早期开发阶段，暂无二进制发布版本。已知问题见[变更日志](CHANGELOG.md)。
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-zh-CN-dark.png">
+    <img src="docs/images/devices-zh-CN-light.png" width="600" alt="设备页面：Mac mini 放在本机上方，已连接">
+  </picture>
+</p>
+
+> [!NOTE]
+> Rinflow 处于早期开发阶段，暂无二进制发布版本。已知问题见[变更日志](CHANGELOG.md)。
 
 ## 功能
 
-- 越过屏幕边缘即可控制其他设备，也可被其他设备控制
-- 拖动设备，排列到显示器周围
-- 加密连接，六位配对码
-- 可选的剪贴板和文件同步，默认关闭
-- 可选的管理员窗口、UAC 弹窗和锁屏输入
-- 英语、简体中文和日语界面
+- **越过边缘切换**：把指针推过屏幕边缘，即可控制下一台设备。按 **Ctrl+Alt+Esc** 收回控制。
+- **设备排列**：像 Windows 显示设置一样，把设备拖到显示器周围。
+- **配对与加密**：新设备需确认六位配对码，所有连接都使用 TLS 1.3 加密。
+- **剪贴板和文件**：文字、图片和复制的文件随指针同步。可选，默认关闭。
+- **管理员窗口与锁屏**：可选的服务让控制方也能操作 UAC 弹窗和锁屏。
+- **多语言**：英语、简体中文和日语。
 
-## 构建
+可与 [Rinflow for macOS](https://github.com/rinflow-dev/rinflow-macos) 配合使用，基于 [rinflow-core](https://github.com/rinflow-dev/rinflow-core) 构建。
 
-需要 Windows 10 1809 或更高版本、MSVC 工具链的 Rust，以及带 C++ 和 WinUI 工作负载的 Visual Studio 或 Build Tools 2026。详情见[构建和运行](docs/building.md)。
+## 系统要求
+
+- Windows 10 1809 或更高版本
+- 同一局域网中另一台运行 Rinflow 的电脑
+
+## 从源码构建
+
+需要 MSVC 工具链的 Rust，以及带 C++ 和 WinUI 工作负载的 Visual Studio 或 Build Tools 2026。生成安装程序还需要 Inno Setup 6。详情见[构建和运行](docs/building.md)。
 
 ```powershell
 git clone https://github.com/rinflow-dev/rinflow-core.git
 git clone https://github.com/rinflow-dev/rinflow-windows.git
 cd rinflow-windows
 .\build.cmd -Configuration Release
-.\installer\build-installer.ps1    # 可选：生成安装程序，需要 Inno Setup 6
+.\installer\build-installer.ps1    # 可选：生成安装程序
 ```
 
-## 使用
+## 快速上手
 
-1. 在同一网络的两台设备上启动 Rinflow。
-2. 点击**添加设备**，确认两边显示相同的六位配对码。
-3. 把设备拖到它实际所在的屏幕一侧。
-4. 把指针推过该边缘。按 **Ctrl+Alt+Esc** 收回控制。
+1. 在两台电脑上启动 Rinflow。
+2. 点击**添加设备**，确认两台电脑显示相同的六位配对码。
+3. 把另一台电脑拖到它实际所在的屏幕一侧。
+4. 把指针推过该边缘。
 
 ## 文档（英文）
 
