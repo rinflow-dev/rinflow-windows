@@ -1,6 +1,6 @@
 [package]
 name = "rinflow-agent"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 description = "Background agent for Rinflow on Windows: runs the core, the tray icon and the IPC endpoint for the settings app"
 license = "MPL-2.0"

@@ -2,7 +2,7 @@
 
 Notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - Unreleased
+## [0.0.1] - 2026-11-05
 
 First public version.
 
@@ -14,7 +14,7 @@ First public version.
 - Optional clipboard and file sync (off by default)
 - Input into elevated windows, UAC prompts and the lock screen through an optional service
 - English, Simplified Chinese and Japanese interface, and light and dark themes
-- Setup program for x64
+- Setup programs for x64 and ARM64
 
 ### Known issues
 
