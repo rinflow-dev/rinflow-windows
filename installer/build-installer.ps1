@@ -7,19 +7,27 @@
 Builds the Rinflow setup program: the Release build, then Inno Setup.
 
 .DESCRIPTION
-Runs build.ps1 -Configuration Release -EffectDemo Off, then compiles Rinflow.iss with
-ISCC.exe (Inno Setup 6). The version comes from agent\Cargo.toml. The
-result is installer\output\Rinflow-Setup-<version>-x64.exe.
+Runs build.ps1 -Configuration Release -EffectDemo Off for the platform, then
+compiles Rinflow.iss with ISCC.exe (Inno Setup 6). The version comes from
+agent\Cargo.toml. The result is
+installer\output\Rinflow-Setup-<version>-<x64|arm64>.exe.
 Keep this file ASCII-only: Windows PowerShell 5.1 reads scripts without a
 BOM in the system code page.
 
 .EXAMPLE
 .\installer\build-installer.ps1
+.\installer\build-installer.ps1 -Platform ARM64
 .\installer\build-installer.ps1 -SkipBuild
 #>
 [CmdletBinding()]
 param(
-    # Package what is already in app\x64\Release\Rinflow.
+    [ValidateSet('x64', 'ARM64')]
+    [string]$Platform = 'x64',
+
+    # Language of build messages, passed to build.ps1.
+    [string]$Language = 'zh-CN',
+
+    # Package what is already in app\<platform>\Release\Rinflow.
     [switch]$SkipBuild
 )
 
@@ -37,7 +45,7 @@ if (-not $iscc) {
 
 if (-not $SkipBuild) {
     # Setup never carries the edge animation's tuning page.
-    & (Join-Path $root 'build.ps1') -Configuration Release -EffectDemo Off
+    & (Join-Path $root 'build.ps1') -Configuration Release -Platform $Platform -Language $Language -EffectDemo Off
     if ($LASTEXITCODE -ne 0) {
         throw "The Release build failed ($LASTEXITCODE)."
     }
@@ -48,15 +56,16 @@ if ($cargo -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
     throw 'No version in agent\Cargo.toml.'
 }
 $version = $Matches[1]
-$source = Join-Path $root 'app\x64\Release\Rinflow'
+$arch = $Platform.ToLowerInvariant()
+$source = Join-Path $root "app\$Platform\Release\Rinflow"
 foreach ($exe in 'Rinflow.exe', 'rinflow-agent.exe', 'rinflow-input.exe', 'rinflow-service.exe') {
     if (-not (Test-Path (Join-Path $source $exe))) {
         throw "$exe is missing from $source."
     }
 }
 
-& $iscc "/DAppVersion=$version" "/DSourceDir=$source" (Join-Path $PSScriptRoot 'Rinflow.iss')
+& $iscc "/DAppVersion=$version" "/DArch=$arch" "/DSourceDir=$source" (Join-Path $PSScriptRoot 'Rinflow.iss')
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed ($LASTEXITCODE)."
 }
-Get-Item (Join-Path $PSScriptRoot "output\Rinflow-Setup-$version-x64.exe")
+Get-Item (Join-Path $PSScriptRoot "output\Rinflow-Setup-$version-$arch.exe")

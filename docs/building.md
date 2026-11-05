@@ -10,7 +10,7 @@ git clone https://github.com/rinflow-dev/rinflow-windows.git
 ## Prerequisites
 
 - Windows 10 1809 or later (Windows 11 recommended).
-- [Rust](https://rustup.rs) with the MSVC toolchain (`stable-x86_64-pc-windows-msvc`). Add `aarch64-pc-windows-msvc` for ARM64 builds.
+- [Rust](https://rustup.rs) with the MSVC toolchain (`stable-x86_64-pc-windows-msvc`). For ARM64 builds, add the `aarch64-pc-windows-msvc` target, and [LLVM](https://llvm.org) for `clang` (`winget install LLVM.LLVM`), which the `ring` crate needs to build for ARM64.
 - Visual Studio 2026 or Build Tools 2026 with:
   - the **Desktop development with C++** workload (`Microsoft.VisualStudio.Workload.VCTools`) plus the MSVC x64/x86 tools and a Windows 11 SDK;
   - the **WinUI application development build tools** workload (`Microsoft.VisualStudio.Workload.UniversalBuildTools`) with **C++ WinUI app development build tools** and **C++ Universal Windows Platform tools**. The project uses `ApplicationType=Windows Store`, which needs these.
@@ -36,7 +36,7 @@ From any PowerShell or Command Prompt window:
 cd rinflow-windows
 .\build.cmd                              # Debug, x64
 .\build.cmd -Configuration Release
-.\build.cmd -Platform ARM64              # needs: rustup target add aarch64-pc-windows-msvc
+.\build.cmd -Platform ARM64              # needs the ARM64 Rust target and clang (see above)
 .\build.cmd -SkipAgent                   # the WinUI app only
 .\build.cmd -EffectDemo On               # with the edge animation page, also in Release
 ```
@@ -65,11 +65,12 @@ A Release x64 build is about 64 MB of files, most of it the Windows App Runtime 
 ### Setup program
 
 ```powershell
-.\installer\build-installer.ps1             # Release build, then the setup program
-.\installer\build-installer.ps1 -SkipBuild  # package the existing Release build
+.\installer\build-installer.ps1                  # Release build, then the setup program (x64)
+.\installer\build-installer.ps1 -Platform ARM64  # the same for ARM64
+.\installer\build-installer.ps1 -SkipBuild       # package the existing Release build
 ```
 
-[build-installer.ps1](../installer/build-installer.ps1) runs the Release build and compiles [Rinflow.iss](../installer/Rinflow.iss) with Inno Setup into `installer\output\Rinflow-Setup-<version>-x64.exe` (the version comes from [agent/Cargo.toml](../agent/Cargo.toml)). The setup program speaks English or Simplified Chinese ([ChineseSimplified.isl](../installer/ChineseSimplified.isl), MIT, from [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation)), picked from the Windows display language; for any other language it asks which one. Its own texts are `[CustomMessages]` in the script. It needs an administrator and:
+[build-installer.ps1](../installer/build-installer.ps1) runs the Release build and compiles [Rinflow.iss](../installer/Rinflow.iss) with Inno Setup into `installer\output\Rinflow-Setup-<version>-<x64|arm64>.exe` (the version comes from [agent/Cargo.toml](../agent/Cargo.toml)). The x64 setup program also installs on ARM64 Windows, where the app runs under emulation; the ARM64 one installs only there. The setup program speaks English, Simplified Chinese or Japanese ([ChineseSimplified.isl](../installer/ChineseSimplified.isl), MIT, from [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation)), picked from the Windows display language; for any other language it asks which one. Its own texts are `[CustomMessages]` in the script. It needs an administrator and:
 
 - installs into `Program Files\Rinflow`, where only administrators can change files (the input helper and the agent rely on that when they check each other);
 - adds a firewall rule for the agent on private **and public** networks (Windows often marks a new Wi-Fi network public, and nothing would be found without saying why);
@@ -78,6 +79,15 @@ A Release x64 build is about 64 MB of files, most of it the Windows App Runtime 
 - before replacing files (an upgrade), removes the service and closes Rinflow; uninstalling removes the service, the firewall rule and the logs, and keeps each user's settings and pairings.
 
 It is not code-signed yet, so SmartScreen warns before it runs; `SignTool` in the script is ready for a certificate.
+
+### Releases
+
+Releases are built on GitHub from a version tag:
+
+1. Set the version in `agent/Cargo.toml` and `input/Cargo.toml`, and add its section to [CHANGELOG.md](../CHANGELOG.md).
+2. Push a tag such as `v0.0.1` on `main`.
+
+[release.yml](../.github/workflows/release.yml) then builds the x64 and ARM64 setup programs and publishes a release with them, their SHA-256 checksums and the version's changelog section. It stops if the tag does not match the version. The core is built from the commit in `CORE_REF` at the top of the workflow. Running the workflow by hand only builds.
 
 To work on the agent alone:
 

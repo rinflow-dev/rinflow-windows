@@ -1,0 +1,119 @@
+# Builds the setup programs for a version tag (v0.0.1, ...) and publishes
+# them as a GitHub release. Run by hand, it only builds, to try the workflow.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The rinflow-core commit this version is built with. Update it when the
+  # Windows client moves to a newer core.
+  CORE_REF: a8d7dea2881f838752259f39ade90a149db62f0e
+
+jobs:
+  build:
+    name: Setup (${{ matrix.platform }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rust-target: x86_64-pc-windows-msvc
+          - platform: ARM64
+            rust-target: aarch64-pc-windows-msvc
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: rinflow-windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: rinflow-windows
+      # The agent builds the core from source, from a sibling folder.
+      - uses: actions/checkout@v4
+        with:
+          repository: rinflow-dev/rinflow-core
+          ref: ${{ env.CORE_REF }}
+          path: rinflow-core
+
+      - name: Check the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          $tag = '${{ github.ref_name }}'.TrimStart('v')
+          $version = [regex]::Match((Get-Content -Raw agent\Cargo.toml), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          if ($tag -ne $version) { throw "Tag v$tag does not match version $version in agent\Cargo.toml." }
+
+      - name: Install Rust and Inno Setup
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.rust-target }}
+          choco install innosetup --no-progress -y
+          # ring needs clang to build for ARM64.
+          if ('${{ matrix.platform }}' -eq 'ARM64' -and -not (Get-Command clang -ErrorAction SilentlyContinue)) {
+            choco install llvm --no-progress -y
+            Add-Content $env:GITHUB_PATH "$env:ProgramFiles\LLVM\bin"
+          }
+
+      - name: Build the setup program
+        run: .\installer\build-installer.ps1 -Platform ${{ matrix.platform }} -Language en-US
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-${{ matrix.platform }}
+          path: rinflow-windows/installer/output/Rinflow-Setup-*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write the release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # The version's section of the changelog, without its heading.
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+          {
+            echo
+            echo '### Checksums (SHA-256)'
+            echo
+            echo '```'
+            (cd dist && sha256sum Rinflow-Setup-*.exe)
+            echo '```'
+          } >> notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/Rinflow-Setup-*.exe \
+            --title "Rinflow for Windows ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md \
+            "${prerelease[@]}"

@@ -1,8 +1,9 @@
 ﻿; Rinflow for Windows: the setup program (Inno Setup 6).
 ;
 ; Built by build-installer.ps1, which builds the Release app first and
-; passes the version and the folder to package:
-;   ISCC.exe /DAppVersion=0.1.0 /DSourceDir=..\app\x64\Release\Rinflow Rinflow.iss
+; passes the version, the architecture and the folder to package:
+;   ISCC.exe /DAppVersion=0.0.1 /DArch=x64 /DSourceDir=..\app\x64\Release\Rinflow Rinflow.iss
+;   ISCC.exe /DAppVersion=0.0.1 /DArch=arm64 /DSourceDir=..\app\ARM64\Release\Rinflow Rinflow.iss
 ;
 ; What it installs, into Program Files\Rinflow (only administrators can
 ; change files there, which the input helper and the agent rely on when they
@@ -22,10 +23,20 @@
 ;   installs it when turned on and removes it when turned off.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.0.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\app\x64\Release\Rinflow"
+#endif
+; x64 or arm64: the Windows the setup program installs on, and its file name.
+; An x64 setup also runs on ARM64 Windows, under emulation.
+#ifndef Arch
+  #define Arch "x64"
+#endif
+#if Arch == "arm64"
+  #define Allowed "arm64"
+#else
+  #define Allowed "x64compatible"
 #endif
 
 [Setup]
@@ -43,11 +54,11 @@ DisableProgramGroupPage=yes
 ; for every user from the drive root.
 DisableDirPage=yes
 PrivilegesRequired=admin
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#Allowed}
+ArchitecturesInstallIn64BitMode={#Allowed}
 MinVersion=10.0.17763
 OutputDir=output
-OutputBaseFilename=Rinflow-Setup-{#AppVersion}-x64
+OutputBaseFilename=Rinflow-Setup-{#AppVersion}-{#Arch}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
