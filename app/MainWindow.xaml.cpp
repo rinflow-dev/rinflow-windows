@@ -25,11 +25,12 @@ using namespace winrt::Windows::Data::Json;
 
 namespace
 {
-#if defined(_DEBUG)
-    // The edge animation is a development aid; release builds leave it out.
-    constexpr bool DevelopmentBuild = true;
+#if defined(RINFLOW_EFFECT_DEMO)
+    // The edge animation's tuning page, a development aid: only in builds
+    // with EffectDemo (on in Debug by default; setup never has it).
+    constexpr bool EffectDemo = true;
 #else
-    constexpr bool DevelopmentBuild = false;
+    constexpr bool EffectDemo = false;
 #endif
 
     // What a row shows, to skip rebuilding rows that did not change. The
@@ -156,7 +157,7 @@ namespace winrt::Rinflow::implementation
         {
             if (auto self = weak.get()) self->ShowPage(Page::Settings);
         });
-        EffectButton().Visibility(DevelopmentBuild ? Visibility::Visible : Visibility::Collapsed);
+        EffectButton().Visibility(EffectDemo ? Visibility::Visible : Visibility::Collapsed);
         EffectButton().Click([weak](auto&&, auto&&)
         {
             if (auto self = weak.get()) self->ShowPage(Page::Effect);
@@ -193,7 +194,7 @@ namespace winrt::Rinflow::implementation
         };
         show(DevicesPage(), page == Page::Devices);
         show(SettingsPage(), page == Page::Settings);
-        show(EffectPage(), page == Page::Effect && DevelopmentBuild);
+        show(EffectPage(), page == Page::Effect && EffectDemo);
         show(BackButton(), page != Page::Devices);
         if (page == Page::Devices && m_layoutDirty && !m_drag && !m_settling)
         {
@@ -393,18 +394,9 @@ namespace winrt::Rinflow::implementation
     {
         m_model = RinflowApp::DeviceModel::FromState(state);
         m_connectedPeerIds.clear();
-        hstring controller;
-        size_t connected = 0;
-        bool connecting = false;
         for (auto const& device : m_model.mine)
         {
-            if (device.connected)
-            {
-                m_connectedPeerIds.insert(std::wstring(device.id));
-                ++connected;
-                if (device.controlling) controller = device.name;
-            }
-            connecting = connecting || device.connecting;
+            if (device.connected) m_connectedPeerIds.insert(std::wstring(device.id));
         }
 
         std::vector<Rinflow::PeerItem> rows;
@@ -416,22 +408,6 @@ namespace winrt::Rinflow::implementation
         for (auto const& device : m_model.nearby) nearby.push_back(RinflowApp::NearbyRow(device));
         UpdateRows(m_nearby, nearby);
         NearbyEmptyPanel().Visibility(nearby.empty() ? Visibility::Visible : Visibility::Collapsed);
-
-        // The dot by 添加设备: green while connected; the tooltip says more.
-        StatusDotConnected().Visibility(connected > 0 ? Visibility::Visible : Visibility::Collapsed);
-        hstring status;
-        if (!controller.empty()) status = RinflowApp::Format(L"StatusControlledBy", std::wstring(controller));
-        else if (connected == 1) status = RinflowApp::Text(L"StatusOneConnected");
-        else if (connected > 1) status = RinflowApp::Format(L"StatusManyConnected", connected);
-        else if (connecting) status = RinflowApp::Text(L"StatusConnecting");
-        else
-        {
-            auto core = state.GetNamedString(L"core", L"starting");
-            status = core == L"running" ? RinflowApp::Text(L"StatusSearching")
-                : core == L"stopped" ? RinflowApp::Text(L"StatusCoreStopped")
-                : RinflowApp::Text(L"StatusStarting");
-        }
-        ToolTipService::SetToolTip(StatusIndicator(), box_value(status));
     }
 
     void MainWindow::ApplyTheme(hstring const& theme)
@@ -457,8 +433,6 @@ namespace winrt::Rinflow::implementation
     {
         if (!linked)
         {
-            ToolTipService::SetToolTip(StatusIndicator(), box_value(RinflowApp::Text(L"StatusAgentConnecting")));
-            StatusDotConnected().Visibility(Visibility::Collapsed);
             m_devices.Clear();
             m_nearby.Clear();
             m_connectedPeerIds.clear();

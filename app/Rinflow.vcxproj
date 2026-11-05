@@ -105,6 +105,20 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <!--
+    The edge animation's tuning page and its button (a development aid): on in
+    Debug and off in Release unless RinflowEffectDemo says otherwise
+    (build.ps1 -EffectDemo On|Off). build-installer.ps1 always turns it off.
+  -->
+  <PropertyGroup>
+    <RinflowEffectDemo Condition="'$(RinflowEffectDemo)' == '' and '$(Configuration)' == 'Debug'">true</RinflowEffectDemo>
+    <RinflowEffectDemo Condition="'$(RinflowEffectDemo)' == ''">false</RinflowEffectDemo>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(RinflowEffectDemo)' == 'true'">
+    <ClCompile>
+      <PreprocessorDefinitions>RINFLOW_EFFECT_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <!--
     Release links the Visual C++ runtime statically (the "hybrid CRT", as the
     Windows App SDK's own DLLs do): vcruntime and the C++ library go into
     Rinflow.exe, the Universal CRT stays the one Windows ships. Setup then

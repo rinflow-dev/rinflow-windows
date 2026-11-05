@@ -53,13 +53,6 @@
   <data name="ForgetTitle" xml:space="preserve"><value>Remove {0}?</value></data>
   <data name="ForgetContent" xml:space="preserve"><value>It disconnects and leaves the arrangement. While it&apos;s online it still shows up under Add device.</value></data>
   <data name="ForgetConfirm" xml:space="preserve"><value>Remove</value></data>
-  <data name="StatusControlledBy" xml:space="preserve"><value>{0} is using this PC&apos;s keyboard and mouse</value></data>
-  <data name="StatusOneConnected" xml:space="preserve"><value>1 device connected</value></data>
-  <data name="StatusManyConnected" xml:space="preserve"><value>{0} devices connected</value></data>
-  <data name="StatusSearching" xml:space="preserve"><value>Not connected · Looking for devices on the network</value></data>
-  <data name="StatusCoreStopped" xml:space="preserve"><value>The Rinflow service stopped</value></data>
-  <data name="StatusStarting" xml:space="preserve"><value>Starting…</value></data>
-  <data name="StatusAgentConnecting" xml:space="preserve"><value>Connecting to the background service…</value></data>
   <data name="AgentProblemTitle" xml:space="preserve"><value>The background service isn't running</value></data>
   <data name="AgentCannotStart" xml:space="preserve"><value>rinflow-agent.exe can't be started (error {0}). Antivirus software may have blocked or removed it; reinstalling Rinflow usually fixes this.</value></data>
   <data name="AgentExited" xml:space="preserve"><value>The background service quit right after starting (code {0}). The log says why: Settings → Open logs folder.</value></data>

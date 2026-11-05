@@ -7,7 +7,7 @@
 Builds the Rinflow setup program: the Release build, then Inno Setup.
 
 .DESCRIPTION
-Runs build.ps1 -Configuration Release, then compiles Rinflow.iss with
+Runs build.ps1 -Configuration Release -EffectDemo Off, then compiles Rinflow.iss with
 ISCC.exe (Inno Setup 6). The version comes from agent\Cargo.toml. The
 result is installer\output\Rinflow-Setup-<version>-x64.exe.
 Keep this file ASCII-only: Windows PowerShell 5.1 reads scripts without a
@@ -36,7 +36,8 @@ if (-not $iscc) {
 }
 
 if (-not $SkipBuild) {
-    & (Join-Path $root 'build.ps1') -Configuration Release
+    # Setup never carries the edge animation's tuning page.
+    & (Join-Path $root 'build.ps1') -Configuration Release -EffectDemo Off
     if ($LASTEXITCODE -ne 0) {
         throw "The Release build failed ($LASTEXITCODE)."
     }

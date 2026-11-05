@@ -38,7 +38,10 @@ cd rinflow-windows
 .\build.cmd -Configuration Release
 .\build.cmd -Platform ARM64              # needs: rustup target add aarch64-pc-windows-msvc
 .\build.cmd -SkipAgent                   # the WinUI app only
+.\build.cmd -EffectDemo On               # with the edge animation page, also in Release
 ```
+
+The edge animation page (a tool for tuning the push-through effect) and its button are in Debug builds and not in Release builds; `-EffectDemo On` or `Off` overrides that. The setup program never has it: [build-installer.ps1](../installer/build-installer.ps1) builds with `-EffectDemo Off`.
 
 [build.cmd](../build.cmd) runs [build.ps1](../build.ps1) without changing the PowerShell execution policy. The script:
 

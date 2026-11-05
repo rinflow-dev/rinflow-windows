@@ -53,13 +53,6 @@
   <data name="ForgetTitle" xml:space="preserve"><value>移除 {0}？</value></data>
   <data name="ForgetContent" xml:space="preserve"><value>会断开连接，并删除它在排列中的位置。它在线时仍会出现在“添加设备”里。</value></data>
   <data name="ForgetConfirm" xml:space="preserve"><value>移除</value></data>
-  <data name="StatusControlledBy" xml:space="preserve"><value>正在被 {0} 控制键盘和鼠标</value></data>
-  <data name="StatusOneConnected" xml:space="preserve"><value>已连接 1 台设备</value></data>
-  <data name="StatusManyConnected" xml:space="preserve"><value>已连接 {0} 台设备</value></data>
-  <data name="StatusSearching" xml:space="preserve"><value>未连接 · 正在局域网中查找设备</value></data>
-  <data name="StatusCoreStopped" xml:space="preserve"><value>核心服务已停止</value></data>
-  <data name="StatusStarting" xml:space="preserve"><value>正在启动…</value></data>
-  <data name="StatusAgentConnecting" xml:space="preserve"><value>正在连接后台服务…</value></data>
   <data name="AgentProblemTitle" xml:space="preserve"><value>后台服务没有运行</value></data>
   <data name="AgentCannotStart" xml:space="preserve"><value>无法启动 rinflow-agent.exe（错误 {0}）。它可能被杀毒软件拦截或被删除了，重新安装 Rinflow 通常可以解决。</value></data>
   <data name="AgentExited" xml:space="preserve"><value>后台服务启动后立即退出了（代码 {0}）。原因记录在日志里：设置 → 打开日志文件夹。</value></data>

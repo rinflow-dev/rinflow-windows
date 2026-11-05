@@ -67,7 +67,7 @@ app/
   MainWindow.Arrangement.cpp the arrangement canvas: to-scale screens, dragging, the strip of unplaced devices
   MainWindow.Settings.cpp    the 设置 page and the lock-shortcut dialog
   MainWindow.Pairing.cpp     the 配对 dialog (the pairing code)
-  MainWindow.Effect.cpp      the edge animation page (development builds only)
+  MainWindow.Effect.cpp      the edge animation page (builds with EffectDemo only)
   TrayWindow.xaml(.cpp)      the tray panel (acrylic, closes when it loses focus)
   DeviceModel.{h,cpp}        the user's / nearby devices from the agent's snapshot, and their rows
   AgentClient.{h,cpp}        named-pipe client; starts the agent if needed

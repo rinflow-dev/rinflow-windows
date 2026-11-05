@@ -150,12 +150,13 @@
                 Grid.Column="1"
                 Padding="16,0,0,0"
                 Background="Transparent"
-                ColumnSpacing="12">
+                ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Image Width="24" Height="24" VerticalAlignment="Center" Stretch="Uniform" Source="{ThemeResource AppLogo}" AutomationProperties.AccessibilityView="Raw" />
+                <!-- 16 x 16, as Windows 11 title bars, close to the title. -->
+                <Image Width="16" Height="16" VerticalAlignment="Center" Stretch="Uniform" Source="{ThemeResource AppLogo}" AutomationProperties.AccessibilityView="Raw" />
                 <TextBlock
                     Grid.Column="1"
                     VerticalAlignment="Center"
@@ -185,25 +186,6 @@
                             VerticalAlignment="Center"
                             Orientation="Horizontal"
                             Spacing="12">
-                            <!-- Connection status: grey, or green while a
-                                 device is connected; the tooltip says more. -->
-                            <Grid
-                                x:Name="StatusIndicator"
-                                Margin="0,0,4,0"
-                                Padding="4"
-                                VerticalAlignment="Center"
-                                Background="Transparent">
-                                <Ellipse
-                                    Width="8"
-                                    Height="8"
-                                    Fill="{ThemeResource ControlStrongStrokeColorDisabledBrush}" />
-                                <Ellipse
-                                    x:Name="StatusDotConnected"
-                                    Width="8"
-                                    Height="8"
-                                    Fill="{ThemeResource SystemFillColorSuccessBrush}"
-                                    Visibility="Collapsed" />
-                            </Grid>
                             <Button
                                 x:Name="AddDeviceButton"
                                 x:Uid="AddDeviceButton" AutomationProperties.Name="添加设备"
@@ -213,8 +195,8 @@
                                     <TextBlock x:Uid="AddDeviceLabel" Text="添加设备" />
                                 </StackPanel>
                             </Button>
-                            <!-- The edge animation's tuning page exists in
-                                 development builds only. -->
+                            <!-- The edge animation's tuning page: only in
+                                 builds with EffectDemo (docs/building.md). -->
                             <Button
                                 x:Name="EffectButton"
                                 AutomationProperties.Name="动画效果（开发版）"

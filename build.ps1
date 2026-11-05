@@ -17,6 +17,7 @@ scripts without a BOM in the system code page.
 .\build.cmd
 .\build.cmd -Configuration Release
 .\build.cmd -Language en-US
+.\build.cmd -Configuration Release -EffectDemo On
 #>
 [CmdletBinding()]
 param(
@@ -30,6 +31,11 @@ param(
     # MSBuild includes most languages. The C++ compiler only speaks the
     # Visual Studio language packs that are installed (see docs/building.md).
     [string]$Language = 'zh-CN',
+
+    # The edge animation's tuning page and its button. Without this, Debug
+    # builds have it and Release builds do not.
+    [ValidateSet('On', 'Off')]
+    [string]$EffectDemo,
 
     [switch]$SkipAgent
 )
@@ -101,6 +107,9 @@ $arguments = @(
 )
 if ($SkipAgent) {
     $arguments += '-p:SkipAgentBuild=true'
+}
+if ($EffectDemo) {
+    $arguments += "-p:RinflowEffectDemo=$(if ($EffectDemo -eq 'On') { 'true' } else { 'false' })"
 }
 
 & msbuild @arguments

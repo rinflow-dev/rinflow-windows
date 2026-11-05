@@ -53,13 +53,6 @@
   <data name="ForgetTitle" xml:space="preserve"><value>{0} を削除しますか?</value></data>
   <data name="ForgetContent" xml:space="preserve"><value>接続を切断し、配置からも外します。オンラインの間は [デバイスを追加] に引き続き表示されます。</value></data>
   <data name="ForgetConfirm" xml:space="preserve"><value>削除</value></data>
-  <data name="StatusControlledBy" xml:space="preserve"><value>{0} がこの PC のキーボードとマウスを使用しています</value></data>
-  <data name="StatusOneConnected" xml:space="preserve"><value>1 台のデバイスに接続しています</value></data>
-  <data name="StatusManyConnected" xml:space="preserve"><value>{0} 台のデバイスに接続しています</value></data>
-  <data name="StatusSearching" xml:space="preserve"><value>未接続 · ネットワーク上のデバイスを探しています</value></data>
-  <data name="StatusCoreStopped" xml:space="preserve"><value>Rinflow のサービスが停止しました</value></data>
-  <data name="StatusStarting" xml:space="preserve"><value>起動しています…</value></data>
-  <data name="StatusAgentConnecting" xml:space="preserve"><value>バックグラウンド サービスに接続しています…</value></data>
   <data name="AgentProblemTitle" xml:space="preserve"><value>バックグラウンド サービスが動作していません</value></data>
   <data name="AgentCannotStart" xml:space="preserve"><value>rinflow-agent.exe を起動できません (エラー {0})。ウイルス対策ソフトによってブロックまたは削除された可能性があります。通常は Rinflow を再インストールすると解決します。</value></data>
   <data name="AgentExited" xml:space="preserve"><value>バックグラウンド サービスが起動直後に終了しました (コード {0})。原因はログに記録されています: [設定] → [ログ フォルダーを開く]。</value></data>
