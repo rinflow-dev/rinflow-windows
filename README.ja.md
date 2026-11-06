@@ -24,7 +24,24 @@
 </p>
 
 > [!NOTE]
-> Rinflow は開発初期の段階です。バイナリのリリースはまだありません。既知の問題は[変更履歴](CHANGELOG.md)をご覧ください。
+> Rinflow は開発初期の段階です。既知の問題は[変更履歴](CHANGELOG.md)をご覧ください。
+
+## ダウンロード
+
+お使いの PC に合ったセットアップ プログラムを [Releases](https://github.com/rinflow-dev/rinflow-windows/releases/latest) からダウンロードします。
+
+| お使いの PC | ファイル |
+| --- | --- |
+| Intel または AMD のプロセッサ | `Rinflow-Setup-<バージョン>-x64.exe` |
+| ARM プロセッサ（Snapdragon など） | `Rinflow-Setup-<バージョン>-arm64.exe` |
+
+どちらか分からない場合は、PowerShell で次のコマンドを実行します。自動で判別して適切なファイルをダウンロードし、SHA-256 を確認してから起動します。
+
+```powershell
+irm https://raw.githubusercontent.com/rinflow-dev/rinflow-windows/main/scripts/install.ps1 | iex
+```
+
+セットアップ プログラムはまだコード署名されていないため、実行前に Windows SmartScreen の警告が表示されます。
 
 ## 機能
 

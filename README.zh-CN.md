@@ -24,7 +24,24 @@
 </p>
 
 > [!NOTE]
-> Rinflow 处于早期开发阶段，暂无二进制发布版本。已知问题见[变更日志](CHANGELOG.md)。
+> Rinflow 处于早期开发阶段。已知问题见[变更日志](CHANGELOG.md)。
+
+## 下载
+
+从 [Releases](https://github.com/rinflow-dev/rinflow-windows/releases/latest) 下载适合你电脑的安装程序：
+
+| 你的电脑 | 文件 |
+| --- | --- |
+| Intel 或 AMD 处理器 | `Rinflow-Setup-<版本>-x64.exe` |
+| ARM 处理器（骁龙等） | `Rinflow-Setup-<版本>-arm64.exe` |
+
+不确定选哪个？在 PowerShell 中运行下面的命令，它会自动识别、下载对应的文件，核对 SHA-256 后启动安装：
+
+```powershell
+irm https://raw.githubusercontent.com/rinflow-dev/rinflow-windows/main/scripts/install.ps1 | iex
+```
+
+安装程序暂未代码签名，运行前 Windows SmartScreen 会给出警告。
 
 ## 功能
 

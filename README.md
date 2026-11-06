@@ -24,7 +24,24 @@
 </p>
 
 > [!NOTE]
-> Rinflow is in early development. There are no binary releases yet, and known issues are listed in the [changelog](CHANGELOG.md).
+> Rinflow is in early development. Known issues are listed in the [changelog](CHANGELOG.md).
+
+## Download
+
+Get the setup program for your PC from [Releases](https://github.com/rinflow-dev/rinflow-windows/releases/latest):
+
+| Your PC | File |
+| --- | --- |
+| Intel or AMD processor | `Rinflow-Setup-<version>-x64.exe` |
+| ARM processor (Snapdragon and similar) | `Rinflow-Setup-<version>-arm64.exe` |
+
+Not sure which one? In PowerShell, this finds out, downloads the right file, checks its SHA-256 and starts it:
+
+```powershell
+irm https://raw.githubusercontent.com/rinflow-dev/rinflow-windows/main/scripts/install.ps1 | iex
+```
+
+The setup program is not code-signed yet, so Windows SmartScreen warns before it runs.
 
 ## Features
 
