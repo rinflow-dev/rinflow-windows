@@ -27,8 +27,6 @@ namespace
     constexpr uint32_t DefaultModifiers = ModControl | ModAlt;
     constexpr uint32_t DefaultKey = 'L';
 
-    constexpr wchar_t ReleasesPage[] = L"https://github.com/rinflow-dev/rinflow-windows/releases";
-
     bool IsModifierKey(uint32_t vk)
     {
         switch (vk)
@@ -397,10 +395,65 @@ namespace winrt::Rinflow::implementation
             }
         });
 
-        CheckUpdateButton().Click([](auto&&, auto&&)
+        // Checks now, or installs the update the agent has ready (setup asks
+        // for an administrator, then Rinflow restarts by itself).
+        CheckUpdateButton().Click([weak](auto&&, auto&&)
         {
-            ShellExecuteW(nullptr, L"open", ReleasesPage, nullptr, nullptr, SW_SHOWNORMAL);
+            auto self = weak.get();
+            if (!self) return;
+            if (self->m_updateReady)
+            {
+                // This click makes the app the foreground; passing that on
+                // through the agent to setup brings the administrator
+                // prompt to the front rather than flashing in the taskbar.
+                AllowSetForegroundWindow(ASFW_ANY);
+                self->m_agent->InstallUpdate();
+            }
+            else self->m_agent->CheckUpdate();
         });
+        wire(AutoUpdateToggle(), AutoUpdateState(), L"auto_update");
+    }
+
+    void MainWindow::ApplyUpdate(JsonObject const& state)
+    {
+        auto value = state.GetNamedValue(L"update", JsonValue::CreateNullValue());
+        auto update = value.ValueType() == JsonValueType::Object ? value.GetObject() : JsonObject{};
+        // A missing or null field is empty (GetNamedString would throw on null).
+        auto text = [&update](wchar_t const* key)
+        {
+            auto field = update.GetNamedValue(key, JsonValue::CreateNullValue());
+            return field.ValueType() == JsonValueType::String ? std::wstring(field.GetString()) : std::wstring();
+        };
+        auto status = text(L"status");
+        auto version = text(L"version");
+        auto error = text(L"error");
+
+        std::wstring line;
+        if (status == L"checking") line = RinflowApp::Text(L"UpdateChecking");
+        else if (status == L"up_to_date") line = RinflowApp::Text(L"UpdateUpToDate");
+        else if (status == L"downloading")
+        {
+            auto progress = update.GetNamedValue(L"progress", JsonValue::CreateNullValue());
+            int percent = progress.ValueType() == JsonValueType::Number
+                ? static_cast<int>(std::clamp(progress.GetNumber(), 0.0, 1.0) * 100) : 0;
+            line = RinflowApp::Format(L"UpdateDownloading", version, percent);
+        }
+        else if (status == L"ready") line = RinflowApp::Format(L"UpdateReady", version);
+        else if (status == L"installing") line = RinflowApp::Format(L"UpdateInstalling", version);
+        // Why the last step failed: on its own, or under 已下载 when the
+        // install did not go through and the update is still ready.
+        if (!error.empty()) line = line.empty() || status == L"failed" ? error : line + L"\n" + error;
+        UpdateStatusText().Text(line);
+        UpdateStatusText().Visibility(line.empty() ? Visibility::Collapsed : Visibility::Visible);
+
+        m_updateReady = status == L"ready";
+        CheckUpdateButton().Content(box_value(RinflowApp::Text(m_updateReady ? L"UpdateInstallButton" : L"UpdateCheckButton")));
+        CheckUpdateButton().IsEnabled(status != L"checking" && status != L"downloading" && status != L"installing");
+
+        auto notes = text(L"notes_url");
+        bool showNotes = !version.empty() && notes.starts_with(L"https://");
+        if (showNotes) UpdateNotesLink().NavigateUri(Windows::Foundation::Uri(notes));
+        UpdateNotesLink().Visibility(showNotes ? Visibility::Visible : Visibility::Collapsed);
     }
 
     void MainWindow::ApplySettings(JsonObject const& state)
@@ -457,6 +510,7 @@ namespace winrt::Rinflow::implementation
         SetSwitch(KeepAwakeToggle(), KeepAwakeState(), settings.GetNamedBoolean(L"keep_awake", true));
         SetSwitch(HideCursorToggle(), HideCursorState(), settings.GetNamedBoolean(L"hide_cursor_on_leave", true));
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
+        SetSwitch(AutoUpdateToggle(), AutoUpdateState(), settings.GetNamedBoolean(L"auto_update", true));
 
         // Encryption is not a choice: every connection is encrypted. Without
         // a fingerprint the core is not running (no certificate or port).
@@ -547,6 +601,7 @@ namespace winrt::Rinflow::implementation
         ToolTipService::SetToolTip(DeviceIdText(), full.empty() ? nullptr : box_value(m_fingerprint));
         CopyIdButton().IsEnabled(!full.empty());
         VersionText().Text(RinflowApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
+        ApplyUpdate(state);
 
         m_applying = false;
     }

@@ -76,7 +76,9 @@ A Release x64 build is about 64 MB of files, most of it the Windows App Runtime 
 - adds a firewall rule for the agent on private **and public** networks (Windows often marks a new Wi-Fi network public, and nothing would be found without saying why);
 - registers and starts the `RinflowInput` service (`rinflow-service.exe --install`) and writes the 被控时可操作管理员窗口、UAC 和锁屏 setting (a task, checked by default; see [Elevated windows, UAC prompts and the lock screen](design.md#elevated-windows-uac-prompts-and-the-lock-screen));
 - turns on starting at sign-in (a task) for the user who ran it (`rinflow-agent.exe --launch-at-login on`, run as that user, not as the administrator);
-- before replacing files (an upgrade), removes the service and closes Rinflow; uninstalling removes the service, the firewall rule and the logs, and keeps each user's settings and pairings.
+- before replacing files (an upgrade), asks the agent to quit (`rinflow-agent.exe --quit`, from 0.0.2 on), removes the service and closes what is left of Rinflow; uninstalling removes the service, the firewall rule and the logs, and keeps each user's settings and pairings.
+
+Run by the agent's updater (`/VERYSILENT /RinflowUpdate=1`), it also starts the agent again afterwards, as the user, and leaves starting at sign-in as the user set it. See [Updates](design.md#updates).
 
 It is not code-signed yet, so SmartScreen warns before it runs; `SignTool` in the script is ready for a certificate.
 
@@ -88,6 +90,27 @@ Releases are built on GitHub from a version tag:
 2. Push a tag such as `v0.0.1` on `main`.
 
 [release.yml](../.github/workflows/release.yml) then builds the x64 and ARM64 setup programs and publishes a release with them, their SHA-256 checksums and the version's changelog section. It stops if the tag does not match the version. The core is built from the commit in `CORE_REF` at the top of the workflow. Running the workflow by hand only builds.
+
+The release also carries what installed copies update from: a minisign signature beside each setup program (`*.exe.minisig`) and `latest.json`, made by [tools/update-signing](../tools/update-signing/src/main.rs). Signing needs the repository secret `RINFLOW_UPDATE_KEY`, the secret key whose public half is `PUBLIC_KEY` in [update.rs](../agent/src/update.rs); without it, or with a key the agent does not accept, the release stops. The key is made once:
+
+```powershell
+cd tools\update-signing
+cargo run -- generate $env:USERPROFILE\.rinflow\update-signing.key   # prints the public key for update.rs
+Get-Content -Raw $env:USERPROFILE\.rinflow\update-signing.key | gh secret set RINFLOW_UPDATE_KEY -R rinflow-dev/rinflow-windows
+```
+
+Keep a copy of the secret key somewhere safe (a password manager). Losing it means copies already installed can no longer update by themselves; a new key only reaches them through a version installed by hand.
+
+To try an update without publishing one, sign a setup program with a higher version, serve it and its `latest.json` from this PC, and point the agent there (`RINFLOW_UPDATE_FEED`, plain HTTP is allowed only to `127.0.0.1` and `localhost`):
+
+```powershell
+$env:RINFLOW_UPDATE_KEY = Get-Content -Raw $env:USERPROFILE\.rinflow\update-signing.key
+cd tools\update-signing
+cargo run -- sign --version 0.0.3 ..\..\installer\output\Rinflow-Setup-0.0.3-x64.exe
+cargo run -- manifest --version 0.0.3 --base-url http://127.0.0.1:8000 --notes-url https://example.com --out ..\..\installer\output\latest.json ..\..\installer\output\Rinflow-Setup-0.0.3-x64.exe
+# serve installer\output on port 8000, then start the installed (older) agent with
+# RINFLOW_UPDATE_FEED=http://127.0.0.1:8000/latest.json and select 检查更新
+```
 
 To work on the agent alone:
 

@@ -34,6 +34,7 @@ mod spring;
 mod state;
 mod tray;
 mod trust;
+mod update;
 mod win;
 
 use rinflow_core::{Core, CoreConfig};
@@ -65,6 +66,15 @@ fn main() {
     {
         let result = settings::autostart::set(value == "on");
         std::process::exit(i32::from(result.is_err()));
+    }
+    // `--quit`: setup asks the running agent to quit before it replaces the
+    // programs (see `update.rs`), and nothing else happens.
+    if let [flag] = arguments.as_slice()
+        && flag == "--quit"
+    {
+        let quit = win::current_user_sid()
+            .is_ok_and(|sid| ipc::quit_running_agent(&sid, std::time::Duration::from_secs(15)));
+        std::process::exit(i32::from(!quit));
     }
 
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
@@ -308,6 +318,10 @@ fn main() {
             }
         };
 
+    // Newer versions: found and downloaded in the background, installed
+    // when the user says so.
+    let updater = update::start(state.clone(), settings.clone());
+
     let services = Arc::new(Services::new(
         Arc::downgrade(&core),
         state,
@@ -317,6 +331,7 @@ fn main() {
         clipboard,
         settings,
         arrangement,
+        updater,
     ));
     ipc::spawn(&identity.user_sid, services.clone());
 

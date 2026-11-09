@@ -200,4 +200,15 @@
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
   <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Quit Rinflow</value></data>
   <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Quit Rinflow</value></data>
+  <data name="UpdateChecking" xml:space="preserve"><value>Checking for updates…</value></data>
+  <data name="UpdateUpToDate" xml:space="preserve"><value>You have the latest version.</value></data>
+  <data name="UpdateDownloading" xml:space="preserve"><value>Downloading {0} ({1}%)…</value></data>
+  <data name="UpdateReady" xml:space="preserve"><value>Version {0} is downloaded and ready to install.</value></data>
+  <data name="UpdateInstalling" xml:space="preserve"><value>Installing {0}. Rinflow restarts by itself when it is done…</value></data>
+  <data name="UpdateCheckButton" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="UpdateInstallButton" xml:space="preserve"><value>Install and restart</value></data>
+  <data name="UpdateNotesLink.Content" xml:space="preserve"><value>What's new</value></data>
+  <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>Check for updates automatically</value></data>
+  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>Looks for a new version once a day and downloads it in the background. Rinflow asks before installing it.</value></data>
+  <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Check for updates automatically</value></data>
 </root>

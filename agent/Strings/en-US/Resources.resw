@@ -48,4 +48,16 @@
   <data name="PairingTimedOut" xml:space="preserve"><value>Pairing timed out. It wasn't confirmed within two minutes.</value></data>
   <data name="UnpairedDisconnected" xml:space="preserve"><value>An unpaired device was disconnected ("Only paired devices" is on).</value></data>
   <data name="Unpaired" xml:space="preserve"><value>Unpaired.</value></data>
+  <data name="TrayInstallUpdate" xml:space="preserve"><value>Install update {0}</value></data>
+  <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} is ready to install</value></data>
+  <data name="UpdateReadyText" xml:space="preserve"><value>Click here to install it from the settings, or use the tray menu.</value></data>
+  <data name="UpdatedTitle" xml:space="preserve"><value>Rinflow was updated</value></data>
+  <data name="UpdatedText" xml:space="preserve"><value>You now have version {0}.</value></data>
+  <data name="UpdateCheckFailed" xml:space="preserve"><value>Could not check for updates: {0}</value></data>
+  <data name="UpdateDownloadFailed" xml:space="preserve"><value>Could not download the update: {0}</value></data>
+  <data name="UpdateBadSignature" xml:space="preserve"><value>The downloaded setup program failed the signature check and was deleted.</value></data>
+  <data name="UpdateFeedInvalid" xml:space="preserve"><value>The update information is not valid.</value></data>
+  <data name="UpdateNoPackage" xml:space="preserve"><value>The new version has no setup program for this PC.</value></data>
+  <data name="UpdateStartFailed" xml:space="preserve"><value>Could not start the setup program: {0}</value></data>
+  <data name="UpdateNotInstalled" xml:space="preserve"><value>The update was not installed: the administrator prompt was declined, or setup failed. Details: {0}</value></data>
 </root>

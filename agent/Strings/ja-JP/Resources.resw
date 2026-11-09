@@ -48,4 +48,16 @@
   <data name="PairingTimedOut" xml:space="preserve"><value>ペアリングがタイムアウトしました。2 分以内に確認されませんでした。</value></data>
   <data name="UnpairedDisconnected" xml:space="preserve"><value>ペアリングされていないデバイスを切断しました (「ペアリング済みのデバイスのみ」がオンです)。</value></data>
   <data name="Unpaired" xml:space="preserve"><value>ペアリングを解除しました。</value></data>
+  <data name="TrayInstallUpdate" xml:space="preserve"><value>アップデート {0} をインストール</value></data>
+  <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} をインストールできます</value></data>
+  <data name="UpdateReadyText" xml:space="preserve"><value>ここをクリックして設定からインストールするか、トレイメニューからインストールしてください。</value></data>
+  <data name="UpdatedTitle" xml:space="preserve"><value>Rinflow をアップデートしました</value></data>
+  <data name="UpdatedText" xml:space="preserve"><value>現在のバージョンは {0} です。</value></data>
+  <data name="UpdateCheckFailed" xml:space="preserve"><value>アップデートを確認できませんでした: {0}</value></data>
+  <data name="UpdateDownloadFailed" xml:space="preserve"><value>アップデートをダウンロードできませんでした: {0}</value></data>
+  <data name="UpdateBadSignature" xml:space="preserve"><value>ダウンロードしたセットアップの署名を確認できなかったため、削除しました。</value></data>
+  <data name="UpdateFeedInvalid" xml:space="preserve"><value>アップデート情報を読み取れません。</value></data>
+  <data name="UpdateNoPackage" xml:space="preserve"><value>新しいバージョンにはこの PC 用のセットアップがありません。</value></data>
+  <data name="UpdateStartFailed" xml:space="preserve"><value>セットアップを起動できませんでした: {0}</value></data>
+  <data name="UpdateNotInstalled" xml:space="preserve"><value>アップデートはインストールされませんでした。管理者の確認が取り消されたか、セットアップに失敗しました。詳細: {0}</value></data>
 </root>

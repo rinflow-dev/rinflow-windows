@@ -12,6 +12,7 @@ use crate::i18n::{s, tr, trf};
 use crate::overlay::{Command, OverlayHandle};
 use crate::settings::{SettingsStore, autostart};
 use crate::state::SharedState;
+use crate::update::UpdateHandle;
 use rinflow_core::Core;
 use rinflow_core::layout::Offset;
 use serde_json::{Map, Value};
@@ -26,6 +27,7 @@ pub struct Services {
     clipboard: ClipboardHandle,
     settings: Arc<SettingsStore>,
     arrangement: Arc<Arrangement>,
+    pub update: UpdateHandle,
 }
 
 impl Services {
@@ -39,6 +41,7 @@ impl Services {
         clipboard: ClipboardHandle,
         settings: Arc<SettingsStore>,
         arrangement: Arc<Arrangement>,
+        update: UpdateHandle,
     ) -> Self {
         Self {
             core,
@@ -49,6 +52,7 @@ impl Services {
             clipboard,
             settings,
             arrangement,
+            update,
         }
     }
 

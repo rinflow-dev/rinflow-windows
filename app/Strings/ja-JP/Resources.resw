@@ -200,4 +200,15 @@
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>設定</value></data>
   <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Rinflow を終了</value></data>
   <data name="TrayQuitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Rinflow を終了</value></data>
+  <data name="UpdateChecking" xml:space="preserve"><value>アップデートを確認しています…</value></data>
+  <data name="UpdateUpToDate" xml:space="preserve"><value>最新バージョンです。</value></data>
+  <data name="UpdateDownloading" xml:space="preserve"><value>{0} をダウンロードしています ({1}%)…</value></data>
+  <data name="UpdateReady" xml:space="preserve"><value>バージョン {0} をダウンロードしました。インストールできます。</value></data>
+  <data name="UpdateInstalling" xml:space="preserve"><value>{0} をインストールしています。完了すると Rinflow は自動的に再起動します…</value></data>
+  <data name="UpdateCheckButton" xml:space="preserve"><value>更新を確認</value></data>
+  <data name="UpdateInstallButton" xml:space="preserve"><value>インストールして再起動</value></data>
+  <data name="UpdateNotesLink.Content" xml:space="preserve"><value>新機能</value></data>
+  <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
+  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>1 日に 1 回新しいバージョンを確認し、バックグラウンドでダウンロードします。インストールの前に確認します。</value></data>
+  <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
 </root>

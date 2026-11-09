@@ -49,6 +49,7 @@ agent/
   src/hider.rs               hides the cursor where a controlling peer's pointer left it
   src/elevated.rs            the agent's end of the input helper's pipe
   src/keymap.rs              USB HID usage → Windows scan code
+  src/update.rs              updates: latest.json, signed downloads (update/http.rs: WinHTTP), running setup
   src/win.rs                 Win32 helpers: mutex, user SID, pipe security
 input/                       input beyond a normal process (elevated windows, UAC prompts, lock screen)
   src/lib.rs                 pipe protocol shared with the agent, SendInput helpers
@@ -278,6 +279,22 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
 | 被控时可操作管理员窗口、UAC 和锁屏 | (machine-wide) | `HKLM\SOFTWARE\Rinflow\ElevatedInput`, set by the setup program (on by default). Changing it asks for an administrator. Disabled when the input service is not installed. See [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen). |
+| 自动检查更新 | `auto_update` | On by default. See [Updates](#updates). |
+
+## Updates
+
+[update.rs](../agent/src/update.rs) keeps Rinflow up to date, the way VS Code's system-wide setup does: it finds a newer version, downloads its setup program in the background, and runs it when the user says so.
+
+| | What |
+| --- | --- |
+| Where | Every release carries `latest.json` (version, release notes, and per architecture the setup program's URL, size and signature). GitHub serves the newest release's at `releases/latest/download/latest.json`; pre-releases are never offered. Fetched with WinHTTP, so the system's proxy settings apply. |
+| When | A minute after the agent starts and then once a day, while **自动检查更新** (`auto_update`) is on; and whenever the user selects **检查更新** on the 设置 page. |
+| Trust | Each setup program is signed with the project's minisign key; the public key is built into the agent (`PUBLIC_KEY`). The signed comment names the file and its version (`file:Rinflow-Setup-0.0.2-x64.exe`, `version:0.0.2`), so a changed `latest.json` can neither offer a file the key did not sign, nor an older version as a newer one. The download is checked while it arrives into `%LOCALAPPDATA%\Rinflow\updates`, deleted when it does not match, and checked again just before it runs. |
+| Ready | The tray shows a notification (clicking it opens the 设置 page), the tray menu gains **安装更新 x.y.z**, and the 设置 page shows the version and **安装并重启**, with a link to the release notes. |
+| Installing | The setup program runs with `/VERYSILENT /RinflowUpdate=1`; Windows asks for an administrator once (UAC), as for any install into Program Files. Setup runs `rinflow-agent.exe --quit` as the user, so the agent quits as from its tray menu (peers see a clean disconnect, the settings app closes with it), replaces the files, and starts the agent again as the user, not elevated. Starting at sign-in stays as the user set it. Declined or failed, Rinflow keeps running and the update stays ready; the 设置 page says so and where setup's log is (`updates\setup.log`). |
+| Afterwards | The first start of a new version says so in a notification and deletes the downloaded setup program. |
+
+The signing key's secret half is the release workflow's `RINFLOW_UPDATE_KEY` secret (see [Building and running](building.md#releases)). Not yet: Authenticode signatures (SmartScreen, and a second check of the publisher before running setup), updating without UAC through the service.
 
 ## Presence
 
@@ -327,7 +344,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":17}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":18}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -342,6 +359,8 @@ App → agent:
 | `{"type":"clear_error"}` | The user closed the error bar: `last_error` is cleared. |
 | `{"type":"cancel_transfer","transfer":N}` | Stop files being received or sent (`transfers`). |
 | `{"type":"quit"}` | Quit the agent, as the tray's 退出. |
+| `{"type":"check_update"}` | Look for a newer version now (the snapshot's `update`). |
+| `{"type":"install_update"}` | Run the setup program of the update that is ready. |
 | `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `config.json` `effect`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
 | `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
@@ -351,7 +370,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":17,"agent_version":"0.0.1"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":18,"agent_version":"0.0.1"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
@@ -368,6 +387,7 @@ A `state` message looks like this:
 - `quitting` turns true just before the agent exits because the user quit Rinflow: the app closes too and does not start the agent again.
 - `manual_addresses` lists the addresses the user added, as the core reports them: `{"address", "status"}` with `status` `searching`, `found` (with `peer_id` and `name`), `no_response`, or `unresolved` (with `error`).
 - `switch_hotkeys_blocked` is true when another program took one of the switch shortcuts first.
+- `update` is `{"status"}`, `status` one of `idle`, `checking`, `up_to_date`, `downloading`, `ready`, `installing` or `failed`, with `version` and `notes_url` once a newer version was found, `progress` (0 to 1) while downloading, and `error` (for the user) when the last step failed. See [Updates](#updates).
 - `transfers` lists files on their way: `{"transfer", "peer_id", "peer_name", "direction"` (`receiving` or `sending`), `"name"` (the first top-level item), `"items"`, `"count"` (files), `"done"`, `"total"}` (bytes).
 - `effect` holds the current parameters.
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.

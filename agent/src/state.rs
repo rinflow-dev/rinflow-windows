@@ -5,6 +5,7 @@
 use crate::effect::EffectParams;
 use crate::i18n::{s, tr, trf};
 use crate::settings::Settings;
+use crate::update::UpdateView;
 use rinflow_core::layout::{Display, Offset, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -164,6 +165,8 @@ pub struct Snapshot {
     /// Another program took one or more of the switch shortcuts first: the
     /// settings page suggests the other combination.
     pub switch_hotkeys_blocked: bool,
+    /// A newer version: found, downloading, ready to install (see `update.rs`).
+    pub update: UpdateView,
 }
 
 /// Whether input can reach elevated windows, UAC prompts and the lock screen.
@@ -217,7 +220,13 @@ impl SharedState {
             manual_addresses: Vec::new(),
             transfers: Vec::new(),
             switch_hotkeys_blocked: false,
+            update: UpdateView::default(),
         })))
+    }
+
+    pub fn set_update(&self, view: UpdateView) {
+        self.0
+            .send_if_modified(|snapshot| replace(&mut snapshot.update, view));
     }
 
     /// Another program took one or more of the switch shortcuts first.

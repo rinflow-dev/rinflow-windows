@@ -54,6 +54,8 @@ pub const SETTINGS: &str = "settings";
 pub const LAYOUT: &str = "layout";
 pub const TRUSTED: &str = "trusted";
 pub const EFFECT: &str = "effect";
+/// update.rs: the version that ran last, to say when it changed.
+pub const UPDATE: &str = "update";
 
 /// The files of versions up to 0.0.1 and the section each became.
 const LEGACY: [(&str, &str); 5] = [

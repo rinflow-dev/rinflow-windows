@@ -44,7 +44,9 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// declined.
 /// 17: setting `modifier_map` (a Mac's modifier keys, chosen per key)
 /// replaces `shortcut_remap`.
-pub const PROTOCOL_VERSION: u32 = 17;
+/// 18: `check_update`, `install_update`; the snapshot gains `update`, and
+/// the setting `auto_update`.
+pub const PROTOCOL_VERSION: u32 = 18;
 
 /// The longest request line the agent reads, `\n` excluded. The app's
 /// largest requests (`update_settings` with every manual address and
@@ -54,6 +56,43 @@ const MAX_REQUEST_LINE: usize = 1024 * 1024;
 
 pub fn pipe_name(user_sid: &str) -> String {
     format!(r"\\.\pipe\Rinflow.Agent.{user_sid}")
+}
+
+/// `rinflow-agent --quit`: asks the agent running for this user to quit,
+/// as the tray's 退出 does, and waits until it has (its end of the pipe
+/// closes as the process exits), at most `wait`. Setup runs this before it
+/// replaces the programs, so peers see a clean disconnect instead of the
+/// process being ended. True when no agent runs any more.
+pub fn quit_running_agent(user_sid: &str, wait: std::time::Duration) -> bool {
+    use std::io::{Read, Write};
+    let pipe = match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(pipe_name(user_sid))
+    {
+        Ok(pipe) => pipe,
+        // No agent (or not answering): nothing to wait for.
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return true,
+        Err(error) => {
+            eprintln!("rinflow-agent: cannot reach the running agent: {error}");
+            return false;
+        }
+    };
+    // An agent of another version answers `hello` with an error, but still
+    // quits: `quit` has not changed since protocol 6.
+    let request =
+        format!("{{\"type\":\"hello\",\"protocol\":{PROTOCOL_VERSION}}}\n{{\"type\":\"quit\"}}\n");
+    let (done, finished) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut pipe = pipe;
+        if pipe.write_all(request.as_bytes()).is_ok() {
+            // Snapshots until the agent's end closes.
+            let mut buffer = [0u8; 64 * 1024];
+            while matches!(pipe.read(&mut buffer), Ok(read) if read > 0) {}
+        }
+        let _ = done.send(());
+    });
+    finished.recv_timeout(wait).is_ok()
 }
 
 #[derive(Deserialize)]
@@ -127,6 +166,10 @@ enum Request {
     },
     /// Quits the agent as the tray's 退出 does.
     Quit,
+    /// Looks for a newer version now (snapshot `update`).
+    CheckUpdate,
+    /// Runs the setup program of the update that is ready.
+    InstallUpdate,
 }
 
 #[derive(Serialize)]
@@ -347,6 +390,14 @@ fn handle_request(
         }
         Request::Quit => {
             crate::tray::quit();
+            Ok(())
+        }
+        Request::CheckUpdate => {
+            services.update.check();
+            Ok(())
+        }
+        Request::InstallUpdate => {
+            services.update.install();
             Ok(())
         }
     };

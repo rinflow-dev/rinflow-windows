@@ -45,6 +45,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_Graphics_Gdi",
     "Win32_NetworkManagement_IpHelper",
     "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinHttp",
     "Win32_Networking_WinSock",
     "Win32_Security",
     "Win32_Security_Authorization",
@@ -69,6 +70,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+minisign-verify = "0.3.0"
 
 [profile.release]
 lto = "thin"
@@ -77,3 +79,6 @@ strip = "symbols"
 
 [build-dependencies]
 embed-resource = "3.0.12"
+
+[dev-dependencies]
+minisign = "0.10"

@@ -1,0 +1,11 @@
+[package]
+name = "update-signing"
+version = "0.1.0"
+edition = "2024"
+description = "Makes the key that signs Rinflow's update packages, and signs them (minisign format)"
+license = "MPL-2.0"
+publish = false
+
+[dependencies]
+minisign = "0.10.0"
+serde_json = "1.0.154"

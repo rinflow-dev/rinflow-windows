@@ -808,13 +808,31 @@
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" Text="Rinflow" />
                             <TextBlock x:Name="VersionText" Style="{StaticResource RowDescriptionStyle}" />
+                            <!-- The update the agent found (snapshot update): checking, downloading, ready, why it failed. -->
+                            <TextBlock x:Name="UpdateStatusText" Style="{StaticResource RowDescriptionStyle}" TextWrapping="Wrap" Visibility="Collapsed" />
+                            <HyperlinkButton x:Name="UpdateNotesLink" x:Uid="UpdateNotesLink" Padding="0" Content="更新内容" Visibility="Collapsed" />
                         </StackPanel>
+                        <!-- 检查更新, or 安装并重启 once an update is ready. -->
                         <Button
                             x:Name="CheckUpdateButton"
                             x:Uid="CheckUpdateButton"
                             Grid.Column="1"
+                            Margin="12,0,0,0"
                             VerticalAlignment="Center"
                             Content="检查更新" />
+                    </Grid>
+                    <Grid Style="{StaticResource CardStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Uid="AutoUpdateTitle" Style="{StaticResource RowTitleStyle}" Text="自动检查更新" />
+                            <TextBlock x:Uid="AutoUpdateDescription" Style="{StaticResource RowDescriptionStyle}" Text="每天检查一次新版本，并在后台下载。安装前会先询问。" />
+                        </StackPanel>
+                        <TextBlock x:Name="AutoUpdateState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
+                        <ToggleSwitch x:Name="AutoUpdateToggle" x:Uid="AutoUpdateToggle" Grid.Column="2" AutomationProperties.Name="自动检查更新" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>

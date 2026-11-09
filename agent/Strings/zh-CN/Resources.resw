@@ -48,4 +48,16 @@
   <data name="PairingTimedOut" xml:space="preserve"><value>配对超时，没有在两分钟内确认。</value></data>
   <data name="UnpairedDisconnected" xml:space="preserve"><value>未配对的设备已断开（已开启“仅允许已配对设备”）。</value></data>
   <data name="Unpaired" xml:space="preserve"><value>已取消配对。</value></data>
+  <data name="TrayInstallUpdate" xml:space="preserve"><value>安装更新 {0}</value></data>
+  <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} 可以安装了</value></data>
+  <data name="UpdateReadyText" xml:space="preserve"><value>点按这里在设置页安装，或者从托盘菜单安装。</value></data>
+  <data name="UpdatedTitle" xml:space="preserve"><value>Rinflow 已更新</value></data>
+  <data name="UpdatedText" xml:space="preserve"><value>现在的版本是 {0}。</value></data>
+  <data name="UpdateCheckFailed" xml:space="preserve"><value>无法检查更新：{0}</value></data>
+  <data name="UpdateDownloadFailed" xml:space="preserve"><value>下载更新失败：{0}</value></data>
+  <data name="UpdateBadSignature" xml:space="preserve"><value>下载的安装程序没有通过签名校验，已删除。</value></data>
+  <data name="UpdateFeedInvalid" xml:space="preserve"><value>无法识别更新信息。</value></data>
+  <data name="UpdateNoPackage" xml:space="preserve"><value>新版本没有适合这台电脑的安装程序。</value></data>
+  <data name="UpdateStartFailed" xml:space="preserve"><value>无法启动安装程序：{0}</value></data>
+  <data name="UpdateNotInstalled" xml:space="preserve"><value>更新没有安装：可能取消了管理员确认，或者安装失败。详情见 {0}</value></data>
 </root>

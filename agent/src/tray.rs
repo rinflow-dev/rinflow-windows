@@ -7,7 +7,7 @@
 //! it with `--tray`, which shows its tray panel (devices, the sharing switch,
 //! the way to the main window).
 
-use crate::i18n::{s, tr};
+use crate::i18n::{s, tr, trf};
 use crate::win::wide;
 use std::io;
 use std::path::PathBuf;
@@ -21,7 +21,7 @@ use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, 
 use windows_sys::Win32::UI::Controls::{LIM_SMALL, LoadIconMetric};
 use windows_sys::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY,
-    NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIN_BALLOONUSERCLICK, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, CreateWindowExW,
@@ -37,6 +37,7 @@ const WM_TRAY: u32 = WM_APP + 1;
 const TRAY_ID: u32 = 1;
 const MENU_OPEN: usize = 1;
 const MENU_QUIT: usize = 2;
+const MENU_INSTALL_UPDATE: usize = 3;
 /// Retries adding the icon: Explorer may not take it yet (busy at sign-in,
 /// or restarting). The agent works on meanwhile.
 const ICON_RETRY_TIMER: usize = 1;
@@ -187,6 +188,11 @@ unsafe extern "system" fn window_proc(
             match lparam as u32 {
                 WM_LBUTTONUP => open_app(&["--tray"]),
                 WM_RBUTTONUP => show_menu(window),
+                // The notification that an update is ready: the settings
+                // page, where it is installed.
+                NIN_BALLOONUSERCLICK if crate::update::ready_version().is_some() => {
+                    open_app(&["--settings"])
+                }
                 _ => {}
             }
             0
@@ -298,6 +304,8 @@ fn load_tray_icon() -> HICON {
 fn show_menu(window: HWND) {
     let open = wide(tr(s::TrayOpen));
     let quit = wide(tr(s::TrayQuit));
+    let install =
+        crate::update::ready_version().map(|version| wide(&trf(s::TrayInstallUpdate, &[&version])));
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
         let menu = CreatePopupMenu();
@@ -305,6 +313,9 @@ fn show_menu(window: HWND) {
             return;
         }
         AppendMenuW(menu, MF_STRING, MENU_OPEN, open.as_ptr());
+        if let Some(install) = &install {
+            AppendMenuW(menu, MF_STRING, MENU_INSTALL_UPDATE, install.as_ptr());
+        }
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         AppendMenuW(menu, MF_STRING, MENU_QUIT, quit.as_ptr());
 
@@ -325,6 +336,7 @@ fn show_menu(window: HWND) {
 
         match command as usize {
             MENU_OPEN => open_app(&[]),
+            MENU_INSTALL_UPDATE => crate::update::install(),
             MENU_QUIT => {
                 DestroyWindow(window);
             }

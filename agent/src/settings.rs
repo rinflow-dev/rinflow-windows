@@ -84,6 +84,9 @@ pub struct Settings {
     /// Windows languages that Rinflow has, or English), `en-US`, `zh-CN` or
     /// `ja-JP`.
     pub language: String,
+    /// Look for a newer version once a day and download it in the
+    /// background (see `update.rs`); installing always waits for the user.
+    pub auto_update: bool,
 }
 
 /// The values of [`Settings::language`].
@@ -148,6 +151,7 @@ impl Default for Settings {
             manual_addresses: Vec::new(),
             peer_input: BTreeMap::new(),
             language: "system".to_owned(),
+            auto_update: true,
         }
     }
 }

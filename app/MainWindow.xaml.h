@@ -161,6 +161,9 @@ namespace winrt::Rinflow::implementation
         // ---- Settings (MainWindow.Settings.cpp) ----------------------------
         void SetupSettingsPage();
         void ApplySettings(Windows::Data::Json::JsonObject const& state);
+        // The snapshot's update: its status line, and the button that checks
+        // (检查更新) or installs (安装并重启).
+        void ApplyUpdate(Windows::Data::Json::JsonObject const& state);
         void ShowHotkeyKeys(Microsoft::UI::Xaml::Controls::StackPanel const& panel, uint32_t modifiers, uint32_t key);
         fire_and_forget EditHotkey();
 
@@ -209,6 +212,8 @@ namespace winrt::Rinflow::implementation
         // Set while state from the agent is copied into the controls, so the
         // resulting change events are not echoed back as edits.
         bool m_applying{ false };
+        // An update is downloaded and verified: the button installs it.
+        bool m_updateReady{ false };
         Windows::Data::Json::JsonObject m_settings{ nullptr };
         hstring m_theme;
         bool m_keepInTray{ true };

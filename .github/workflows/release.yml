@@ -85,6 +85,33 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # What installed copies update from (agent/src/update.rs): a minisign
+      # signature per setup program, and latest.json listing them. GitHub
+      # serves the newest release's latest.json at
+      # releases/latest/download/latest.json.
+      - name: Sign the setup programs for updates
+        env:
+          RINFLOW_UPDATE_KEY: ${{ secrets.RINFLOW_UPDATE_KEY }}
+        run: |
+          if [ -z "$RINFLOW_UPDATE_KEY" ]; then
+            echo "The RINFLOW_UPDATE_KEY secret is missing: installed copies could not update to this release." >&2
+            exit 1
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          tool=(cargo run --quiet --release --locked --manifest-path tools/update-signing/Cargo.toml --)
+          "${tool[@]}" sign --version "$version" dist/Rinflow-Setup-*.exe
+          # The agent's built-in key must accept them, or no copy updates.
+          public_key=$(grep -oP 'const PUBLIC_KEY: &str = "\K[^"]+' agent/src/update.rs)
+          for setup in dist/Rinflow-Setup-*.exe; do
+            "${tool[@]}" verify --public-key "$public_key" "$setup"
+          done
+          "${tool[@]}" manifest \
+            --version "$version" \
+            --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" \
+            --notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" \
+            --out dist/latest.json \
+            dist/Rinflow-Setup-*.exe
+
       - name: Write the release notes
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -113,7 +140,7 @@ jobs:
         run: |
           prerelease=()
           case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/Rinflow-Setup-*.exe \
+          gh release create "$GITHUB_REF_NAME" dist/Rinflow-Setup-*.exe dist/Rinflow-Setup-*.exe.minisig dist/latest.json \
             --title "Rinflow for Windows ${GITHUB_REF_NAME#v}" \
             --notes-file notes.md \
             "${prerelease[@]}"

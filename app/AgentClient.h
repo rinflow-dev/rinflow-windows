@@ -67,6 +67,10 @@ namespace RinflowApp
         void Quit();
         // The user dismissed the agent's last_error.
         void ClearError();
+        // Looks for a newer version now (the snapshot's update).
+        void CheckUpdate();
+        // Runs the setup program of the update that is ready.
+        void InstallUpdate();
         // Stops files being received or sent (the snapshot's transfers).
         void CancelTransfer(uint32_t transfer);
 

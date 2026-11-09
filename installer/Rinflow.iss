@@ -136,12 +136,16 @@ Root: HKLM64; Subkey: "SOFTWARE\Rinflow"; ValueType: dword; ValueName: "Elevated
 [Run]
 ; Starting at sign-in is per user: the agent writes it (the value its
 ; 开机时启动 switch uses) for the user who started setup, not for the
-; administrator account setup may run as.
-Filename: "{app}\rinflow-agent.exe"; Parameters: "--launch-at-login on"; Tasks: autostart; Flags: runasoriginaluser runhidden waituntilterminated
+; administrator account setup may run as. An update from the agent keeps
+; what the user set with that switch since.
+Filename: "{app}\rinflow-agent.exe"; Parameters: "--launch-at-login on"; Tasks: autostart; Check: not IsUpdate; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Rinflow"""; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Rinflow"" dir=in action=allow program=""{app}\rinflow-agent.exe"" enable=yes profile=private,public"; StatusMsg: "{cm:StatusFirewall}"; Flags: runhidden waituntilterminated
 ; The service only with the feature on (PrepareToInstall removed any old one).
 Filename: "{app}\rinflow-service.exe"; Parameters: "--install"; StatusMsg: "{cm:StatusService}"; Check: ElevatedChosen; Flags: runhidden waituntilterminated
+; An update from the agent (agent/src/update.rs) runs silently: Rinflow
+; comes back by itself, as the user who started setup, not elevated.
+Filename: "{app}\rinflow-agent.exe"; Check: IsUpdate; Flags: runasoriginaluser nowait
 Filename: "{app}\Rinflow.exe"; Description: "{cm:RunApp}"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
@@ -183,6 +187,12 @@ begin
   Result := PreviousElevated < 0;
 end;
 
+// Started by the agent's updater: /VERYSILENT /RinflowUpdate=1.
+function IsUpdate(): Boolean;
+begin
+  Result := ExpandConstant('{param:RinflowUpdate|0}') = '1';
+end;
+
 // The task on a first install; on an upgrade, what the settings switch set.
 function ElevatedChosen(): Boolean;
 begin
@@ -192,12 +202,28 @@ begin
     Result := PreviousElevated = 1;
 end;
 
+// The installed agent understands --quit: version 0.0.2 or later.
+function AgentKnowsQuit(): Boolean;
+var
+  VersionMS, VersionLS: Cardinal;
+begin
+  Result := GetVersionNumbers(ExpandConstant('{app}\rinflow-agent.exe'), VersionMS, VersionLS)
+    and ((VersionMS > 0) or (VersionLS >= $20000));
+end;
+
 // Before files are replaced (an upgrade): the service and its helper hold
 // their executables, and the agent and the app may be running.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
+  // The agent quits as from its tray menu, so devices it is connected to
+  // see a clean disconnect, and the app closes with it. It runs as the user
+  // who started setup: the agent's pipe belongs to that user. Versions
+  // before 0.0.2 do not know --quit (they would start instead); taskkill
+  // below ends them.
+  if AgentKnowsQuit() then
+    ExecAsOriginalUser(ExpandConstant('{app}\rinflow-agent.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   if FileExists(ExpandConstant('{app}\rinflow-service.exe')) then
     Exec(ExpandConstant('{app}\rinflow-service.exe'), '--uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Rinflow.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);

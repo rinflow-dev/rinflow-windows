@@ -2,6 +2,25 @@
 
 Notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Automatic updates: Rinflow finds a new version, downloads it in the background and checks its signature, and installs it when you choose **Install and restart** (Windows asks for an administrator once). **Check for updates automatically** turns the daily check off. Versions before this one have to install it by hand once.
+
+### Changed
+
+- Settings, the arrangement, paired devices and this PC's device ID are kept in one file, `config.json`, with a backup of the previous version. The files of 0.0.1 are moved into it on the first start.
+- Only your own devices (connected once, or placed) are remembered across restarts, not every device seen on the network.
+- Setup lets Rinflow quit by itself before an upgrade, so connected devices see a clean disconnect.
+
+### Fixed
+
+- The main window could close unexpectedly when a device added by address went offline.
+- Copying very large text or images could end Rinflow.
+- Saving the arrangement could briefly stall the pointer while controlling another device.
+- One invalid value in the settings no longer resets all the others, and a settings file that cannot be read at the moment is no longer overwritten.
+
 ## [0.0.1] - 2026-11-05
 
 First public version.

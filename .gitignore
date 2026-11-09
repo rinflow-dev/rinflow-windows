@@ -2,6 +2,7 @@
 /agent/target/
 /input/target/
 /tools/icons/target/
+/tools/update-signing/target/
 
 # Setup programs built by installer\build-installer.ps1
 /installer/output/

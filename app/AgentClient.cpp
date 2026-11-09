@@ -10,7 +10,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 17;
+    constexpr int ProtocolVersion = 18;
 
     // A started agent opens its pipe within a second or two; past this it
     // is stuck (or another agent exited 0 for one that never came up).
@@ -184,6 +184,16 @@ namespace RinflowApp
     void AgentClient::ClearError()
     {
         Send(Request(L"clear_error"));
+    }
+
+    void AgentClient::CheckUpdate()
+    {
+        Send(Request(L"check_update"));
+    }
+
+    void AgentClient::InstallUpdate()
+    {
+        Send(Request(L"install_update"));
     }
 
     void AgentClient::CancelTransfer(uint32_t transfer)
