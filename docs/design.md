@@ -10,7 +10,7 @@ The Windows client for Rinflow. It is two programs:
 ```
  Rinflow.exe (WinUI 3)  ── named pipe, JSON lines ──►  rinflow-agent.exe (Rust)
    devices, arrangement,                                    ├ tray icon
-   settings, tray panel                                     ├ arrangement (layout.json, display watcher)
+   settings, tray panel                                     ├ arrangement (config.json, display watcher)  
                                                             ├ edge effect overlay (Direct2D + DirectComposition)
                                                             ├ rinflow-core ── UDP 42420 / QUIC 42421 ──► other devices
                                                             ├ input injection (SendInput)
@@ -27,22 +27,23 @@ agent/
                              version resource (FileDescription "Rinflow": the name on its
                              notifications, in Task Manager and in the firewall prompt)
   src/main.rs                single instance, core start-up, shutdown
+  src/config.rs              config.json: one file for everything the agent keeps (see Data folder)
   src/state.rs               folds core events into the snapshot the app renders
   src/ipc.rs                 named-pipe server
   src/services.rs            what IPC requests act on (core, arrangement, effect, demo)
   src/displays.rs            monitors in logical points, display-change watcher, physical portals
-  src/arrangement.rs         saved placements and known devices (%LOCALAPPDATA%\Rinflow\layout.json)
-  src/effect.rs              effect parameters (%LOCALAPPDATA%\Rinflow\effect.json)
+  src/arrangement.rs         saved placements and the user's devices (config.json `layout`)
+  src/effect.rs              effect parameters (config.json `effect`)
   src/spring.rs              damped spring with SwiftUI-style response/damping
   src/overlay.rs             click-through overlay that draws the edge effect
   src/edge.rs                edge thread: raw-input push tracking at the portals, crossing, the demo,
                              the lock shortcut
   src/capture.rs             while driving a peer: low-level hooks, hidden parked cursor, return
   src/clipboard.rs           the Windows clipboard ↔ the core: text, HTML (CF_HTML), PNG (and CF_DIB)
-  src/settings.rs            preferences (%LOCALAPPDATA%\Rinflow\settings.json), start at sign-in
+  src/settings.rs            preferences (config.json `settings`), start at sign-in
   src/tray.rs                notification-area icon: opens the tray panel; menu with 打开主窗口 / 退出
-  src/identity.rs            device ID (%LOCALAPPDATA%\Rinflow\device-id) and name
-  src/trust.rs               paired devices (%LOCALAPPDATA%\Rinflow\trusted.json)
+  src/identity.rs            device ID (config.json `device_id`) and name
+  src/trust.rs               paired devices (config.json `trusted`)
   src/power.rs               sleep, wake and IP address changes, reported to the core
   src/inject.rs              plays a controlling peer's input with SendInput (or through the input helper)
   src/hider.rs               hides the cursor where a controlling peer's pointer left it
@@ -74,6 +75,27 @@ app/
   PeerItem.{idl,h,cpp}       row model for the device lists
 ```
 
+## Data folder
+
+Everything is kept per user in `%LOCALAPPDATA%\Rinflow` (local, not roaming: the device ID and the certificate belong to this PC):
+
+```
+%LOCALAPPDATA%\Rinflow\
+  config.json        device ID, settings, arrangement, paired devices, effect parameters
+  config.json.bak    the version before the last save; used when config.json is damaged
+  identity.pem       this PC's certificate and private key (the core's own file)
+  logs\agent.log     the agent's log (agent.1.log once it passes 2 MB)
+```
+
+`config.json` ([config.rs](../agent/src/config.rs)) has one section per owner: `device_id` ([identity.rs](../agent/src/identity.rs)), `settings` ([settings.rs](../agent/src/settings.rs)), `layout` ([arrangement.rs](../agent/src/arrangement.rs)), `trusted` ([trust.rs](../agent/src/trust.rs)) and `effect` ([effect.rs](../agent/src/effect.rs), only once the tuning page changed it), plus `version`.
+
+- **Saving.** A new version is written to `config.json.tmp`, flushed to disk, and replaces the file; the old one becomes `config.json.bak`. A crash or power loss never leaves a half-written file.
+- **Never waited on by the input hooks.** Each owner stages its section under its own lock, so saves keep the order of changes, and writes the file after letting go of it.
+- **Damage.** A file that is not JSON is kept as `config.json.corrupt` and the backup is used. In a valid file, each section and each setting is read on its own: an invalid one falls back to its default alone.
+- **Unreadable.** A file another program holds open (a virus scanner, a backup tool) is read again for about a second. If it still cannot be, the agent uses the backup and saves nothing that session, so the file is not replaced; without a device ID it does not start.
+- **From 0.0.1.** The first start moves `settings.json`, `layout.json`, `trusted.json`, `effect.json` and `device-id` into `config.json` and deletes them. One that is not valid is kept as `<name>.corrupt`.
+- **The settings app** reads only the `language` setting from it, before its first window (also from `settings.json` until the agent has moved it). Everything else comes from the agent's snapshot.
+
 ## Arranging devices
 
 The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core architecture](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/architecture.md#arrangement).
@@ -89,7 +111,7 @@ The canvas on the **设备** page draws this PC's monitors (accent outline) and 
 - **Device states.** A peer that is discovered but not connected says **未连接** under its name. A placed device that is offline is dimmed, says **离线** and keeps its place.
 - **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
 - **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
-- **Persistence.** Placements and the last known name, platform and displays of each device are saved to `%LOCALAPPDATA%\Rinflow\layout.json` ([arrangement.rs](../agent/src/arrangement.rs)), so placed devices still show while offline.
+- **Persistence.** Placements and the last known name, platform and displays of each device are saved in `config.json` (`layout`, [arrangement.rs](../agent/src/arrangement.rs)), so placed devices still show while offline. Only the user's own devices (connected once, or placed) are saved; other devices seen on the network are known only while the agent runs.
 - **Portals.** The agent converts the touching segments into physical pixels per monitor ([displays.rs](../agent/src/displays.rs)). The effect demo already uses them. Input capture (M2) will use them to decide where the cursor leaves this PC.
 
 ## Being controlled by another device
@@ -183,7 +205,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Copied files | Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`, with their names as text. The core sends a manifest, and the peer pulls the files while this PC runs. Files a peer copied land in `Downloads\Rinflow` (folders kept, names never overwritten). They are then put on the clipboard as `CF_HDROP` with a copy drop effect, so Ctrl+V in Explorer copies them. |
 | Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While sharing is off it is refused. A failed transfer shows as the error bar. |
 | Progress | Files on their way, either way, show as cards on the **设备** page with their progress and a button to stop them (the snapshot's `transfers`, from the core's `files_receiving`, `files_progress`, `files_sending` and `files_send_ended`; `cancel_transfer`). When files arrive, a notification says so; clicking it opens `Downloads\Rinflow`. |
-| Setting | Off by default. Saved to `%LOCALAPPDATA%\Rinflow\settings.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
+| Setting | Off by default. Saved in `config.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
 ## Edge push-through effect
 
@@ -207,7 +229,7 @@ All motion uses a damped spring with SwiftUI-style `response` and damping ratio 
 
 Every slider takes effect on the next push. The demo stops when the settings window closes.
 
-The parameters are saved to `%LOCALAPPDATA%\Rinflow\effect.json` ([effect.rs](../agent/src/effect.rs)). Units are platform-neutral so other clients can share the file format:
+The parameters are saved as the `effect` section of `config.json` ([effect.rs](../agent/src/effect.rs)) once the page changes them. Units are platform-neutral so other clients can share the format:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -229,15 +251,15 @@ The parameters are saved to `%LOCALAPPDATA%\Rinflow\effect.json` ([effect.rs](..
 
 ## Settings
 
-The **设置** page. Preferences live in `%LOCALAPPDATA%\Rinflow\settings.json` ([settings.rs](../agent/src/settings.rs)); the agent applies every change at once.
+The **设置** page. Preferences live in the `settings` section of `config.json` ([settings.rs](../agent/src/settings.rs)); the agent applies every change at once. A saved value that is not valid (edited by hand, or from a newer version) falls back to its default alone; the others are kept.
 
 | Setting | Key | How it works |
 | --- | --- | --- |
 | 共享键盘和鼠标 (设备 page, tray panel) | `sharing` | Off pauses both directions: the edge thread does not cross, a peer being driven is given back, and the core refuses peers (`Core::set_remote_control_allowed(false)`): one that drives this PC, or starts to, gets `ControlRevoke` and none of its input is played. Sessions and the clipboard stay. |
-| 开机时启动 | (registry) | The `Rinflow` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `settings.json`. |
+| 开机时启动 | (registry) | The `Rinflow` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `config.json`. |
 | 关闭窗口时保留在托盘 | `keep_in_tray` | Off: closing the main window also quits the agent. |
 | 主题 | `theme` | `system`, `light` or `dark`, for both windows. |
-| 语言 | `language` | `system` (Windows' display language: Simplified Chinese, English for every other one), `zh-CN` or `en-US`. The app reads it from `settings.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (tray menu, notifications, errors) switches at once. See [Languages](#languages). |
+| 语言 | `language` | `system` (the first of the user's Windows languages that Rinflow has, then English), `en-US`, `zh-CN` or `ja-JP`. The app reads it from `config.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (tray menu, notifications, errors) switches at once. See [Languages](#languages). |
 | 切换延迟 | `switch_delay_ms` | 0–500 ms (default 150): how long a push must last before it crosses. Crossing back within the effect's warm time needs no push. |
 | 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
@@ -292,7 +314,7 @@ The core does the protocol work (QUIC with TLS 1.3, certificates, the pairing co
 | | Where | What |
 | --- | --- | --- |
 | Certificate | core | A self-signed certificate and its key, made on first start, in `%LOCALAPPDATA%\Rinflow\identity.pem` (`CoreConfig::identity_path`). Peers know this PC by its fingerprint. Deleting the file gives this PC a new identity, and paired devices then refuse it until they pair again. |
-| Paired devices | agent ([trust.rs](../agent/src/trust.rs)) | Device ID → fingerprint, in `%LOCALAPPDATA%\Rinflow\trusted.json`. Passed to the core at start (`trusted_peers`); updated on the core's `paired` and `unpaired` events. **移除此设备** also unpairs. |
+| Paired devices | agent ([trust.rs](../agent/src/trust.rs)) | Device ID → fingerprint, in `config.json` (`trusted`). Passed to the core at start (`trusted_peers`); updated on the core's `paired` and `unpaired` events. **移除此设备** also unpairs. |
 | Pairing | core, app | When a device wants to pair, the core reports `pairing_requested` with a six-digit code computed from both certificates. The agent opens the main window, and the **配对** dialog ([MainWindow.Pairing.cpp](../app/MainWindow.Pairing.cpp)) shows the code. **配对** accepts and waits for the other device; **取消** (or Esc) declines, and the other device says **对方拒绝了配对**. Two minutes without an answer ends it. |
 | Device rows | app | A device waiting for its code to be confirmed says **等待配对确认…**. |
 | Refusals | agent | A paired device that shows another certificate is refused; the error bar says its identity certificate changed and to remove and pair it again. When the other device refuses this PC (it removed it, or takes only paired devices), the error bar says so and suggests **连接** to pair again. Neither side then reconnects by itself. |
@@ -312,7 +334,7 @@ App → agent:
 | `{"type":"preview_placement","peer_id":"…","x":1440,"y":-11}` | Where `set_placement` would put it, without placing it. Answered with `{"type":"placement_preview","peer_id":"…","offset":{"x":…,"y":…}}` (`offset` is `null` when there is no room). |
 | `{"type":"remove_placement","peer_id":"…"}` | Remove the peer's placement. |
 | `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
-| `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `settings.json`. |
+| `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `config.json`. |
 | `{"type":"update_settings","values":{"sharing":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
 | `{"type":"forget_device","peer_id":"…"}` | Disconnect, unplace, unpair and stop listing a device. |
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
@@ -320,7 +342,7 @@ App → agent:
 | `{"type":"clear_error"}` | The user closed the error bar: `last_error` is cleared. |
 | `{"type":"cancel_transfer","transfer":N}` | Stop files being received or sent (`transfers`). |
 | `{"type":"quit"}` | Quit the agent, as the tray's 退出. |
-| `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `effect.json`; missing keys take their defaults) and save them. |
+| `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `config.json` `effect`; missing keys take their defaults) and save them. |
 | `{"type":"reset_effect"}` | Restore the default parameters. |
 | `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
 | `{"type":"effect_preview"}` | Play the effect once on the primary monitor. With `"hold":0.6` the bump freezes at that progress until the next effect command, which helps when inspecting it. |

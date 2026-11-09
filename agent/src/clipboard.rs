@@ -64,6 +64,13 @@ const MAX_PIXELS: usize = 50_000_000;
 /// What the core shares at most (`MAX_CLIPBOARD_SIZE`): larger contents
 /// lose their image, then their HTML, so the text at least goes.
 const SHARE_LIMIT: usize = 8 * 1024 * 1024 - 4096;
+/// Largest clipboard block `read` copies. Anything bigger cannot end up
+/// within `SHARE_LIMIT`: UTF-16 text with CRLF shrinks at most 4× (`\r\n`
+/// is 4 bytes, `\n` in UTF-8 one), CF_HTML is its fragment plus context, a
+/// bitmap is only converted below 4 bytes per shared byte. Checked before
+/// copying, so copying a gigabyte of text elsewhere cannot exhaust the
+/// agent's memory.
+const READ_LIMIT: usize = 4 * SHARE_LIMIT;
 /// Timers on the clipboard window: try again when another program held the
 /// clipboard too long, a few times.
 const REPORT_RETRY_TIMER: usize = 1;
@@ -651,8 +658,9 @@ fn available(format: u32) -> bool {
     format != 0 && unsafe { IsClipboardFormatAvailable(format) } != 0
 }
 
-/// A format's bytes. The clipboard must be open.
-fn get_bytes(format: u32) -> Option<Vec<u8>> {
+/// A format's bytes; `None` when there are more than `limit`, without
+/// copying them. The clipboard must be open.
+fn get_bytes(format: u32, limit: usize) -> Option<Vec<u8>> {
     if !available(format) {
         return None;
     }
@@ -664,6 +672,9 @@ fn get_bytes(format: u32) -> Option<Vec<u8>> {
             return None;
         }
         let size = GlobalSize(handle);
+        if size > limit {
+            return None;
+        }
         let pointer = GlobalLock(handle) as *const u8;
         if pointer.is_null() {
             return None;
@@ -705,7 +716,7 @@ fn is_private() -> bool {
         return true;
     }
     // A DWORD 0 here means "keep out of clipboard history".
-    get_bytes(register("CanIncludeInClipboardHistory"))
+    get_bytes(register("CanIncludeInClipboardHistory"), 64)
         .is_some_and(|bytes| bytes.len() >= 4 && bytes[..4] == [0, 0, 0, 0])
 }
 
@@ -728,25 +739,27 @@ fn read(window: HWND) -> Option<Clipboard> {
         if is_private() {
             return Some(Clipboard::default());
         }
-        let drop = get_bytes(CF_HDROP);
+        let drop = get_bytes(CF_HDROP, READ_LIMIT);
         if drop.is_some() {
             Raw {
                 drop,
                 ..Raw::default()
             }
         } else {
-            let png = get_bytes(register("PNG"));
+            // A PNG is shared as it is, so one over the limit never is: the
+            // bitmap is tried instead.
+            let png = get_bytes(register("PNG"), SHARE_LIMIT);
             Raw {
                 drop: None,
-                html: get_bytes(register("HTML Format")),
+                html: get_bytes(register("HTML Format"), READ_LIMIT),
                 // A bitmap only when there is no PNG to take as it is.
                 dib: if png.is_none() {
-                    get_bytes(CF_DIB)
+                    get_bytes(CF_DIB, READ_LIMIT)
                 } else {
                     None
                 },
                 png,
-                text: get_bytes(CF_UNICODETEXT),
+                text: get_bytes(CF_UNICODETEXT, READ_LIMIT),
             }
         }
     };

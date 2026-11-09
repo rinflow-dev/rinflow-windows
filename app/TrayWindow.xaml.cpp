@@ -61,7 +61,17 @@ namespace winrt::Rinflow::implementation
                 {
                     // Not once the panel is closing: its window may be gone.
                     auto self = weak.get();
-                    if (self && !self->m_closing && message.GetNamedString(L"type", L"") == L"state") self->ApplyState(message);
+                    if (!self || self->m_closing) return;
+                    // As in MainWindow::ApplyMessage: a value of an
+                    // unexpected type skips this snapshot, not the app.
+                    try
+                    {
+                        if (message.GetNamedString(L"type", L"") == L"state") self->ApplyState(message);
+                    }
+                    catch (hresult_error const& error)
+                    {
+                        OutputDebugStringW((L"Rinflow: skipped an agent message: " + error.message() + L"\n").c_str());
+                    }
                 });
             },
             [](bool) {});

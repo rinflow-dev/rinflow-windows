@@ -284,8 +284,14 @@ namespace winrt::Rinflow::implementation
             hstring line;
             if (kind == L"found")
             {
-                auto name = status.GetNamedString(L"name", status.GetNamedString(L"peer_id", L""));
-                line = RinflowApp::Format(L"AddressFound", std::wstring(name));
+                // `name` is null, not missing, for the few seconds the core
+                // still reports the address as found after the device itself
+                // expired (it slept or left): GetNamedString would throw.
+                auto name = status.GetNamedValue(L"name", JsonValue::CreateNullValue());
+                auto shown = name.ValueType() == JsonValueType::String
+                    ? name.GetString()
+                    : status.GetNamedString(L"peer_id", L"");
+                line = RinflowApp::Format(L"AddressFound", std::wstring(shown));
             }
             else if (kind == L"no_response") line = RinflowApp::Text(L"AddressNoResponse");
             else if (kind == L"unresolved")

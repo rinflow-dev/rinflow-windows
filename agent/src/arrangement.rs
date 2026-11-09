@@ -6,27 +6,67 @@
 //!
 //! rinflow-core owns placements: it snaps them, syncs them with peers and
 //! reports every change as `placement_changed`. This module saves those
-//! reports to `%LOCALAPPDATA%\Rinflow\layout.json` (handed back to the core
-//! at start-up), remembers peers' names and displays so placed devices still
-//! show while offline, and derives the view and the physical portals.
+//! reports as the `layout` section of `config.json` (handed back to the core
+//! at start-up; see `config.rs`), remembers peers' names and displays so
+//! placed devices still show while offline, and derives the view and the
+//! physical portals.
 
+use crate::config;
 use crate::displays::{self, Monitor, PhysicalPortal};
-use crate::identity;
 use crate::state::{DeviceView, LayoutView, SharedState};
 use rinflow_core::PlacementRecord;
 use rinflow_core::layout::{self, Display, Neighbor, Offset, Portal, Side};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct Saved {
     #[serde(default)]
     placements: Vec<PlacementRecord>,
-    /// Every peer seen so far, by device ID.
+    /// Every peer seen while the agent runs, by device ID; only the user's
+    /// own are saved (see [`Saved::kept`]).
     #[serde(default)]
     devices: BTreeMap<String, KnownDevice>,
+}
+
+impl Saved {
+    /// The arrangement saved in `config.json`; empty when it is not valid.
+    fn from_saved(saved: Option<Value>) -> Self {
+        let Some(saved) = saved else {
+            return Self::default();
+        };
+        match serde_json::from_value::<Self>(saved) {
+            Ok(saved) => saved.kept(),
+            Err(error) => {
+                log!("the saved arrangement is not valid ({error}); starting without it");
+                Self::default()
+            }
+        }
+    }
+
+    /// What is worth keeping across restarts: every placement, and the
+    /// user's own devices (connected once, or placed). Other devices seen on
+    /// the network stay known while the agent runs, but are not saved: on a
+    /// busy network the file would otherwise collect every device that ever
+    /// passed by, none of which the settings app shows once it is gone.
+    fn kept(&self) -> Self {
+        let placed = |id: &str| {
+            self.placements
+                .iter()
+                .any(|record| record.peer_id == id && record.offset.is_some())
+        };
+        Self {
+            placements: self.placements.clone(),
+            devices: self
+                .devices
+                .iter()
+                .filter(|(id, device)| device.remembered || placed(id))
+                .map(|(id, device)| (id.clone(), device.clone()))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -145,7 +185,7 @@ struct Inner {
 
 impl Arrangement {
     pub fn load(state: SharedState, monitors: Vec<Monitor>) -> Arc<Self> {
-        let saved = identity::read_json::<Saved>(&path()).unwrap_or_default();
+        let saved = Saved::from_saved(config::section(config::LAYOUT));
         let arrangement = Arc::new(Self {
             inner: Mutex::new(Inner {
                 saved,
@@ -244,8 +284,7 @@ impl Arrangement {
             .saved
             .placements
             .retain(|record| record.peer_id != peer_id);
-        save(&inner.saved);
-        self.publish(&mut inner);
+        self.commit(inner);
     }
 
     /// Picks peer descriptions, connections and placement changes out of the
@@ -319,8 +358,7 @@ impl Arrangement {
                 if offset.is_none() && !inner.saved.devices.contains_key(id) {
                     // Removed with a forgotten device: nothing to keep.
                     inner.saved.placements.retain(|record| record.peer_id != id);
-                    save(&inner.saved);
-                    self.publish(&mut inner);
+                    self.commit(inner);
                     return;
                 }
                 let updated_ms = event["updated_ms"].as_u64().unwrap_or_default();
@@ -341,8 +379,20 @@ impl Arrangement {
             }
             _ => return,
         }
-        save(&inner.saved);
+        self.commit(inner);
+    }
+
+    /// Shows a change to the saved arrangement, then writes `config.json`
+    /// once the lock is let go. The input hooks read the arrangement
+    /// (crossing into a neighbouring device, the switch shortcuts), and
+    /// Windows silently removes a hook that waits too long: it must never
+    /// wait for the disk, slowed by a virus scanner, say.
+    fn commit(&self, mut inner: MutexGuard<'_, Inner>) {
         self.publish(&mut inner);
+        // Staged under the lock, so saves keep the order of changes.
+        let pending = config::stage(config::LAYOUT, &inner.saved.kept());
+        drop(inner);
+        pending.write();
     }
 
     fn publish(&self, inner: &mut Inner) {
@@ -453,24 +503,35 @@ fn describe(device: &mut KnownDevice, id: &str, peer: &Value) {
     }
 }
 
-fn path() -> std::path::PathBuf {
-    identity::data_directory().join("layout.json")
-}
-
-fn save(saved: &Saved) {
-    match serde_json::to_string_pretty(saved) {
-        Ok(text) => {
-            if let Err(error) = identity::write_file(&path(), &text) {
-                log!("cannot save layout: {error}");
-            }
-        }
-        Err(error) => log!("cannot encode layout: {error}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_users_own_devices_are_saved() {
+        let saved = serde_json::json!({
+            "placements": [
+                {"peer_id": "placed", "offset": {"x": 1920.0, "y": 0.0}, "updated_ms": 1},
+                {"peer_id": "unplaced", "offset": null, "updated_ms": 2}
+            ],
+            "devices": {
+                "mine": {"name": "MacBook", "remembered": true},
+                "placed": {"name": "Mac mini"},
+                "unplaced": {"name": "Old PC"},
+                "passer-by": {"name": "Debian"}
+            }
+        });
+        let saved = Saved::from_saved(Some(saved));
+        let ids: Vec<&str> = saved.devices.keys().map(String::as_str).collect();
+        assert_eq!(ids, ["mine", "placed"]);
+        // Removed placements stay: the newer edit wins when devices sync.
+        assert_eq!(saved.placements.len(), 2);
+        assert!(
+            Saved::from_saved(Some(serde_json::json!([1])))
+                .devices
+                .is_empty()
+        );
+    }
 
     fn screen(x: f64, y: f64, width: f64, height: f64) -> Display {
         Display {

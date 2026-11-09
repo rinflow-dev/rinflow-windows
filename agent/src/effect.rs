@@ -8,7 +8,7 @@
 //! renderers, so every value is in platform-neutral units: points at 100 %
 //! scale, seconds, and raw pointer counts for the push distance.
 
-use crate::identity;
+use crate::config;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
@@ -94,16 +94,21 @@ impl EffectParams {
 }
 
 /// Current parameters, shared by the IPC thread, the edge tracker and the
-/// overlay renderer. Saved to `%LOCALAPPDATA%\Rinflow\effect.json`.
+/// overlay renderer. Saved as the `effect` section of `config.json` (see
+/// `config.rs`), once the tuning page changed them.
 #[derive(Clone)]
 pub struct EffectStore(Arc<RwLock<EffectParams>>);
 
 impl EffectStore {
     pub fn load() -> Self {
-        let params = crate::identity::read_json::<EffectParams>(&path())
-            .unwrap_or_default()
-            .sanitized();
-        Self(Arc::new(RwLock::new(params)))
+        let params = match config::section(config::EFFECT) {
+            None => EffectParams::default(),
+            Some(saved) => serde_json::from_value::<EffectParams>(saved).unwrap_or_else(|error| {
+                log!("the saved effect parameters are not valid ({error}); using the defaults");
+                EffectParams::default()
+            }),
+        };
+        Self(Arc::new(RwLock::new(params.sanitized())))
     }
 
     pub fn get(&self) -> EffectParams {
@@ -115,21 +120,17 @@ impl EffectStore {
 
     pub fn set(&self, params: EffectParams) -> EffectParams {
         let params = params.sanitized();
-        // Saved while holding the lock, so concurrent saves cannot interleave
-        // and the file always ends up with the values in memory.
-        let Ok(mut current) = self.0.write() else {
-            return params;
+        let pending = {
+            let Ok(mut current) = self.0.write() else {
+                return params;
+            };
+            *current = params.clone();
+            // Staged under the lock, so saves keep the order of changes; the
+            // disk is waited on after it, as the edge and overlay threads
+            // read the parameters on every push.
+            config::stage(config::EFFECT, &params)
         };
-        *current = params.clone();
-        if let Ok(text) = serde_json::to_string_pretty(&params)
-            && let Err(error) = identity::write_file(&path(), &text)
-        {
-            log!("cannot save effect settings: {error}");
-        }
+        pending.write();
         params
     }
-}
-
-fn path() -> std::path::PathBuf {
-    identity::data_directory().join("effect.json")
 }

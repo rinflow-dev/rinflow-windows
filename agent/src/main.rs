@@ -12,6 +12,7 @@ mod log;
 mod arrangement;
 mod capture;
 mod clipboard;
+mod config;
 mod displays;
 mod edge;
 mod effect;

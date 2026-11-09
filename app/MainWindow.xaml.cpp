@@ -347,19 +347,31 @@ namespace winrt::Rinflow::implementation
 
     void MainWindow::ApplyMessage(JsonObject const& message)
     {
-        auto type = message.GetNamedString(L"type", L"");
-        if (type == L"state")
+        // Windows.Data.Json throws when a value has another type than asked
+        // for (a null where a string was expected, say). Nothing above this
+        // catches it in a release build, so one unexpected message would end
+        // the app: skip that message instead. The next snapshot is whole
+        // again, as every snapshot is.
+        try
         {
-            ApplyState(message);
+            auto type = message.GetNamedString(L"type", L"");
+            if (type == L"state")
+            {
+                ApplyState(message);
+            }
+            else if (type == L"placement_preview")
+            {
+                ApplyPlacementPreview(message);
+            }
+            else if (type == L"error")
+            {
+                // A request failed: shown until closed or replaced.
+                ShowError(message.GetNamedString(L"message", L""), false);
+            }
         }
-        else if (type == L"placement_preview")
+        catch (hresult_error const& error)
         {
-            ApplyPlacementPreview(message);
-        }
-        else if (type == L"error")
-        {
-            // A request failed: shown until closed or replaced.
-            ShowError(message.GetNamedString(L"message", L""), false);
+            OutputDebugStringW((L"Rinflow: skipped an agent message: " + error.message() + L"\n").c_str());
         }
     }
 

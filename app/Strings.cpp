@@ -10,6 +10,50 @@
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
 #include <winrt/Microsoft.Windows.Globalization.h>
 
+namespace
+{
+    using winrt::Windows::Data::Json::JsonObject;
+    using winrt::Windows::Data::Json::JsonValueType;
+
+    // The JSON object in a file; nullptr when there is none or it is not one.
+    JsonObject ReadJsonObject(std::wstring const& path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        if (!file) return nullptr;
+        std::stringstream text;
+        text << file.rdbuf();
+        JsonObject object{ nullptr };
+        if (!JsonObject::TryParse(winrt::to_hstring(text.str()), object)) return nullptr;
+        return object;
+    }
+
+    // `object[key]` if it is a string; empty otherwise (missing, null, or
+    // another type, which GetNamedString would throw on).
+    std::wstring StringOf(JsonObject const& object, std::wstring_view key)
+    {
+        if (!object || !object.HasKey(key)) return {};
+        auto value = object.GetNamedValue(key);
+        return value.ValueType() == JsonValueType::String ? std::wstring(value.GetString()) : std::wstring();
+    }
+
+    // The `language` setting the agent keeps: the `settings` section of
+    // config.json (agent/src/config.rs). Before the agent's first start
+    // after an update from 0.0.1, it is still in settings.json.
+    std::wstring SavedLanguage(std::wstring const& folder)
+    {
+        if (auto config = ReadJsonObject(folder + L"\\config.json"))
+        {
+            auto settings = config.GetNamedValue(L"settings", nullptr);
+            if (settings && settings.ValueType() == JsonValueType::Object)
+            {
+                return StringOf(settings.GetObject(), L"language");
+            }
+            return {};
+        }
+        return StringOf(ReadJsonObject(folder + L"\\settings.json"), L"language");
+    }
+}
+
 namespace RinflowApp
 {
     void ApplyLanguageSetting()
@@ -25,14 +69,7 @@ namespace RinflowApp
         }
         else if (auto folder = wil::TryGetEnvironmentVariableW(L"LOCALAPPDATA"))
         {
-            std::ifstream file(std::wstring(folder.get()) + L"\\Rinflow\\settings.json", std::ios::binary);
-            std::stringstream text;
-            text << file.rdbuf();
-            winrt::Windows::Data::Json::JsonObject settings{ nullptr };
-            if (file && winrt::Windows::Data::Json::JsonObject::TryParse(winrt::to_hstring(text.str()), settings))
-            {
-                language = settings.GetNamedString(L"language", L"system");
-            }
+            language = SavedLanguage(std::wstring(folder.get()) + L"\\Rinflow");
         }
         // Empty follows the user's Windows languages: the first one with
         // resources, then English (the default language).

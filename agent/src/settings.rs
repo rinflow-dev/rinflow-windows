@@ -2,12 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Agent preferences other than the effect and the arrangement, saved to
-//! `%LOCALAPPDATA%\Rinflow\settings.json`. Starting at login is not kept
-//! here: the `Run` registry value is the truth (see [`autostart`]).
+//! Agent preferences other than the effect and the arrangement: the
+//! `settings` section of `config.json` (see `config.rs`). Starting at login
+//! is not kept there: the `Run` registry value is the truth (see
+//! [`autostart`]).
 
+use crate::config;
 use crate::i18n::{s, tr, trf};
-use crate::identity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -245,65 +246,72 @@ impl Settings {
     }
 }
 
-/// The settings and their file. Reading never waits for the disk: the input
-/// hooks read settings, and Windows silently removes a hook that takes too
-/// long. So the file is written outside the lock, and only ever with the
-/// newest settings.
+impl Settings {
+    /// The settings saved in `config.json`. Every value that is valid here
+    /// is kept: one edited by hand, or written by a newer version, falls
+    /// back to its default alone instead of taking the others with it.
+    pub fn from_saved(saved: Option<&Value>) -> Self {
+        let defaults = Self::default();
+        let values = match saved {
+            None => return defaults,
+            Some(Value::Object(values)) => values,
+            Some(_) => {
+                log!("the saved settings are not an object; using the defaults");
+                return defaults;
+            }
+        };
+        // All at once first: values that are only valid together (the lock
+        // shortcut and the switch modifiers) must not be refused one by one.
+        if let Ok(settings) = defaults.merged(values) {
+            return settings;
+        }
+        let mut settings = defaults;
+        for (key, value) in values {
+            let one = Map::from_iter([(key.clone(), value.clone())]);
+            match settings.merged(&one) {
+                Ok(merged) => settings = merged,
+                Err(error) => log!("saved setting {key} ignored: {error}"),
+            }
+        }
+        settings
+    }
+}
+
+/// The settings, saved in `config.json`. Reading never waits for the disk:
+/// the input hooks read settings, and Windows silently removes a hook that
+/// takes too long. So the file is written outside the lock.
 pub struct SettingsStore {
-    /// The settings, and how many changes they have had.
-    current: Mutex<(Settings, u64)>,
-    /// Taken while saving: the change count of the settings last saved.
-    saved: Mutex<u64>,
+    current: Mutex<Settings>,
 }
 
 impl SettingsStore {
     pub fn load() -> Self {
-        let settings: Settings = identity::read_json(&path()).unwrap_or_default();
-        // A file edited by hand falls back to defaults for what is invalid.
-        let settings = settings.merged(&Map::new()).unwrap_or_else(|_| Settings {
-            clipboard: settings.clipboard,
-            ..Settings::default()
-        });
+        let settings = Settings::from_saved(config::section(config::SETTINGS).as_ref());
         Self {
-            current: Mutex::new((settings, 0)),
-            saved: Mutex::new(0),
+            current: Mutex::new(settings),
         }
     }
 
     pub fn get(&self) -> Settings {
         self.current
             .lock()
-            .map(|current| current.0.clone())
+            .map(|current| current.clone())
             .unwrap_or_default()
     }
 
     pub fn update(&self, change: impl FnOnce(&mut Settings)) -> Settings {
-        let (settings, changes) = {
+        let (settings, pending) = {
             let Ok(mut current) = self.current.lock() else {
                 return Settings::default();
             };
-            change(&mut current.0);
-            current.1 += 1;
-            (current.0.clone(), current.1)
+            change(&mut current);
+            // Staged under the lock, so saves keep the order of changes.
+            let pending = config::stage(config::SETTINGS, &*current);
+            (current.clone(), pending)
         };
-        // Saves take turns. One that comes after a save of newer settings
-        // has nothing to add, and must not put older ones back.
-        if let Ok(mut saved) = self.saved.lock()
-            && *saved < changes
-        {
-            if let Ok(text) = serde_json::to_string_pretty(&settings)
-                && let Err(error) = identity::write_file(&path(), &text)
-            {
-                log!("cannot save settings: {error}");
-            }
-            *saved = changes;
-        }
+        pending.write();
         settings
     }
-}
-
-fn path() -> std::path::PathBuf {
-    identity::data_directory().join("settings.json")
 }
 
 /// Starting the agent when the user signs in: the `Rinflow` value under
@@ -407,6 +415,37 @@ mod tests {
         assert!(settings.sharing && settings.keep_in_tray && settings.corner_guard);
         assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.lock_hotkey, Hotkey::default());
+    }
+
+    #[test]
+    fn one_bad_saved_value_keeps_the_others() {
+        let saved = json!({
+            "sharing": false,
+            "theme": "dark",
+            "switch_delay_ms": 5000,
+            "port": "not a port",
+            "from_a_newer_version": true,
+            "manual_addresses": ["192.168.1.20"]
+        });
+        let settings = Settings::from_saved(Some(&saved));
+        assert!(!settings.sharing);
+        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.manual_addresses, ["192.168.1.20"]);
+        assert_eq!(settings.switch_delay_ms, 150);
+        assert_eq!(settings.port, None);
+
+        // Valid only together: the lock shortcut on the arrow keys with
+        // Ctrl+Alt+Shift, once the switch shortcuts use Ctrl+Alt.
+        let together = json!({
+            "switch_modifiers": MOD_CONTROL | MOD_ALT,
+            "lock_hotkey": {"modifiers": MOD_CONTROL | MOD_ALT | MOD_SHIFT, "key": 0x25}
+        });
+        let settings = Settings::from_saved(Some(&together));
+        assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT);
+        assert_eq!(settings.lock_hotkey.key, 0x25);
+
+        assert_eq!(Settings::from_saved(Some(&json!([1]))), Settings::default());
+        assert_eq!(Settings::from_saved(None), Settings::default());
     }
 
     #[test]

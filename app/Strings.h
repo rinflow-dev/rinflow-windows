@@ -33,7 +33,7 @@ namespace RinflowApp
     // differently, and text without it can get the other language's glyphs.
     winrt::hstring LanguageTag();
 
-    // The `language` setting the agent keeps in settings.json ("system",
+    // The `language` setting the agent keeps in config.json ("system",
     // "en-US", "zh-CN" or "ja-JP"), applied before the first window loads: resources
     // are picked by it from then on. Read from the file because the agent's
     // snapshot only arrives later.
