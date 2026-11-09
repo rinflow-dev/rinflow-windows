@@ -124,7 +124,7 @@ cargo run          # debug builds keep a console window for logs
 
 Start either program:
 
-- `Rinflow.exe` connects to the agent and starts `rinflow-agent.exe` from the same folder if it is not running yet. It runs once per user: starting it again brings the running window back.
+- `Rinflow.exe` connects to the agent and starts `rinflow-agent.exe` from the same folder if it is not running yet. It runs once per user: starting it again brings the running window back. An agent that goes away without being quit is started again, at once after a stable run; one that ends within 30 seconds of answering is started again after 2 s, then 10 s, and after a third such end not again: the window shows its exit code and **重试** ([AgentClient.cpp](../app/AgentClient.cpp)).
 - `rinflow-agent.exe` puts an icon in the notification area. Left-click it for the tray panel: the 键鼠共享 switch, the devices, **打开主窗口**, settings and quit. The right-click menu has **打开主窗口** and **退出**. Quitting stops the agent and the core.
 - Closing the main window leaves the agent running in the tray, unless **关闭窗口时保留在托盘** is off; then it quits Rinflow.
 

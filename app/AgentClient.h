@@ -21,6 +21,9 @@ namespace RinflowApp
         Exited,
         // It runs but has not opened its pipe in AgentAnswerTimeout.
         NoAnswer,
+        // It answered, then ended soon after, several times in a row: it is
+        // not started again until the user retries (code: its last exit code).
+        Crashing,
     };
 
     class AgentClient
@@ -86,6 +89,9 @@ namespace RinflowApp
         // Whether the agent started by LaunchAgent failed, reported once.
         void CheckLaunch();
         void Report(AgentProblem problem, uint32_t code);
+        // The agent's pipe closed: waits before starting it again, or gives
+        // up, when it keeps ending soon after it answers.
+        void AfterLinkLost();
         static bool IsAgentPipe(HANDLE pipe);
         bool Send(winrt::Windows::Data::Json::JsonObject const& message);
         bool WaitOrStop(DWORD milliseconds) const;
@@ -103,6 +109,12 @@ namespace RinflowApp
         wil::unique_handle m_agentProcess;
         std::chrono::steady_clock::time_point m_launchedAt{};
         AgentProblem m_problem{ AgentProblem::None };
+        // The agent this client is connected to, and since when; how many
+        // times in a row it ended within StableLink of answering (reader
+        // thread only).
+        wil::unique_handle m_linkedProcess;
+        std::chrono::steady_clock::time_point m_linkedAt{};
+        int m_quickExits{ 0 };
         std::atomic<bool> m_retry{ false };
         wil::unique_event m_stop{ wil::EventOptions::ManualReset };
         std::mutex m_pipeLock;

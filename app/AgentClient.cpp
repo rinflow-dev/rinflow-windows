@@ -16,6 +16,14 @@ namespace
     // is stuck (or another agent exited 0 for one that never came up).
     constexpr auto AgentAnswerTimeout = std::chrono::seconds(15);
 
+    // An agent that ends sooner than this after answering crashed early:
+    // probably on something it does at every start. It is started again
+    // after the delays below, then no more until the user retries; a crash
+    // after a stable run restarts it at once.
+    constexpr auto StableLink = std::chrono::seconds(30);
+    constexpr std::chrono::milliseconds RestartDelays[] = { std::chrono::seconds(2), std::chrono::seconds(10) };
+    constexpr int MaxQuickExits = static_cast<int>(std::size(RestartDelays)) + 1;
+
     // Must match pipe_name() in agent/src/ipc.rs.
     std::wstring AgentPipeName()
     {
@@ -239,7 +247,41 @@ namespace RinflowApp
                 m_pipe.reset();
             }
             m_onLink(false);
+            AfterLinkLost();
         }
+    }
+
+    void AgentClient::AfterLinkLost()
+    {
+        auto process = std::move(m_linkedProcess);
+        // Quit by the user (or for an update), or this window is closing:
+        // nothing to start again.
+        if (m_agentQuit || m_stop.is_signaled())
+        {
+            return;
+        }
+        bool quick = std::chrono::steady_clock::now() - m_linkedAt < StableLink;
+        m_quickExits = quick ? m_quickExits + 1 : 0;
+        if (m_quickExits == 0)
+        {
+            return;
+        }
+        if (m_quickExits >= MaxQuickExits)
+        {
+            // Its exit code says why; the pipe closes as the process ends,
+            // so it is there or about to be.
+            DWORD exitCode = 0;
+            if (process && WaitForSingleObject(process.get(), 2000) == WAIT_OBJECT_0)
+            {
+                GetExitCodeProcess(process.get(), &exitCode);
+            }
+            OutputDebugStringW(L"Rinflow: the agent keeps ending soon after it starts; not starting it again\n");
+            // Open does not start it until Retry.
+            m_agentLaunched = true;
+            Report(AgentProblem::Crashing, exitCode);
+            return;
+        }
+        WaitOrStop(static_cast<DWORD>(RestartDelays[m_quickExits - 1].count()));
     }
 
     bool AgentClient::Open()
@@ -251,6 +293,7 @@ namespace RinflowApp
             m_agentQuit = false;
             m_agentProcess.reset();
             m_problem = AgentProblem::None;
+            m_quickExits = 0;
         }
 
         // Overlapped I/O lets the reader thread block in ReadFile while the
@@ -271,9 +314,18 @@ namespace RinflowApp
                 std::lock_guard lock(m_pipeLock);
                 m_pipe = std::move(opened);
             }
-            // Answered: should it go away later (not quit), start it again.
+            // Answered: should it go away later (not quit), start it again,
+            // unless it keeps going away soon (AfterLinkLost).
             m_agentLaunched = false;
             m_agentProcess.reset();
+            m_linkedAt = std::chrono::steady_clock::now();
+            // For its exit code should it crash: whichever process serves
+            // the pipe, started here, at sign-in or by the other window.
+            ULONG serverPid = 0;
+            if (GetNamedPipeServerProcessId(m_pipe.get(), &serverPid))
+            {
+                m_linkedProcess.reset(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, serverPid));
+            }
             Report(AgentProblem::None, 0);
             return true;
         }

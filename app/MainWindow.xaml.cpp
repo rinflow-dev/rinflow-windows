@@ -478,6 +478,8 @@ namespace winrt::Rinflow::implementation
             ? RinflowApp::Format(L"AgentCannotStart", std::to_wstring(code))
             : problem == AgentProblem::Exited
             ? RinflowApp::Format(L"AgentExited", hex)
+            : problem == AgentProblem::Crashing
+            ? RinflowApp::Format(L"AgentCrashing", hex)
             : RinflowApp::Text(L"AgentNoAnswer");
         AgentBar().Title(RinflowApp::Text(L"AgentProblemTitle"));
         AgentBar().Message(message);

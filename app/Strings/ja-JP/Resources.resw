@@ -211,4 +211,5 @@
   <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
   <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>1 日に 1 回新しいバージョンを確認し、バックグラウンドでダウンロードします。インストールの前に確認します。</value></data>
   <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
+  <data name="AgentCrashing" xml:space="preserve"><value>バックグラウンド サービスが起動後まもなく終了することが続いたため (コード {0})、自動での再起動を停止しました。原因はログに記録されています: [設定] → [ログ フォルダーを開く]。</value></data>
 </root>

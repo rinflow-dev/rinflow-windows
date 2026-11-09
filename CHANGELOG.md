@@ -17,6 +17,7 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 ### Fixed
 
 - The main window could close unexpectedly when a device added by address went offline.
+- When the background service kept ending right after it started, the app restarted it endlessly. It now waits longer each time, and after the third time says so and offers **Retry**.
 - Copying very large text or images could end Rinflow.
 - Saving the arrangement could briefly stall the pointer while controlling another device.
 - One invalid value in the settings no longer resets all the others, and a settings file that cannot be read at the moment is no longer overwritten.

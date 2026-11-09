@@ -211,4 +211,5 @@
   <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>自动检查更新</value></data>
   <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>每天检查一次新版本，并在后台下载。安装前会先询问。</value></data>
   <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>自动检查更新</value></data>
+  <data name="AgentCrashing" xml:space="preserve"><value>后台服务启动后多次很快就退出了（代码 {0}），已停止自动重启。原因记录在日志里：设置 → 打开日志文件夹。</value></data>
 </root>

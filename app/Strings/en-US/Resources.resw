@@ -211,4 +211,5 @@
   <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>Check for updates automatically</value></data>
   <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>Looks for a new version once a day and downloads it in the background. Rinflow asks before installing it.</value></data>
   <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Check for updates automatically</value></data>
+  <data name="AgentCrashing" xml:space="preserve"><value>The background service stopped soon after starting, several times in a row (code {0}), so Rinflow stopped restarting it. The log says why: Settings → Open logs folder.</value></data>
 </root>
