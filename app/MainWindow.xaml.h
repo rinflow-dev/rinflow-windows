@@ -101,6 +101,8 @@ namespace winrt::Rinflow::implementation
         void SetupArrangement();
         void ApplyLayout(Windows::Data::Json::JsonObject const& state);
         void RenderArrangement();
+        // Whether a redraw after a drop keeps the view (m_keepViewUntil).
+        bool KeepView(double width, double height) const;
         void RenderDots();
         void UpdateStrip();
         // One screen card; `insets` draw it inside its to-scale bounds.
@@ -231,6 +233,12 @@ namespace winrt::Rinflow::implementation
         double m_layoutScale{ 1.0 };
         double m_layoutOriginX{ 0.0 };
         double m_layoutOriginY{ 0.0 };
+        // After a drop, the redraws that follow keep this scale and origin
+        // (while everything still fits), so nothing jumps away from where it
+        // was let go. Until then, and for the canvas size it was set for.
+        std::chrono::steady_clock::time_point m_keepViewUntil{};
+        double m_keptViewWidth{ 0.0 };
+        double m_keptViewHeight{ 0.0 };
         std::optional<LayoutDrag> m_drag;
         // A dropped device glides to where it lands; redrawing waits for it.
         bool m_settling{ false };

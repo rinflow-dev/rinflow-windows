@@ -89,6 +89,9 @@ const WM_RELEASE_CAPTURE: u32 = WM_APP + 6;
 /// Thread message: a game on a peer let go of its pointer; the peer is in
 /// [`POINTER_RELEASED`].
 const WM_POINTER_RELEASED: u32 = WM_APP + 7;
+/// Thread message: the arrangement changed (a placement, on either device,
+/// or displays); a driven peer's pointer follows it (`capture::rearranged`).
+const WM_ARRANGEMENT_CHANGED: u32 = WM_APP + 8;
 const HOTKEY_ID: i32 = 1;
 /// The switch shortcuts (arrow keys), registered while no peer is driven (the capture
 /// hooks take them otherwise): ids 2 to 5, in [`SWITCH_SIDES`] order.
@@ -180,13 +183,24 @@ impl EdgeHandle {
     pub fn core_event(&self, json: &str) {
         if !(json.contains("control_revoked")
             || json.contains("peer_pointer_lock")
-            || json.contains("\"disconnected\""))
+            || json.contains("\"disconnected\"")
+            || json.contains("placement_changed")
+            || json.contains("portals_changed"))
         {
             return;
         }
         let Ok(event) = serde_json::from_str::<serde_json::Value>(json) else {
             return;
         };
+        // The arrangement already took it in (main.rs hands it events
+        // first); a peer driven meanwhile keeps its pointer where it is.
+        if event["event"] == "placement_changed" || event["event"] == "portals_changed" {
+            // SAFETY: posts to the edge thread's message queue.
+            unsafe {
+                PostThreadMessageW(self.thread_id, WM_ARRANGEMENT_CHANGED, 0, 0);
+            }
+            return;
+        }
         let Some(peer_id) = event["peer_id"].as_str() else {
             return;
         };
@@ -282,6 +296,10 @@ impl EdgeThread {
                         }
                         if message.hwnd.is_null() && message.message == WM_RELEASE_CAPTURE {
                             capture::release();
+                            continue;
+                        }
+                        if message.hwnd.is_null() && message.message == WM_ARRANGEMENT_CHANGED {
+                            capture::rearranged();
                             continue;
                         }
                         if message.hwnd.is_null() && message.message == WM_POINTER_RELEASED {

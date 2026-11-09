@@ -17,6 +17,9 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 ### Fixed
 
 - The main window could close unexpectedly when a device added by address went offline.
+- Dragging a screen in the arrangement could move another device instead, when that device has monitors of different sizes and its empty corner lay over the screen.
+- After a drop, the arrangement no longer jumps: what was dragged stays where it was let go, also when it is this PC.
+- While this PC drives another device, a change to the arrangement (made on either device) now applies at once: the pointer stays where it is and comes back through the new edge, instead of the old one until the next crossing.
 - When the background service kept ending right after it started, the app restarted it endlessly. It now waits longer each time, and after the third time says so and offers **Retry**.
 - Copying very large text or images could end Rinflow.
 - Saving the arrangement could briefly stall the pointer while controlling another device.

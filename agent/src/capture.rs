@@ -548,6 +548,47 @@ pub fn release() {
     with_capture(|capture| capture.request_end(capture.home()));
 }
 
+/// The arrangement changed while a peer is driven: it was placed elsewhere
+/// (on either device, perhaps with this very pointer), or displays changed.
+/// The pointer stays where it is on the peer and comes back through the
+/// portals as they are now. Only a peer no longer placed ends the capture,
+/// as after a release.
+pub fn rearranged() {
+    with_capture(|capture| {
+        if capture.ending.is_some() {
+            return;
+        }
+        match capture.context.arrangement.target(&capture.peer_id) {
+            Some(target) => capture.pointer = follow(&capture.pointer, target),
+            None => capture.request_end(capture.home()),
+        }
+    });
+}
+
+/// `pointer` at the same spot on its peer, with the peer placed as in
+/// `target`. The portal it left through (where it comes back on a release)
+/// becomes the new one on the same side, or any.
+fn follow(pointer: &RemotePointer, target: Target) -> RemotePointer {
+    let (x, y) = pointer.position();
+    let entry = pointer.entry().and_then(|left| {
+        target
+            .portals
+            .iter()
+            .find(|portal| portal.side == left.side)
+            .or(target.portals.first())
+            .copied()
+    });
+    RemotePointer::enter_at(
+        &target.peer,
+        &target.portals,
+        target.offset,
+        x + target.offset.x,
+        y + target.offset.y,
+        entry,
+    )
+    .with_neighbors(target.neighbors)
+}
+
 /// Raw input reported real input of `device` (the edge thread's window).
 pub fn raw_input(device: Device) {
     with_capture(|capture| capture.raw_input(device));
@@ -1274,9 +1315,59 @@ unsafe extern "system" fn cursor_window_proc(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rinflow_core::layout::{self, Display, Offset};
 
     fn ms(value: u64) -> Duration {
         Duration::from_millis(value)
+    }
+
+    fn screen(x: f64, y: f64, width: f64, height: f64) -> Display {
+        Display {
+            x,
+            y,
+            width,
+            height,
+            scale: 1.0,
+        }
+    }
+
+    fn target(local: &[Display], peer: &[Display], offset: Offset) -> Target {
+        Target {
+            peer: peer.to_vec(),
+            offset,
+            portals: layout::portals(local, peer, offset),
+            neighbors: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_driven_peer_moved_elsewhere_keeps_its_pointer() {
+        let local = [screen(0.0, 0.0, 1920.0, 1080.0)];
+        let mac = [screen(0.0, 0.0, 1512.0, 982.0)];
+        // The Mac on the right; the pointer crossed there and moved a bit.
+        let right = target(&local, &mac, Offset { x: 1920.0, y: 0.0 });
+        let portal = right.portals[0];
+        let mut pointer = RemotePointer::enter(
+            &right.peer,
+            &right.portals,
+            right.offset,
+            portal,
+            1919.0,
+            500.0,
+        );
+        assert_eq!(pointer.step(300.0, 40.0), Motion::Stay);
+        let before = pointer.position();
+
+        // Now placed on the left of this PC (on either device).
+        let left = target(&local, &mac, Offset { x: -1512.0, y: 0.0 });
+        let mut moved = follow(&pointer, left);
+        assert_eq!(moved.position(), before);
+        assert_eq!(moved.entry().map(|portal| portal.side), Some(Side::Left));
+        // Back home through the new portal: to the right, into this PC.
+        match moved.step(2000.0, 0.0) {
+            Motion::Home(x, _) => assert!((0.0..10.0).contains(&x)),
+            other => panic!("expected to come home, got {other:?}"),
+        }
     }
 
     #[test]

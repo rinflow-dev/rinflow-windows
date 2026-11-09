@@ -49,6 +49,9 @@ namespace
     constexpr auto SettleDuration = std::chrono::milliseconds(180);
     // Redrawing waits this long for the snapshot with the new placement.
     constexpr auto SnapshotWait = std::chrono::milliseconds(500);
+    // How long the redraws after a drop keep the view: the snapshots with the
+    // new placements come well within it.
+    constexpr auto KeepViewAfterDrop = std::chrono::seconds(3);
 
     LayoutRect ParseRect(JsonObject const& value)
     {
@@ -296,6 +299,37 @@ namespace winrt::Rinflow::implementation
         return screen;
     }
 
+    bool MainWindow::KeepView(double width, double height) const
+    {
+        if (std::chrono::steady_clock::now() >= m_keepViewUntil
+            || width != m_keptViewWidth || height != m_keptViewHeight)
+        {
+            return false;
+        }
+        // Only while this PC and every placed peer are still on the canvas.
+        auto inside = [&](LayoutRect const& rect)
+        {
+            double left = (rect.x - m_layoutOriginX) * m_layoutScale;
+            double top = (rect.y - m_layoutOriginY) * m_layoutScale;
+            double right = left + rect.width * m_layoutScale;
+            double bottom = top + rect.height * m_layoutScale;
+            return left >= 0 && top >= 0 && right <= width && bottom <= height - StripHeight;
+        };
+        if (!inside(BoundsOf(m_localDisplays)))
+        {
+            return false;
+        }
+        for (auto const& device : m_layoutDevices)
+        {
+            if (device.offset && !inside({ device.bounds.x + device.offset->first,
+                device.bounds.y + device.offset->second, device.bounds.width, device.bounds.height }))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     void MainWindow::RenderArrangement()
     {
         auto canvas = ArrangementCanvas();
@@ -325,9 +359,12 @@ namespace winrt::Rinflow::implementation
             }
         }
         double areaHeight = (std::max)(height - PadTop - PadBottom, 40.0);
-        m_layoutScale = (std::min)((width - 2 * PadSide) / view.width, areaHeight / view.height);
-        m_layoutOriginX = view.x - (width / m_layoutScale - view.width) / 2;
-        m_layoutOriginY = view.y - (areaHeight / m_layoutScale - view.height) / 2 - PadTop / m_layoutScale;
+        if (!KeepView(width, height))
+        {
+            m_layoutScale = (std::min)((width - 2 * PadSide) / view.width, areaHeight / view.height);
+            m_layoutOriginX = view.x - (width / m_layoutScale - view.width) / 2;
+            m_layoutOriginY = view.y - (areaHeight / m_layoutScale - view.height) / 2 - PadTop / m_layoutScale;
+        }
         auto toCanvasX = [this](double x) { return (x - m_layoutOriginX) * m_layoutScale; };
         auto toCanvasY = [this](double y) { return (y - m_layoutOriginY) * m_layoutScale; };
 
@@ -341,7 +378,9 @@ namespace winrt::Rinflow::implementation
         Grid localGroup;
         localGroup.Width(local.width * m_layoutScale);
         localGroup.Height(local.height * m_layoutScale);
-        localGroup.Background(SolidColorBrush(Windows::UI::Colors::Transparent()));
+        // No background: only the screens take the pointer. The rest of the
+        // box around monitors of different sizes is empty, and may lie over
+        // another device's screen.
         int number = 2;
         auto primary = PrimaryIndex(m_localDisplays);
         for (size_t i = 0; i < m_localDisplays.size(); ++i)
@@ -457,7 +496,9 @@ namespace winrt::Rinflow::implementation
         Grid group;
         group.Width(device.bounds.width * scale);
         group.Height(device.bounds.height * scale);
-        group.Background(SolidColorBrush(Windows::UI::Colors::Transparent()));
+        // No background: only the screens take the pointer, as for this PC.
+        // An L-shaped pair of monitors would otherwise grab presses on the
+        // screens drawn under its empty corner.
         if (ghost) group.Opacity(0.85);
         else if (!online) group.Opacity(0.6);
 
@@ -785,6 +826,24 @@ namespace winrt::Rinflow::implementation
             // draws it there.
             auto [x, y] = DraggedOffset();
             m_agent->SetPlacement(m_drag->peerId, x, y);
+        }
+        if (moved && !m_drag->overStrip)
+        {
+            // The redraws for this drop keep the view, rather than fitting it
+            // anew: what was let go stays under the pointer.
+            m_keepViewUntil = std::chrono::steady_clock::now() + KeepViewAfterDrop;
+            m_keptViewWidth = ArrangementHost().ActualWidth();
+            m_keptViewHeight = ArrangementHost().ActualHeight();
+            if (m_drag->local)
+            {
+                // This PC is where the arrangement is measured from: it never
+                // moves, the peers move the other way. Moving the view as far
+                // keeps this PC where it was dropped and the peers in place.
+                auto to = m_drag->landing.value_or(m_drag->free);
+                auto local = BoundsOf(m_localDisplays);
+                m_layoutOriginX = local.x - to.X / m_layoutScale;
+                m_layoutOriginY = local.y - to.Y / m_layoutScale;
+            }
         }
         auto element = m_drag->element;
         auto landing = m_drag->landing;
