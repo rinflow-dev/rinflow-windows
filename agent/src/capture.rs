@@ -559,7 +559,15 @@ pub fn rearranged() {
             return;
         }
         match capture.context.arrangement.target(&capture.peer_id) {
-            Some(target) => capture.pointer = follow(&capture.pointer, target),
+            Some(target) => {
+                capture.pointer = follow(&capture.pointer, target);
+                // The peer's own system may have moved its cursor while its
+                // displays changed, or the display it was on is gone: put it
+                // where this PC now tracks it (unless a game holds it).
+                if !edge::pointer_held(&capture.peer_id) {
+                    capture.send_position();
+                }
+            }
             None => capture.request_end(capture.home()),
         }
     });
@@ -674,14 +682,7 @@ pub fn finish() -> Option<Ended> {
 pub fn pointer_released(peer_id: &str) {
     with_capture(|capture| {
         if capture.peer_id == peer_id && capture.ending.is_none() {
-            let (x, y) = capture.pointer.position();
-            capture.send(LcInputEvent {
-                kind: LC_INPUT_MOUSE_MOVE,
-                flags: LC_INPUT_FLAG_ABSOLUTE_POSITION,
-                x,
-                y,
-                ..LcInputEvent::default()
-            });
+            capture.send_position();
         }
     });
 }
@@ -788,6 +789,18 @@ impl Capture {
 
     fn send(&self, event: LcInputEvent) {
         let _ = self.core.send_input(event);
+    }
+
+    /// Puts the peer's cursor where this PC tracks the pointer.
+    fn send_position(&self) {
+        let (x, y) = self.pointer.position();
+        self.send(LcInputEvent {
+            kind: LC_INPUT_MOUSE_MOVE,
+            flags: LC_INPUT_FLAG_ABSOLUTE_POSITION,
+            x,
+            y,
+            ..LcInputEvent::default()
+        });
     }
 
     fn watch(&mut self, device: Device) -> &mut HookWatch {
