@@ -166,13 +166,43 @@
         </Grid>
 
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Above every page, not on the devices page alone: most
+                 requests that can fail are made on the settings page. Code
+                 collapses a closed bar, so its margin takes no room. -->
+            <StackPanel MaxWidth="1040" Padding="28,0,28,0">
+                <!-- The background service could not be started
+                     (AgentClient's problems); its text comes from code. -->
+                <InfoBar
+                    x:Name="AgentBar"
+                    Margin="0,0,0,8"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Error">
+                    <InfoBar.ActionButton>
+                        <Button x:Name="AgentRetryButton" x:Uid="AgentRetryButton" Content="重试" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
+                <InfoBar
+                    x:Name="ErrorBar"
+                    Margin="0,0,0,8"
+                    IsOpen="False"
+                    Severity="Warning" />
+            </StackPanel>
+
             <!-- ================= Devices ================= -->
             <!-- ScrollView with vertical content: the page is laid out at the
                  viewport's width (a ScrollViewer would centre a narrower page
                  by its desired width). -->
-            <ScrollView x:Name="DevicesPage" ContentOrientation="Vertical">
+            <ScrollView x:Name="DevicesPage" Grid.Row="1" ContentOrientation="Vertical">
                 <StackPanel MaxWidth="1040" Padding="28,8,28,24">
-                    <Grid Margin="0,0,0,16" ColumnSpacing="12">
+                    <!-- 40 below: as it was with the two bars that are now
+                         above the pages. -->
+                    <Grid Margin="0,0,0,40" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -215,23 +245,6 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- The background service could not be started
-                         (AgentClient's problems); its text comes from code. -->
-                    <InfoBar
-                        x:Name="AgentBar"
-                        Margin="0,0,0,12"
-                        IsClosable="False"
-                        IsOpen="False"
-                        Severity="Error">
-                        <InfoBar.ActionButton>
-                            <Button x:Name="AgentRetryButton" x:Uid="AgentRetryButton" Content="重试" />
-                        </InfoBar.ActionButton>
-                    </InfoBar>
-                    <InfoBar
-                        x:Name="ErrorBar"
-                        Margin="0,0,0,12"
-                        IsOpen="False"
-                        Severity="Warning" />
                     <InfoBar
                         x:Name="LockBar"
                         Margin="0,0,0,12"
@@ -427,6 +440,7 @@
             <!-- ================= Settings ================= -->
             <ScrollView
                 x:Name="SettingsPage"
+                Grid.Row="1"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
                 <StackPanel MaxWidth="1040" Padding="28,8,28,24" Spacing="4">
@@ -856,6 +870,7 @@
             <!-- ================= Edge animation (development builds) ================= -->
             <ScrollView
                 x:Name="EffectPage"
+                Grid.Row="1"
                 ContentOrientation="Vertical"
                 Visibility="Collapsed">
                 <StackPanel MaxWidth="1040" Padding="28,8,28,24" Spacing="12">

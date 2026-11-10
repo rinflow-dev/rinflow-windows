@@ -45,6 +45,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 /// Access to the input desktop for playing input on it.
 const MAXIMUM_ALLOWED: u32 = 0x0200_0000;
+/// What the session's user may do with the pipe, in SDDL: FILE_GENERIC_READ
+/// and FILE_GENERIC_WRITE without FILE_CREATE_PIPE_INSTANCE (0x4).
+const USER_PIPE_ACCESS: &str = "0x12019b";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct State {
@@ -127,6 +130,28 @@ impl Held {
                 }
             }
             RawInput::Key { .. } => {}
+        }
+    }
+
+    /// Whether `input` lets go of a key or button that is held.
+    fn releases_held(&self, input: RawInput) -> bool {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE,
+            MOUSEEVENTF_XUP,
+        };
+        match input {
+            RawInput::Key { vk, scan, flags } => {
+                flags & KEYEVENTF_UNICODE == 0
+                    && flags & KEYEVENTF_KEYUP != 0
+                    && self.keys.contains(&(
+                        vk,
+                        scan,
+                        flags & (KEYEVENTF_EXTENDEDKEY | KEYEVENTF_SCANCODE),
+                    ))
+            }
+            RawInput::Mouse { data, flags, .. } => self.buttons.iter().any(|&(up, held)| {
+                flags & up != 0 && (up != MOUSEEVENTF_XUP || held == data)
+            }),
         }
     }
 
@@ -299,10 +324,11 @@ fn spawn_injector(shared: Arc<Shared>) -> std::sync::mpsc::Sender<Job> {
                 }
                 continue;
             }
-            if let Job::Input(raw) = job {
-                held.note(raw);
-            }
-            if !shared.allowed() {
+            // What releases a key or button that was played down always goes
+            // through, even where new input may not: it would stay down
+            // otherwise, and `ReleaseAll` would no longer know of it.
+            let releasing = matches!(job, Job::Input(raw) if held.releases_held(raw));
+            if !shared.allowed() && !releasing {
                 continue;
             }
             desktop.follow(&shared, false);
@@ -310,9 +336,13 @@ fn spawn_injector(shared: Arc<Shared>) -> std::sync::mpsc::Sender<Job> {
             if !ok {
                 // The input desktop changed since the watcher looked.
                 desktop.follow(&shared, true);
-                ok = shared.allowed() && play(&job);
+                ok = (shared.allowed() || releasing) && play(&job);
             }
             if ok {
+                // Only what was really played is held (or released).
+                if let Job::Input(raw) = job {
+                    held.note(raw);
+                }
                 played += 1;
                 failing = false;
             } else if !failing {
@@ -408,7 +438,11 @@ async fn serve(
     // (`reject_remote_clients`). A development run (not LocalSystem) owns
     // it itself.
     let owner = if win::is_local_system() { "O:SY" } else { "" };
-    let sddl = format!("{owner}D:P(A;;GA;;;SY)(A;;GRGW;;;{user})");
+    // The user reads and writes, but may not create instances of the pipe
+    // (generic write would include FILE_CREATE_PIPE_INSTANCE): an instance
+    // made by another program would carry this owner, and the agent would
+    // take it for the helper.
+    let sddl = format!("{owner}D:P(A;;GA;;;SY)(A;;{USER_PIPE_ACCESS};;;{user})");
     let mut security = SecurityAttributes::from_sddl(&sddl)?;
     // The first instance must be ours: if something else took the name, a
     // client could talk to it instead.

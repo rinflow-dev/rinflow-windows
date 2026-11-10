@@ -106,7 +106,13 @@ namespace winrt::Rinflow::implementation
 
     void MainWindow::ApplyEffect(JsonObject const& state)
     {
+        // Cleared however this function is left (see ApplySettings).
         m_applyingEffect = true;
+        struct Applied
+        {
+            bool& flag;
+            ~Applied() { flag = false; }
+        } applied{ m_applyingEffect };
 
         // Values are copied only when the agent reloads them (start-up,
         // reset). Copying every snapshot would fight the slider being dragged.
@@ -135,7 +141,5 @@ namespace winrt::Rinflow::implementation
             ? L"现在在“另一台设备”上 · 往回推回到本机"
             : L"现在在本机 · 推向放置了设备的边缘进入另一台设备");
         DemoSideText().Visibility(demo ? Visibility::Visible : Visibility::Collapsed);
-
-        m_applyingEffect = false;
     }
 }

@@ -170,6 +170,18 @@ namespace winrt::Rinflow::implementation
             if (self->m_errorFromAgent) self->m_agent->ClearError();
             self->m_errorFromAgent = false;
         });
+        // The two bars above the pages: a closed InfoBar only hides its
+        // content and would keep its margin, so it is collapsed as well.
+        for (auto const& bar : { AgentBar(), ErrorBar() })
+        {
+            bar.Visibility(bar.IsOpen() ? Visibility::Visible : Visibility::Collapsed);
+            bar.RegisterPropertyChangedCallback(InfoBar::IsOpenProperty(),
+                [](DependencyObject const& sender, DependencyProperty const&)
+            {
+                auto bar = sender.as<InfoBar>();
+                bar.Visibility(bar.IsOpen() ? Visibility::Visible : Visibility::Collapsed);
+            });
+        }
 
         Closed([weak](auto&&, auto&&)
         {
@@ -392,14 +404,28 @@ namespace winrt::Rinflow::implementation
             if (!error.empty()) ShowError(error, true);
             else if (m_errorFromAgent) ShowError(L"", true);
         }
-        ApplySettings(state);
-        ApplyDevices(state);
-        ApplyTransfers(state);
-        ApplyAddresses(state);
-        ApplyLayout(state);
-        ApplyEffect(state);
+        // Each part on its own: a value of an unexpected type in one (see
+        // ApplyMessage) must not keep the others from showing, least of all
+        // the pairing dialog.
+        auto apply = [&](void (MainWindow::*part)(JsonObject const&))
+        {
+            try
+            {
+                (this->*part)(state);
+            }
+            catch (hresult_error const& error)
+            {
+                OutputDebugStringW((L"Rinflow: skipped part of a snapshot: " + error.message() + L"\n").c_str());
+            }
+        };
+        apply(&MainWindow::ApplySettings);
+        apply(&MainWindow::ApplyDevices);
+        apply(&MainWindow::ApplyTransfers);
+        apply(&MainWindow::ApplyAddresses);
+        apply(&MainWindow::ApplyLayout);
+        apply(&MainWindow::ApplyEffect);
         m_lastState = state;
-        ApplyPairing(state);
+        apply(&MainWindow::ApplyPairing);
     }
 
     void MainWindow::ApplyDevices(JsonObject const& state)

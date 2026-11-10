@@ -9,6 +9,7 @@
 
 use crate::i18n::{s, tr, trf};
 use crate::win::wide;
+use std::cell::RefCell;
 use std::io;
 use std::path::PathBuf;
 use std::ptr::{null, null_mut};
@@ -29,8 +30,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetMessageW, HICON, KillTimer, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage,
     RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
-    WM_DISPLAYCHANGE, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_THEMECHANGED, WM_TIMER,
-    WNDCLASSW, WS_OVERLAPPED,
+    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE,
+    WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -117,8 +118,32 @@ unsafe extern "system" fn console_control(event: u32) -> windows_sys::core::BOOL
     1
 }
 
-/// Creates the tray icon and runs the message loop until the user quits.
-pub fn run() -> io::Result<()> {
+thread_local! {
+    /// What stops the agent, until it ran: after the message loop, or
+    /// inside `WM_ENDSESSION`, where Windows waits for it.
+    static SHUTDOWN: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+}
+
+/// Runs what stops the agent, once.
+fn shut_down() {
+    if let Some(shutdown) = SHUTDOWN.with_borrow_mut(Option::take) {
+        shutdown();
+    }
+}
+
+/// Creates the tray icon and runs the message loop until the user quits,
+/// then runs `shutdown`. When the user signs out or Windows shuts down,
+/// `shutdown` runs while Windows still waits for this program, so peers see
+/// a clean disconnect then too (a device driving this PC gets control back
+/// at once, not after a timeout).
+pub fn run(shutdown: impl FnOnce() + 'static) -> io::Result<()> {
+    SHUTDOWN.set(Some(Box::new(shutdown)));
+    let result = run_loop();
+    shut_down();
+    result
+}
+
+fn run_loop() -> io::Result<()> {
     let class_name = wide("RinflowAgentTray");
     let taskbar_created = wide("TaskbarCreated");
     // SAFETY: plain Win32 calls with valid, null-terminated strings. The
@@ -207,6 +232,16 @@ unsafe extern "system" fn window_proc(
                 }
                 PostQuitMessage(0);
             }
+            0
+        }
+        // Signing out, restarting or shutting down. Windows may end the
+        // process as soon as this returns, so the agent stops here, not
+        // after the message loop.
+        WM_ENDSESSION if wparam != 0 => {
+            log!("the Windows session is ending: stopping");
+            shut_down();
+            // SAFETY: this thread's own window; ends the message loop.
+            unsafe { DestroyWindow(window) };
             0
         }
         WM_TIMER if wparam == ICON_RETRY_TIMER => {

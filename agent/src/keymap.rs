@@ -181,9 +181,16 @@ pub fn hid_usage(scan_code: u32, extended: bool, virtual_key: u32) -> Option<u32
     {
         return Some(usage);
     }
+    // Right Shift has no E0 prefix on the wire, but keyboard layouts mark it
+    // extended, and a low-level hook reports it so (`LLKHF_EXTENDED`).
+    if virtual_key == VK_RSHIFT {
+        return Some(0xE5);
+    }
     let code = u16::try_from(scan_code).ok()?;
     reverse.scan.get(&(code, extended)).copied()
 }
+
+const VK_RSHIFT: u32 = 0xA1;
 
 #[cfg(test)]
 mod tests {
@@ -203,6 +210,10 @@ mod tests {
         // Left and right Control share a scan code; E0 tells them apart.
         assert_eq!(hid_usage(0x1D, false, 0xA2), Some(0xE0));
         assert_eq!(hid_usage(0x1D, true, 0xA3), Some(0xE4));
+        // Right Shift, with or without the extended flag a hook reports.
+        assert_eq!(hid_usage(0x36, true, 0xA1), Some(0xE5));
+        assert_eq!(hid_usage(0x36, false, 0xA1), Some(0xE5));
+        assert_eq!(hid_usage(0x2A, false, 0xA0), Some(0xE1));
     }
 
     fn code(usage: u32) -> (u16, bool) {

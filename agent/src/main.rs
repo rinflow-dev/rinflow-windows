@@ -335,27 +335,32 @@ fn main() {
     ));
     ipc::spawn(&identity.user_sid, services.clone());
 
-    if let Err(error) = tray::run() {
+    // Runs when the user quits Rinflow, and when the Windows session ends
+    // (sign-out, restart, shutdown): there Windows waits for it, see
+    // `tray::run`.
+    let shutdown = move || {
+        // An open settings app learns that the agent is going, and quits too
+        // rather than starting it again.
+        services.state.set_quitting();
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
+        let _ = services.set_effect_demo(false);
+        // Gives back the keyboard and mouse if a peer is being driven.
+        drop(edge);
+        drop(clipboard_thread);
+        drop(presence);
+        drop(power);
+        drop(overlay);
+        // Shows the cursor if it is hidden.
+        drop(hider);
+        // The IPC thread only holds a weak reference, so this stops the core
+        // and lets connected peers see a clean disconnect before the process
+        // exits. Stopping the core queues key-ups for anything the peer still
+        // held; the injector plays them before it exits.
+        drop(core);
+        drop(injector);
+    };
+    if let Err(error) = tray::run(shutdown) {
         log!("tray failed: {error}");
     }
-    // An open settings app learns that the user quit, and quits too rather
-    // than starting the agent again.
-    services.state.set_quitting();
-    std::thread::sleep(std::time::Duration::from_millis(150));
-
-    let _ = services.set_effect_demo(false);
-    // Gives back the keyboard and mouse if a peer is being driven.
-    drop(edge);
-    drop(clipboard_thread);
-    drop(presence);
-    drop(power);
-    drop(overlay);
-    // Shows the cursor if it is hidden.
-    drop(hider);
-    // The IPC thread only holds a weak reference, so this stops the core and
-    // lets connected peers see a clean disconnect before the process exits.
-    // Stopping the core queues key-ups for anything the peer still held; the
-    // injector plays them before it exits.
-    drop(core);
-    drop(injector);
 }

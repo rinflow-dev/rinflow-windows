@@ -191,13 +191,16 @@ async fn serve(
     if writer.write_all(&hello.encode()).await.is_err() {
         return;
     }
+    // Connected before the value is read: a change from here on is queued
+    // (`set_remote_control`) and sent by the loop below, so none is lost
+    // between reading it and saying so.
+    channel.connected.store(true, Ordering::SeqCst);
     let remote_control = ClientMessage::RemoteControl {
         active: channel.remote_control.load(Ordering::SeqCst),
     };
     if writer.write_all(&remote_control.encode()).await.is_err() {
         return;
     }
-    channel.connected.store(true, Ordering::SeqCst);
     loop {
         tokio::select! {
             frame = read_frame(&mut reader) => {

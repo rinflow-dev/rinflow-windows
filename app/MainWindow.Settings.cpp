@@ -452,7 +452,18 @@ namespace winrt::Rinflow::implementation
 
         auto notes = text(L"notes_url");
         bool showNotes = !version.empty() && notes.starts_with(L"https://");
-        if (showNotes) UpdateNotesLink().NavigateUri(Windows::Foundation::Uri(notes));
+        if (showNotes)
+        {
+            // An address that does not parse throws: no link then.
+            try
+            {
+                UpdateNotesLink().NavigateUri(Windows::Foundation::Uri(notes));
+            }
+            catch (hresult_error const&)
+            {
+                showNotes = false;
+            }
+        }
         UpdateNotesLink().Visibility(showNotes ? Visibility::Visible : Visibility::Collapsed);
     }
 
@@ -460,7 +471,15 @@ namespace winrt::Rinflow::implementation
     {
         auto settings = state.GetNamedObject(L"settings", JsonObject{});
         m_settings = settings;
+        // Cleared however this function is left: a value of an unexpected
+        // type throws, and the flag staying on would make every switch on
+        // the page ignore the user from then on.
         m_applying = true;
+        struct Applied
+        {
+            bool& flag;
+            ~Applied() { flag = false; }
+        } applied{ m_applying };
 
         SetSwitch(SharingToggle(), SharingState(), settings.GetNamedBoolean(L"sharing", true));
         SetSwitch(LaunchToggle(), LaunchState(), state.GetNamedBoolean(L"launch_at_login", false));
@@ -602,8 +621,6 @@ namespace winrt::Rinflow::implementation
         CopyIdButton().IsEnabled(!full.empty());
         VersionText().Text(RinflowApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
         ApplyUpdate(state);
-
-        m_applying = false;
     }
 
     void MainWindow::ShowHotkeyKeys(StackPanel const& panel, uint32_t modifiers, uint32_t key)

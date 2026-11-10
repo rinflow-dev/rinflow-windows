@@ -198,15 +198,14 @@ impl Config {
             )
         };
         match text {
-            Ok(text) => {
-                if let Err(error) = replace(&self.path, &text) {
-                    log!("cannot save {FILE}: {error}");
-                }
-            }
+            Ok(text) => match replace(&self.path, &text) {
+                // What was just written includes every change staged so far.
+                Ok(()) => *written = latest,
+                // Not counted as written: the next change saves these too.
+                Err(error) => log!("cannot save {FILE}: {error}"),
+            },
             Err(error) => log!("cannot encode {FILE}: {error}"),
         }
-        // What was just written includes every change staged so far.
-        *written = latest;
     }
 }
 
@@ -352,12 +351,62 @@ fn replace(path: &Path, text: &str) -> io::Result<()> {
         // On disk before it replaces the old file, not only in the cache.
         file.sync_all()?;
     }
-    if path.exists() {
-        // Between these two renames there is only the backup; `load` takes
-        // it then.
-        fs::rename(path, with_suffix(path, ".bak"))?;
+    // Another program may hold the file open for a moment (a virus scanner
+    // or the indexer, right after the last save): a few tries.
+    let mut attempt = 0;
+    loop {
+        match swap_in(path, &temporary) {
+            Ok(()) => return Ok(()),
+            Err(error) if attempt + 1 == REPLACE_ATTEMPTS => return Err(error),
+            Err(_) => {
+                attempt += 1;
+                std::thread::sleep(REPLACE_RETRY);
+            }
+        }
     }
-    fs::rename(&temporary, path)
+}
+
+const REPLACE_ATTEMPTS: u32 = 5;
+const REPLACE_RETRY: Duration = Duration::from_millis(40);
+
+/// Puts `temporary` in the place of `path` in one step, the old version
+/// becoming `<path>.bak` (`ReplaceFileW`): at no point is there no
+/// `config.json`. Should Windows fail half way (the old version moved, the
+/// new one not), the next try finds no file and moves the new one in; until
+/// then `load` takes the backup.
+fn swap_in(path: &Path, temporary: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{REPLACEFILE_IGNORE_MERGE_ERRORS, ReplaceFileW};
+    if !path.exists() {
+        return fs::rename(temporary, path);
+    }
+    let wide = |path: &Path| -> Vec<u16> {
+        path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    };
+    let (replaced, replacement, backup) = (
+        wide(path),
+        wide(temporary),
+        wide(&with_suffix(path, ".bak")),
+    );
+    // SAFETY: three null-terminated paths that outlive the call; the
+    // reserved parameters are null.
+    let done = unsafe {
+        ReplaceFileW(
+            replaced.as_ptr(),
+            replacement.as_ptr(),
+            backup.as_ptr(),
+            REPLACEFILE_IGNORE_MERGE_ERRORS,
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    };
+    if done == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {

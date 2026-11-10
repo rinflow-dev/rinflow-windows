@@ -45,9 +45,11 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Weak, mpsc};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{POINT, RECT};
-use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+use windows_sys::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+};
 use windows_sys::Win32::System::Power::{
     ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState,
 };
@@ -92,6 +94,11 @@ enum Job {
 /// How often the pointer lock is checked while a peer drives this PC and no
 /// motion comes (a game may let go meanwhile).
 const LOCK_POLL: Duration = Duration::from_millis(250);
+
+/// How long a played move may take to show in `GetCursorPos`. A pointer
+/// still at its old place after that was stopped by something (an edge, a
+/// clip rectangle), not late.
+const LANDING_TIME: Duration = Duration::from_millis(100);
 
 /// Cloneable sender used by the core callbacks.
 #[derive(Clone)]
@@ -199,10 +206,11 @@ struct Player {
     /// Where the pointer was last seen, for its monitor's scale while a UAC
     /// prompt or the lock screen hides it from this process.
     last_cursor: Option<POINT>,
-    /// Where the last move put the pointer, and what `GetCursorPos` said
-    /// before it. Windows applies injected moves a moment later; reading the
-    /// old position again then means the move is still on its way.
-    last_move: Option<(POINT, POINT)>,
+    /// Where the last move put the pointer, what `GetCursorPos` said before
+    /// it, and when. Windows applies injected moves a moment later; reading
+    /// the old position again within [`LANDING_TIME`] means the move is
+    /// still on its way.
+    last_move: Option<(POINT, POINT, Instant)>,
     /// A game or a pointer-lock page holds the pointer (as last reported).
     pointer_locked: bool,
     core: Option<Weak<Core>>,
@@ -297,9 +305,10 @@ impl Player {
         if seen {
             // Still where it was before the previous move: that move has not
             // landed yet, so go on from where it is going.
-            if let Some((target, before)) = self.last_move
+            if let Some((target, before, at)) = self.last_move
                 && cursor.x == before.x
                 && cursor.y == before.y
+                && at.elapsed() < LANDING_TIME
             {
                 cursor = target;
             }
@@ -328,13 +337,17 @@ impl Player {
         // SAFETY: writes the cursor position into `before`.
         unsafe { GetCursorPos(&mut before) };
         place_cursor(target.x, target.y);
-        // Clamped onto the desktop, as the move itself is.
-        let desktop = VirtualDesktop::current();
-        let landed = POINT {
-            x: target.x.clamp(desktop.x, desktop.x + desktop.width - 1),
-            y: target.y.clamp(desktop.y, desktop.y + desktop.height - 1),
-        };
-        self.last_move = (landed.x != before.x || landed.y != before.y).then_some((landed, before));
+        // Where Windows will put it: on a monitor and within the cursor's
+        // clip, not merely within the desktop's bounding box. A target in
+        // the empty corner beside a smaller monitor would otherwise count as
+        // still on its way for ever, and each move would go on from a point
+        // the pointer never reaches.
+        let landed = landing(target);
+        self.last_move = (landed.x != before.x || landed.y != before.y).then_some((
+            landed,
+            before,
+            Instant::now(),
+        ));
     }
 
     fn move_to(&mut self, x: f64, y: f64) {
@@ -402,6 +415,37 @@ fn confined(clip: RECT, desktop: &VirtualDesktop) -> bool {
         || clip.top > desktop.y
         || clip.right < desktop.x + desktop.width
         || clip.bottom < desktop.y + desktop.height
+}
+
+/// Where an absolute move to `target` leaves the pointer: Windows keeps it
+/// on a monitor (the nearest one) and within the cursor's clip rectangle.
+fn landing(target: POINT) -> POINT {
+    let mut landed = target;
+    // SAFETY: plain monitor and clip queries into properly sized structures.
+    unsafe {
+        let monitor = MonitorFromPoint(target, MONITOR_DEFAULTTONEAREST);
+        let mut info: MONITORINFO = std::mem::zeroed();
+        info.cbSize = size_of::<MONITORINFO>() as u32;
+        if GetMonitorInfoW(monitor, &mut info) != 0 {
+            landed = clamp_into(landed, info.rcMonitor);
+        }
+        let mut clip: RECT = std::mem::zeroed();
+        if GetClipCursor(&mut clip) != 0 {
+            landed = clamp_into(landed, clip);
+        }
+    }
+    landed
+}
+
+/// The point of `rect` (right and bottom exclusive) nearest to `point`.
+fn clamp_into(point: POINT, rect: RECT) -> POINT {
+    if rect.right <= rect.left || rect.bottom <= rect.top {
+        return point;
+    }
+    POINT {
+        x: point.x.clamp(rect.left, rect.right - 1),
+        y: point.y.clamp(rect.top, rect.bottom - 1),
+    }
 }
 
 /// Whole pixels to move now and the fraction to carry over.
@@ -632,6 +676,24 @@ mod tests {
         assert!(confined(rect(0, 0, 2880, 1920), &desktop));
         // Chrome's pointer lock: a tiny rectangle.
         assert!(confined(rect(1440, 960, 1441, 961), &desktop));
+    }
+
+    #[test]
+    fn a_move_lands_on_the_monitor_not_beside_it() {
+        use super::clamp_into;
+        use windows_sys::Win32::Foundation::POINT;
+        // A 1920×1080 monitor next to a taller one: pushing down at its
+        // bottom edge stays on its last row.
+        let monitor = RECT {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
+        let landed = clamp_into(POINT { x: 500, y: 1100 }, monitor);
+        assert_eq!((landed.x, landed.y), (500, 1079));
+        let inside = clamp_into(POINT { x: 500, y: 500 }, monitor);
+        assert_eq!((inside.x, inside.y), (500, 500));
     }
 
     #[test]

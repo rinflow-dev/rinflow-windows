@@ -52,7 +52,10 @@ const WM_PEER_ACTIVE: u32 = WM_APP + 1;
 const WM_LOCK_REQUESTED: u32 = WM_APP + 2;
 /// From the window procedure: this session was locked.
 const WM_SESSION_LOCKED: u32 = WM_APP + 3;
+/// And unlocked again.
+const WM_SESSION_UNLOCKED: u32 = WM_APP + 4;
 const WTS_SESSION_LOCK: usize = 7;
+const WTS_SESSION_UNLOCK: usize = 8;
 const TIMER: usize = 1;
 const TICK_MS: u32 = 5_000;
 /// Input this recent counts as someone using this PC.
@@ -115,6 +118,7 @@ impl PresenceWatch {
                     nudged: None,
                     nudge_tick: None,
                     lock_requested: None,
+                    session_locked: false,
                 };
                 // SAFETY: standard message loop of this thread's window.
                 unsafe {
@@ -124,6 +128,7 @@ impl PresenceWatch {
                             (true, WM_PEER_ACTIVE) => presence.peer_active(),
                             (true, WM_LOCK_REQUESTED) => presence.lock_requested(),
                             (true, WM_SESSION_LOCKED) => presence.locked(),
+                            (true, WM_SESSION_UNLOCKED) => presence.session_locked = false,
                             (false, WM_TIMER) => presence.tick(),
                             _ => {
                                 TranslateMessage(&message);
@@ -178,12 +183,15 @@ struct Presence {
     nudge_tick: Option<u32>,
     /// When a peer last asked this PC to lock.
     lock_requested: Option<Instant>,
+    /// This session is locked: a peer in use does not keep it awake.
+    session_locked: bool,
 }
 
 impl Presence {
     fn tick(&mut self) {
         self.report_activity();
-        let wanted = self.settings.get().keep_awake
+        let wanted = !self.session_locked
+            && self.settings.get().keep_awake
             && self.awake_until.is_some_and(|until| Instant::now() < until);
         if !wanted {
             self.let_sleep();
@@ -276,6 +284,7 @@ impl Presence {
 
     /// This PC was locked: peers lock too, unless a peer's lock caused it.
     fn locked(&mut self) {
+        self.session_locked = true;
         self.awake_until = None;
         self.let_sleep();
         if !self.settings.get().lock_sync
@@ -354,10 +363,17 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     // Session changes may be sent rather than posted: handed to the message
     // loop, which owns the state.
-    if message == WM_WTSSESSION_CHANGE && wparam == WTS_SESSION_LOCK {
+    if message == WM_WTSSESSION_CHANGE
+        && (wparam == WTS_SESSION_LOCK || wparam == WTS_SESSION_UNLOCK)
+    {
+        let change = if wparam == WTS_SESSION_LOCK {
+            WM_SESSION_LOCKED
+        } else {
+            WM_SESSION_UNLOCKED
+        };
         // SAFETY: posts to this thread's own queue.
         unsafe {
-            PostThreadMessageW(GetCurrentThreadId(), WM_SESSION_LOCKED, 0, 0);
+            PostThreadMessageW(GetCurrentThreadId(), change, 0, 0);
         }
         return 0;
     }
