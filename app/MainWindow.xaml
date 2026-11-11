@@ -465,7 +465,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TrayTitle" Text="关闭窗口时保留在托盘" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="TrayDescription" Text="关闭后，关掉窗口会同时退出 Rinflow，键鼠共享也随之停止。" />
                         </StackPanel>
                         <TextBlock x:Name="TrayState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" x:Uid="TrayToggle" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
@@ -494,7 +493,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="LanguageTitle" Style="{StaticResource RowTitleStyle}" Text="语言" />
-                            <TextBlock x:Uid="LanguageDescription" Style="{StaticResource RowDescriptionStyle}" Text="更改后 Rinflow 窗口会重新打开。" />
                         </StackPanel>
                         <!-- Language names stay in their own language. -->
                         <ComboBox
@@ -520,7 +518,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="DelayTitle" Text="切换延迟" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="DelayDescription" Text="光标要在屏幕边缘推住这么久才会切换到另一台设备。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="DelayDescription" Text="光标在屏幕边缘停留多久后切换。" />
                         </StackPanel>
                         <Slider
                             x:Name="SwitchDelaySlider"
@@ -545,7 +543,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="CornerTitle" Text="屏幕角落不触发切换" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="CornerDescription" Text="让开始按钮、菜单和触发角保持好用。" />
                         </StackPanel>
                         <TextBlock x:Name="CornerState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="CornerToggle" Grid.Column="2" x:Uid="CornerToggle" AutomationProperties.Name="屏幕角落不触发切换" Style="{StaticResource BareSwitchStyle}" />
@@ -558,7 +555,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FullscreenTitle" Text="全屏游戏时暂停" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FullscreenDescription" Text="全屏运行游戏、视频或演示时，光标不会切换到其他设备。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FullscreenDescription" Text="游戏、视频或演示全屏时不切换。" />
                         </StackPanel>
                         <TextBlock x:Name="FullscreenState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" x:Uid="FullscreenToggle" AutomationProperties.Name="全屏游戏时暂停" Style="{StaticResource BareSwitchStyle}" />
@@ -571,7 +568,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="LockTitle" Text="锁定到当前屏幕" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="LockDescription" Text="按一次快捷键，光标留在当前屏幕上不再切换；再按一次解除。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="LockDescription" Text="按快捷键锁定，再按一次解除。" />
                         </StackPanel>
                         <StackPanel
                             x:Name="HotkeyKeys"
@@ -598,13 +595,13 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="SwitchHotkeysTitle" Style="{StaticResource RowTitleStyle}" Text="用快捷键切换设备" />
-                            <TextBlock x:Uid="SwitchHotkeysDescription" Style="{StaticResource RowDescriptionStyle}" Text="按所选组合键加方向键，光标直接移到那一侧的设备。其他程序就收不到这组快捷键了。" />
+                            <TextBlock x:Uid="SwitchHotkeysDescription" Style="{StaticResource RowDescriptionStyle}" Text="组合键加方向键，移到那一侧的设备。" />
                             <TextBlock
                                 x:Name="SwitchHotkeysWarning"
                                 x:Uid="SwitchHotkeysWarning"
                                 Foreground="{ThemeResource SystemFillColorCautionBrush}"
                                 Style="{StaticResource RowDescriptionStyle}"
-                                Text="有的组合已被其他程序占用，那几个方向用不了。换一组试试。"
+                                Text="部分组合键已被其他程序占用，换一组试试。"
                                 Visibility="Collapsed" />
                         </StackPanel>
                         <!-- RegisterHotKey modifier bits: Ctrl 2, Alt 1, Shift 4. -->
@@ -675,7 +672,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="HideCursorTitle" Style="{StaticResource RowTitleStyle}" Text="其他设备离开后隐藏光标" />
-                            <TextBlock x:Uid="HideCursorDescription" Style="{StaticResource RowDescriptionStyle}" Text="其他设备控制完这台电脑、光标移走后，这里的光标先藏起来；动一下这台电脑的鼠标或触摸板就会出现。" />
+                            <TextBlock x:Uid="HideCursorDescription" Style="{StaticResource RowDescriptionStyle}" Text="移动本机的鼠标或触摸板后重新显示。" />
                         </StackPanel>
                         <TextBlock x:Name="HideCursorState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="HideCursorToggle" x:Uid="HideCursorToggle" Grid.Column="2" AutomationProperties.Name="其他设备离开后隐藏光标" Style="{StaticResource BareSwitchStyle}" />
@@ -690,7 +687,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="KeepAwakeTitle" Style="{StaticResource RowTitleStyle}" Text="在其他设备上工作时保持唤醒" />
-                            <TextBlock x:Uid="KeepAwakeDescription" Style="{StaticResource RowDescriptionStyle}" Text="你在已连接的其他设备上操作时，这台电脑不熄屏，也不会因闲置而锁定。" />
                         </StackPanel>
                         <TextBlock x:Name="KeepAwakeState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="KeepAwakeToggle" x:Uid="KeepAwakeToggle" Grid.Column="2" AutomationProperties.Name="在其他设备上工作时保持唤醒" Style="{StaticResource BareSwitchStyle}" />
@@ -703,7 +699,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="LockSyncTitle" Style="{StaticResource RowTitleStyle}" Text="一起锁定" />
-                            <TextBlock x:Uid="LockSyncDescription" Style="{StaticResource RowDescriptionStyle}" Text="锁定这台电脑时，已连接的设备一起锁定；它们锁定时，这台电脑也锁定。两台设备都打开此项才生效。" />
+                            <TextBlock x:Uid="LockSyncDescription" Style="{StaticResource RowDescriptionStyle}" Text="任一设备锁定时，其他设备一起锁定。两端都需打开。" />
                         </StackPanel>
                         <TextBlock x:Name="LockSyncState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="LockSyncToggle" x:Uid="LockSyncToggle" Grid.Column="2" AutomationProperties.Name="一起锁定" Style="{StaticResource BareSwitchStyle}" />
@@ -718,7 +714,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ClipboardTitle" Text="同步剪贴板和文件" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="ClipboardDescription" Text="控制权移到另一台设备时，剪贴板跟着过去：文字、网页格式、图片（最大 8 MB）和复制的文件。收到的文件放在“下载\Rinflow”，超过 512 MB 会先询问。密码管理器标记为隐私的内容不会同步。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="ClipboardDescription" Text="文字、图片（最大 8 MB）和文件。超过 512 MB 的文件会先询问。" />
                         </StackPanel>
                         <TextBlock x:Name="ClipboardState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" x:Uid="ClipboardToggle" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
@@ -745,7 +741,7 @@
                             SpinButtonPlacementMode="Hidden"
                             ValidationMode="InvalidInputOverwritten" />
                     </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
+                    <Grid x:Name="TlsCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -755,7 +751,7 @@
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TlsTitle" Text="加密传输 (TLS)" />
                             <TextBlock x:Name="TlsDescription" Style="{StaticResource RowDescriptionStyle}" />
                         </StackPanel>
-                        <!-- Always on when available: not something to turn off. -->
+                        <!-- Always on, so the row shows only when the core could not start. -->
                         <TextBlock x:Name="TlsState" Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" x:Uid="TlsToggle" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
@@ -767,7 +763,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="PairedOnlyTitle" Text="仅允许已配对设备" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="PairedOnlyDescription" Text="新设备第一次连接时，两台设备会显示同一个 6 位验证码，双方确认后才能互相控制。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="PairedOnlyDescription" Text="新设备首次连接时，需在两端确认 6 位验证码。" />
                         </StackPanel>
                         <TextBlock x:Name="PairedOnlyState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" x:Uid="PairedOnlyToggle" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />
@@ -793,7 +789,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FingerprintTitle" Text="本机指纹" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FingerprintDescription" Text="本机证书的 SHA-256 指纹，其他设备靠它认出这台电脑。" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FingerprintDescription" Text="其他设备靠它识别这台电脑。" />
                         </StackPanel>
                         <TextBlock
                             x:Name="DeviceIdText"
@@ -843,7 +839,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="AutoUpdateTitle" Style="{StaticResource RowTitleStyle}" Text="自动检查更新" />
-                            <TextBlock x:Uid="AutoUpdateDescription" Style="{StaticResource RowDescriptionStyle}" Text="每天检查一次新版本，并在后台下载。安装前会先询问。" />
+                            <TextBlock x:Uid="AutoUpdateDescription" Style="{StaticResource RowDescriptionStyle}" Text="每天检查并在后台下载，安装前会询问。" />
                         </StackPanel>
                         <TextBlock x:Name="AutoUpdateState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="AutoUpdateToggle" x:Uid="AutoUpdateToggle" Grid.Column="2" AutomationProperties.Name="自动检查更新" Style="{StaticResource BareSwitchStyle}" />
@@ -855,7 +851,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Uid="LogsTitle" Style="{StaticResource RowTitleStyle}" Text="诊断日志" />
-                            <TextBlock x:Uid="LogsDescription" Style="{StaticResource RowDescriptionStyle}" Text="记录连接、配对和文件传输的情况，不含剪贴板和键入的内容。反馈问题时附上会很有帮助。" />
+                            <TextBlock x:Uid="LogsDescription" Style="{StaticResource RowDescriptionStyle}" Text="不含剪贴板和键入的内容。" />
                         </StackPanel>
                         <Button
                             x:Name="OpenLogsButton"
@@ -1087,7 +1083,7 @@
             <StackPanel MinWidth="420" Spacing="12">
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    x:Uid="AddDeviceHint" Text="同一网络中运行 Rinflow 的设备会出现在下面。连接后它会加入“我的设备”，再把它拖到屏幕旁边即可。"
+                    x:Uid="AddDeviceHint" Text="同一网络中运行 Rinflow 的设备会出现在下面。"
                     TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{x:Bind Nearby}">
                     <ItemsControl.ItemsPanel>
@@ -1152,7 +1148,7 @@
                         x:Uid="AddressHint"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Style="{StaticResource CaptionTextBlockStyle}"
-                        Text="找不到设备时（例如在公司或访客网络、不同网段），输入对方的 IP 地址或设备名称。在一台设备上添加即可。"
+                        Text="找不到设备时，输入对方的 IP 地址或设备名称。"
                         TextWrapping="Wrap" />
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>

@@ -531,10 +531,12 @@ namespace winrt::Rinflow::implementation
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
         SetSwitch(AutoUpdateToggle(), AutoUpdateState(), settings.GetNamedBoolean(L"auto_update", true));
 
-        // Encryption is not a choice: every connection is encrypted. Without
-        // a fingerprint the core is not running (no certificate or port).
+        // Encryption is not a choice: every connection is encrypted, so there
+        // is nothing to show for it. Without a fingerprint the core is not
+        // running (no certificate or port): only then the row appears.
         auto fingerprint = state.GetNamedValue(L"fingerprint", JsonValue::CreateNullValue());
         bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
+        TlsCard().Visibility(encrypted ? Visibility::Collapsed : Visibility::Visible);
         SetSwitch(TlsToggle(), TlsState(), encrypted);
         TlsDescription().Text(encrypted
             ? RinflowApp::Text(L"TlsOn")

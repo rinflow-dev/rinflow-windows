@@ -31,14 +31,14 @@
   <data name="PairingWaiting" xml:space="preserve"><value>相手のデバイスの確認を待っています…</value></data>
   <data name="PairingTitle" xml:space="preserve"><value>{0} とペアリング</value></data>
   <data name="PairingInstruction" xml:space="preserve"><value>両方のデバイスで [ペアリング] を選択すると完了します。</value></data>
-  <data name="TlsOn" xml:space="preserve"><value>すべての接続は TLS 1.3 で暗号化され、相手のデバイスの証明書を確認します。</value></data>
+  <data name="TlsOn" xml:space="preserve"><value>TLS 1.3 で暗号化し、相手の証明書を確認します。</value></data>
   <data name="TlsOff" xml:space="preserve"><value>Rinflow は動作していません。この PC の証明書またはポートを使用できないため、今は他のデバイスに接続できません。</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>ポインターは他のデバイスへ移動しません。{0} を押すと解除します。</value></data>
   <data name="PortPending" xml:space="preserve"><value>Rinflow の再起動後に {0} を使用します。現在は {1} を使用しています。</value></data>
-  <data name="PortHint" xml:space="preserve"><value>他のデバイスはこのポートでこの PC に接続します。変更は Rinflow の再起動後に反映されます。</value></data>
-  <data name="ElevatedOn" xml:space="preserve"><value>他のデバイスがこの PC を操作しているときに、管理者として実行中のアプリ、UAC の確認画面、ロック画面も操作できます。変更には管理者の承認が必要です。</value></data>
-  <data name="ElevatedOff" xml:space="preserve"><value>セットアップ プログラムで Rinflow をインストールする必要があります。入力サービスが追加されます。</value></data>
-  <data name="ElevatedRecommended" xml:space="preserve"><value>推奨: 他のデバイスがこの PC を操作しているときに、管理者として実行中のアプリ、UAC の確認画面、ロック画面も操作できます。オンにするには管理者の承認が必要で、Rinflow 入力サービスがインストールされます。</value></data>
+  <data name="PortHint" xml:space="preserve"><value>変更は Rinflow の再起動後に反映されます。</value></data>
+  <data name="ElevatedOn" xml:space="preserve"><value>変更には管理者の承認が必要です。</value></data>
+  <data name="ElevatedOff" xml:space="preserve"><value>セットアップ プログラムでのインストールが必要です。</value></data>
+  <data name="ElevatedRecommended" xml:space="preserve"><value>推奨。管理者の承認が必要で、入力サービスがインストールされます。</value></data>
   <data name="Version" xml:space="preserve"><value>バージョン {0}</value></data>
   <data name="HotkeyNeedsModifier" xml:space="preserve"><value>Ctrl、Alt、Win のいずれかを含めてください</value></data>
   <data name="MenuDisconnect" xml:space="preserve"><value>切断</value></data>
@@ -92,7 +92,6 @@
   <data name="LaunchTitle.Text" xml:space="preserve"><value>サインイン時に起動</value></data>
   <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>サインイン時に起動</value></data>
   <data name="TrayTitle.Text" xml:space="preserve"><value>ウィンドウを閉じても通知領域で実行を続ける</value></data>
-  <data name="TrayDescription.Text" xml:space="preserve"><value>オフにすると、ウィンドウを閉じたときに Rinflow が終了し、キーボードとマウスの共有も停止します。</value></data>
   <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ウィンドウを閉じても通知領域で実行を続ける</value></data>
   <data name="ThemeTitle.Text" xml:space="preserve"><value>テーマ</value></data>
   <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>テーマ</value></data>
@@ -100,26 +99,24 @@
   <data name="ThemeLight.Content" xml:space="preserve"><value>ライト</value></data>
   <data name="ThemeDark.Content" xml:space="preserve"><value>ダーク</value></data>
   <data name="LanguageTitle.Text" xml:space="preserve"><value>言語</value></data>
-  <data name="LanguageDescription.Text" xml:space="preserve"><value>変更すると Rinflow のウィンドウが開き直されます。</value></data>
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>言語</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>システム設定に従う</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>画面間の移動</value></data>
   <data name="DelayTitle.Text" xml:space="preserve"><value>切り替えの遅延</value></data>
-  <data name="DelayDescription.Text" xml:space="preserve"><value>ポインターを画面の端に押し当ててから、他のデバイスへ移動するまでの時間です。</value></data>
+  <data name="DelayDescription.Text" xml:space="preserve"><value>ポインターを画面の端に押し当ててから切り替わるまでの時間です。</value></data>
   <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切り替えの遅延</value></data>
   <data name="CornerTitle.Text" xml:space="preserve"><value>画面の隅では切り替えない</value></data>
-  <data name="CornerDescription.Text" xml:space="preserve"><value>スタート ボタン、メニュー、ホット コーナーを使いやすく保ちます。</value></data>
   <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>画面の隅では切り替えない</value></data>
   <data name="FullscreenTitle.Text" xml:space="preserve"><value>全画面のゲーム中は一時停止</value></data>
-  <data name="FullscreenDescription.Text" xml:space="preserve"><value>ゲーム、動画、プレゼンテーションを全画面で実行している間は、ポインターは他のデバイスへ移動しません。</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>ゲーム、動画、プレゼンテーションの全画面表示中は切り替えません。</value></data>
   <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全画面のゲーム中は一時停止</value></data>
   <data name="LockTitle.Text" xml:space="preserve"><value>現在の画面にロック</value></data>
-  <data name="LockDescription.Text" xml:space="preserve"><value>ショートカットを 1 回押すとポインターが現在の画面にとどまります。もう一度押すと解除します。</value></data>
+  <data name="LockDescription.Text" xml:space="preserve"><value>ショートカットでロックし、もう一度押すと解除します。</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ショートカットを変更</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>ショートカットを変更</value></data>
   <data name="SwitchHotkeysTitle.Text" xml:space="preserve"><value>ショートカットでデバイスを切り替える</value></data>
-  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>選択したキーと方向キーを押すと、ポインターがその方向のデバイスへ直接移動します。他のアプリではこのショートカットを使えなくなります。</value></data>
-  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>一部のキーは他のアプリで使用されているため、その方向は使えません。別の組み合わせをお試しください。</value></data>
+  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>選択したキーと方向キーで、その方向のデバイスへ移動します。</value></data>
+  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>一部は他のアプリで使用されています。別の組み合わせをお試しください。</value></data>
   <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>デバイス切り替えのキー</value></data>
   <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ショートカットでデバイスを切り替える</value></data>
   <data name="ModifierMapTitle.Text" xml:space="preserve"><value>Mac がこの PC を操作するときの修飾キー</value></data>
@@ -127,23 +124,22 @@
   <data name="ModifierPresetMac.Content" xml:space="preserve"><value>Mac 方式 (推奨)</value></data>
   <data name="ModifierPresetKeep.Content" xml:space="preserve"><value>キーの位置を維持</value></data>
   <data name="ModifierPresetCustom.Content" xml:space="preserve"><value>カスタム</value></data>
-  <data name="ModifierMacDescription" xml:space="preserve"><value>⌘C、⌘V などは Ctrl のショートカットとして動作し、⌃ は Windows キーになります。</value></data>
-  <data name="ModifierKeepDescription" xml:space="preserve"><value>キーの位置はそのままです。⌘ は Windows キー、⌃ は Ctrl になります。</value></data>
-  <data name="ModifierCustomDescription" xml:space="preserve"><value>Mac の各修飾キーをこの PC でどのキーとして扱うかを選択します。</value></data>
+  <data name="ModifierMacDescription" xml:space="preserve"><value>⌘ は Ctrl、⌃ は Windows キーとして動作します。</value></data>
+  <data name="ModifierKeepDescription" xml:space="preserve"><value>⌘ は Windows キー、⌃ は Ctrl として動作します。</value></data>
+  <data name="ModifierCustomDescription" xml:space="preserve"><value>修飾キーを個別に指定します。</value></data>
   <data name="ModifierNone" xml:space="preserve"><value>なし</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>ロックとスリープ</value></data>
   <data name="HideCursorTitle.Text" xml:space="preserve"><value>他のデバイスが離れた後にポインターを隠す</value></data>
-  <data name="HideCursorDescription.Text" xml:space="preserve"><value>他のデバイスがこの PC の操作を終えてポインターが離れると、この PC のマウスやタッチパッドを動かすまでポインターを隠します。</value></data>
+  <data name="HideCursorDescription.Text" xml:space="preserve"><value>この PC のマウスやタッチパッドを動かすと再表示されます。</value></data>
   <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>他のデバイスが離れた後にポインターを隠す</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>他のデバイスで作業中はスリープしない</value></data>
-  <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>接続中の他のデバイスを使っている間、この PC は画面をオンのまま保ち、放置によるロックもしません。</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>他のデバイスで作業中はスリープしない</value></data>
   <data name="LockSyncTitle.Text" xml:space="preserve"><value>一緒にロック</value></data>
-  <data name="LockSyncDescription.Text" xml:space="preserve"><value>この PC をロックすると接続中のデバイスもロックされ、それらがロックされるとこの PC もロックされます。両方のデバイスでオンにしてください。</value></data>
+  <data name="LockSyncDescription.Text" xml:space="preserve"><value>どれかをロックすると他のデバイスもロックされます。両方でオンにしてください。</value></data>
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>一緒にロック</value></data>
   <data name="ClipboardHeader.Text" xml:space="preserve"><value>クリップボード</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>クリップボードとファイルを同期</value></data>
-  <data name="ClipboardDescription.Text" xml:space="preserve"><value>クリップボードはポインターと一緒に他のデバイスへ移動します: テキスト、Web の書式、画像 (最大 8 MB)、コピーしたファイル。受信したファイルは「ダウンロード\Rinflow」に保存され、512 MB を超える場合は先に確認します。パスワード マネージャーがプライベートとしてマークした内容は同期されません。</value></data>
+  <data name="ClipboardDescription.Text" xml:space="preserve"><value>テキスト、画像 (最大 8 MB)、ファイル。512 MB を超えるファイルは先に確認します。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>クリップボードとファイルを同期</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>ネットワークとセキュリティ</value></data>
   <data name="PortTitle.Text" xml:space="preserve"><value>ポート</value></data>
@@ -151,26 +147,26 @@
   <data name="TlsTitle.Text" xml:space="preserve"><value>暗号化接続 (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>暗号化接続</value></data>
   <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>ペアリング済みのデバイスのみ</value></data>
-  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>新しいデバイスが初めて接続するとき、両方のデバイスに同じ 6 桁のコードが表示され、双方が確認すると互いに操作できるようになります。</value></data>
+  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>新しいデバイスは、最初に両方で 6 桁のコードを確認します。</value></data>
   <data name="PairedOnlyToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ペアリング済みのデバイスのみ</value></data>
   <data name="ElevatedTitle.Text" xml:space="preserve"><value>操作されているときの管理者ウィンドウ、UAC、ロック画面</value></data>
   <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>操作されているときの管理者ウィンドウ、UAC、ロック画面</value></data>
   <data name="FingerprintTitle.Text" xml:space="preserve"><value>この PC のフィンガープリント</value></data>
-  <data name="FingerprintDescription.Text" xml:space="preserve"><value>この PC の証明書の SHA-256 フィンガープリントです。他のデバイスはこれでこの PC を識別します。</value></data>
+  <data name="FingerprintDescription.Text" xml:space="preserve"><value>他のデバイスはこれでこの PC を識別します。</value></data>
   <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>フィンガープリントをコピー</value></data>
   <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>コピー</value></data>
   <data name="AboutHeader.Text" xml:space="preserve"><value>バージョン情報</value></data>
   <data name="CheckUpdateButton.Content" xml:space="preserve"><value>更新を確認</value></data>
   <data name="LogsTitle.Text" xml:space="preserve"><value>診断ログ</value></data>
-  <data name="LogsDescription.Text" xml:space="preserve"><value>接続、ペアリング、ファイル転送を記録します。クリップボードの内容や入力した内容は記録しません。問題を報告するときに添付してください。</value></data>
+  <data name="LogsDescription.Text" xml:space="preserve"><value>クリップボードや入力した内容は含みません。</value></data>
   <data name="OpenLogsButton.Content" xml:space="preserve"><value>ログ フォルダーを開く</value></data>
   <data name="AddDeviceDialog.Title" xml:space="preserve"><value>デバイスを追加</value></data>
   <data name="AddDeviceDialog.CloseButtonText" xml:space="preserve"><value>閉じる</value></data>
-  <data name="AddDeviceHint.Text" xml:space="preserve"><value>同じネットワーク上で Rinflow を実行しているデバイスが下に表示されます。接続すると [マイ デバイス] に追加されるので、画面の横にドラッグします。</value></data>
+  <data name="AddDeviceHint.Text" xml:space="preserve"><value>同じネットワークで Rinflow を実行しているデバイスが下に表示されます。</value></data>
   <data name="NearbyConnect.Content" xml:space="preserve"><value>接続</value></data>
   <data name="NearbySearching.Text" xml:space="preserve"><value>近くのデバイスを探しています…</value></data>
   <data name="AddressHeader.Text" xml:space="preserve"><value>アドレスで追加</value></data>
-  <data name="AddressHint.Text" xml:space="preserve"><value>デバイスが表示されない場合 (社内ネットワークやゲスト ネットワーク、別のサブネットなど) は、IP アドレスまたは名前を入力します。どちらか一方のデバイスで追加すれば十分です。</value></data>
+  <data name="AddressHint.Text" xml:space="preserve"><value>デバイスが表示されない場合は、IP アドレスまたは名前を入力します。</value></data>
   <data name="AddressBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>デバイスのアドレス</value></data>
   <data name="AddressBox.PlaceholderText" xml:space="preserve"><value>例: 192.168.1.20</value></data>
   <data name="AddAddressButton.Content" xml:space="preserve"><value>追加</value></data>
@@ -209,7 +205,7 @@
   <data name="UpdateInstallButton" xml:space="preserve"><value>インストールして再起動</value></data>
   <data name="UpdateNotesLink.Content" xml:space="preserve"><value>新機能</value></data>
   <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
-  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>1 日に 1 回新しいバージョンを確認し、バックグラウンドでダウンロードします。インストールの前に確認します。</value></data>
+  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>毎日確認してバックグラウンドでダウンロードし、インストール前に確認します。</value></data>
   <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>アップデートを自動的に確認</value></data>
   <data name="AgentCrashing" xml:space="preserve"><value>バックグラウンド サービスが起動後まもなく終了することが続いたため (コード {0})、自動での再起動を停止しました。原因はログに記録されています: [設定] → [ログ フォルダーを開く]。</value></data>
 </root>

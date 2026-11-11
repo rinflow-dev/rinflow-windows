@@ -31,14 +31,14 @@
   <data name="PairingWaiting" xml:space="preserve"><value>Waiting for the other device…</value></data>
   <data name="PairingTitle" xml:space="preserve"><value>Pair {0}</value></data>
   <data name="PairingInstruction" xml:space="preserve"><value>Done once Pair is selected on both devices.</value></data>
-  <data name="TlsOn" xml:space="preserve"><value>Every connection is encrypted with TLS 1.3, and the other device&apos;s certificate is checked.</value></data>
+  <data name="TlsOn" xml:space="preserve"><value>TLS 1.3, with the other device's certificate checked.</value></data>
   <data name="TlsOff" xml:space="preserve"><value>Rinflow isn&apos;t running: this PC&apos;s certificate or port can&apos;t be used, so it can&apos;t connect to other devices for now.</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>The pointer won&apos;t move to other devices. Press {0} to unlock.</value></data>
   <data name="PortPending" xml:space="preserve"><value>Rinflow uses {0} after it restarts; {1} for now.</value></data>
-  <data name="PortHint" xml:space="preserve"><value>Other devices connect to this PC on this port. A change applies after Rinflow restarts.</value></data>
-  <data name="ElevatedOn" xml:space="preserve"><value>While another device controls this PC, it can also use apps running as administrator, UAC prompts and the lock screen. Changing this needs administrator approval.</value></data>
-  <data name="ElevatedOff" xml:space="preserve"><value>Needs Rinflow installed with its setup program, which adds the input service.</value></data>
-  <data name="ElevatedRecommended" xml:space="preserve"><value>Recommended: while another device controls this PC, it can also use apps running as administrator, UAC prompts and the lock screen. Turning this on needs administrator approval and installs the Rinflow Input service.</value></data>
+  <data name="PortHint" xml:space="preserve"><value>A change applies after Rinflow restarts.</value></data>
+  <data name="ElevatedOn" xml:space="preserve"><value>Changing this needs administrator approval.</value></data>
+  <data name="ElevatedOff" xml:space="preserve"><value>Needs Rinflow installed with its setup program.</value></data>
+  <data name="ElevatedRecommended" xml:space="preserve"><value>Recommended. Needs administrator approval and installs the input service.</value></data>
   <data name="Version" xml:space="preserve"><value>Version {0}</value></data>
   <data name="HotkeyNeedsModifier" xml:space="preserve"><value>Include Ctrl, Alt or Win</value></data>
   <data name="MenuDisconnect" xml:space="preserve"><value>Disconnect</value></data>
@@ -92,7 +92,6 @@
   <data name="LaunchTitle.Text" xml:space="preserve"><value>Start when I sign in</value></data>
   <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Start when I sign in</value></data>
   <data name="TrayTitle.Text" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
-  <data name="TrayDescription.Text" xml:space="preserve"><value>When off, closing the window quits Rinflow, and keyboard and mouse sharing stops.</value></data>
   <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
   <data name="ThemeTitle.Text" xml:space="preserve"><value>Theme</value></data>
   <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Theme</value></data>
@@ -100,26 +99,24 @@
   <data name="ThemeLight.Content" xml:space="preserve"><value>Light</value></data>
   <data name="ThemeDark.Content" xml:space="preserve"><value>Dark</value></data>
   <data name="LanguageTitle.Text" xml:space="preserve"><value>Language</value></data>
-  <data name="LanguageDescription.Text" xml:space="preserve"><value>Rinflow&apos;s windows reopen after a change.</value></data>
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Language</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>Use system setting</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>Moving between screens</value></data>
   <data name="DelayTitle.Text" xml:space="preserve"><value>Switch delay</value></data>
-  <data name="DelayDescription.Text" xml:space="preserve"><value>How long the pointer has to push against a screen edge before it moves to the other device.</value></data>
+  <data name="DelayDescription.Text" xml:space="preserve"><value>How long the pointer waits at a screen edge before it switches.</value></data>
   <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Switch delay</value></data>
   <data name="CornerTitle.Text" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
-  <data name="CornerDescription.Text" xml:space="preserve"><value>Keeps the Start button, menus and hot corners easy to use.</value></data>
   <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
   <data name="FullscreenTitle.Text" xml:space="preserve"><value>Pause during full-screen games</value></data>
-  <data name="FullscreenDescription.Text" xml:space="preserve"><value>While a game, video or presentation runs full screen, the pointer doesn&apos;t move to other devices.</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>No switching while a game, video or presentation is full screen.</value></data>
   <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Pause during full-screen games</value></data>
   <data name="LockTitle.Text" xml:space="preserve"><value>Lock to the current screen</value></data>
-  <data name="LockDescription.Text" xml:space="preserve"><value>Press the shortcut once and the pointer stays on the current screen; press it again to unlock.</value></data>
+  <data name="LockDescription.Text" xml:space="preserve"><value>Press the shortcut to lock, and again to unlock.</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Change shortcut</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Change shortcut</value></data>
   <data name="SwitchHotkeysTitle.Text" xml:space="preserve"><value>Switch devices with shortcuts</value></data>
-  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>Press the chosen keys with an arrow key to move the pointer straight to the device on that side. Other apps no longer get those shortcuts.</value></data>
-  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>Some of these are taken by another app, so those directions don&apos;t work. Try the other combination.</value></data>
+  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>The chosen keys plus an arrow key move to the device on that side.</value></data>
+  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>Some of these are taken by another app. Try the other combination.</value></data>
   <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keys for switching devices</value></data>
   <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Switch devices with shortcuts</value></data>
   <data name="ModifierMapTitle.Text" xml:space="preserve"><value>Modifier keys when a Mac controls this PC</value></data>
@@ -127,23 +124,22 @@
   <data name="ModifierPresetMac.Content" xml:space="preserve"><value>Mac style (recommended)</value></data>
   <data name="ModifierPresetKeep.Content" xml:space="preserve"><value>Keep key positions</value></data>
   <data name="ModifierPresetCustom.Content" xml:space="preserve"><value>Custom</value></data>
-  <data name="ModifierMacDescription" xml:space="preserve"><value>⌘C, ⌘V and the like work as Ctrl shortcuts, and ⌃ is the Windows key.</value></data>
-  <data name="ModifierKeepDescription" xml:space="preserve"><value>Keys stay where they are: ⌘ is the Windows key and ⌃ is Ctrl.</value></data>
-  <data name="ModifierCustomDescription" xml:space="preserve"><value>Choose what each of the Mac's modifier keys does on this PC.</value></data>
+  <data name="ModifierMacDescription" xml:space="preserve"><value>⌘ works as Ctrl, and ⌃ as the Windows key.</value></data>
+  <data name="ModifierKeepDescription" xml:space="preserve"><value>⌘ works as the Windows key, and ⌃ as Ctrl.</value></data>
+  <data name="ModifierCustomDescription" xml:space="preserve"><value>Set each modifier key yourself.</value></data>
   <data name="ModifierNone" xml:space="preserve"><value>None</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>Lock and sleep</value></data>
   <data name="HideCursorTitle.Text" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
-  <data name="HideCursorDescription.Text" xml:space="preserve"><value>When another device stops controlling this PC and its pointer moves away, the pointer here is hidden until you move this PC's mouse or touchpad.</value></data>
+  <data name="HideCursorDescription.Text" xml:space="preserve"><value>It comes back when you move this PC's mouse or touchpad.</value></data>
   <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
-  <data name="KeepAwakeDescription.Text" xml:space="preserve"><value>While you use another connected device, this PC keeps its screen on and doesn&apos;t lock for being idle.</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
   <data name="LockSyncTitle.Text" xml:space="preserve"><value>Lock together</value></data>
-  <data name="LockSyncDescription.Text" xml:space="preserve"><value>Locking this PC locks the connected devices too, and when they lock, so does this PC. Turn it on on both devices.</value></data>
+  <data name="LockSyncDescription.Text" xml:space="preserve"><value>Locking one device locks the others. Turn it on on both devices.</value></data>
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lock together</value></data>
   <data name="ClipboardHeader.Text" xml:space="preserve"><value>Clipboard</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>Sync clipboard and files</value></data>
-  <data name="ClipboardDescription.Text" xml:space="preserve"><value>The clipboard follows the pointer to the other device: text, web formatting, images (up to 8 MB) and copied files. Received files go to Downloads\Rinflow, and you&apos;re asked first above 512 MB. Content a password manager marks as private is never synced.</value></data>
+  <data name="ClipboardDescription.Text" xml:space="preserve"><value>Text, images (up to 8 MB) and files. Files above 512 MB ask first.</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sync clipboard and files</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>Network and security</value></data>
   <data name="PortTitle.Text" xml:space="preserve"><value>Port</value></data>
@@ -151,26 +147,26 @@
   <data name="TlsTitle.Text" xml:space="preserve"><value>Encrypted connections (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Encrypted connections</value></data>
   <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>Only paired devices</value></data>
-  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>When a new device connects for the first time, both devices show the same 6-digit code, and they can control each other only after both confirm it.</value></data>
+  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>A new device first confirms a 6-digit code on both sides.</value></data>
   <data name="PairedOnlyToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Only paired devices</value></data>
   <data name="ElevatedTitle.Text" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
   <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
   <data name="FingerprintTitle.Text" xml:space="preserve"><value>This PC&apos;s fingerprint</value></data>
-  <data name="FingerprintDescription.Text" xml:space="preserve"><value>The SHA-256 fingerprint of this PC&apos;s certificate, which other devices recognize it by.</value></data>
+  <data name="FingerprintDescription.Text" xml:space="preserve"><value>Other devices recognize this PC by it.</value></data>
   <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy fingerprint</value></data>
   <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Copy</value></data>
   <data name="AboutHeader.Text" xml:space="preserve"><value>About</value></data>
   <data name="CheckUpdateButton.Content" xml:space="preserve"><value>Check for updates</value></data>
   <data name="LogsTitle.Text" xml:space="preserve"><value>Diagnostic logs</value></data>
-  <data name="LogsDescription.Text" xml:space="preserve"><value>Records connections, pairing and file transfers, never clipboard contents or what you type. Attach them when you report a problem.</value></data>
+  <data name="LogsDescription.Text" xml:space="preserve"><value>Never include clipboard contents or what you type.</value></data>
   <data name="OpenLogsButton.Content" xml:space="preserve"><value>Open logs folder</value></data>
   <data name="AddDeviceDialog.Title" xml:space="preserve"><value>Add device</value></data>
   <data name="AddDeviceDialog.CloseButtonText" xml:space="preserve"><value>Close</value></data>
-  <data name="AddDeviceHint.Text" xml:space="preserve"><value>Devices on the same network that run Rinflow show up below. Once connected, a device joins My devices; then drag it next to your screen.</value></data>
+  <data name="AddDeviceHint.Text" xml:space="preserve"><value>Devices on the same network that run Rinflow show up below.</value></data>
   <data name="NearbyConnect.Content" xml:space="preserve"><value>Connect</value></data>
   <data name="NearbySearching.Text" xml:space="preserve"><value>Looking for nearby devices…</value></data>
   <data name="AddressHeader.Text" xml:space="preserve"><value>Add by address</value></data>
-  <data name="AddressHint.Text" xml:space="preserve"><value>If a device doesn&apos;t show up (on a company or guest network, or another subnet), enter its IP address or name. Adding it on one of the two devices is enough.</value></data>
+  <data name="AddressHint.Text" xml:space="preserve"><value>If a device doesn't show up, enter its IP address or name.</value></data>
   <data name="AddressBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Device address</value></data>
   <data name="AddressBox.PlaceholderText" xml:space="preserve"><value>For example 192.168.1.20</value></data>
   <data name="AddAddressButton.Content" xml:space="preserve"><value>Add</value></data>
@@ -209,7 +205,7 @@
   <data name="UpdateInstallButton" xml:space="preserve"><value>Install and restart</value></data>
   <data name="UpdateNotesLink.Content" xml:space="preserve"><value>What's new</value></data>
   <data name="AutoUpdateTitle.Text" xml:space="preserve"><value>Check for updates automatically</value></data>
-  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>Looks for a new version once a day and downloads it in the background. Rinflow asks before installing it.</value></data>
+  <data name="AutoUpdateDescription.Text" xml:space="preserve"><value>Checks daily and downloads in the background. Asks before installing.</value></data>
   <data name="AutoUpdateToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Check for updates automatically</value></data>
   <data name="AgentCrashing" xml:space="preserve"><value>The background service stopped soon after starting, several times in a row (code {0}), so Rinflow stopped restarting it. The log says why: Settings → Open logs folder.</value></data>
 </root>
