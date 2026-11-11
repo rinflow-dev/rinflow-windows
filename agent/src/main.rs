@@ -83,6 +83,9 @@ fn main() {
         return;
     };
     log::init();
+    // The agent shows no window, but it carries the pointer: not a
+    // background program to slow down.
+    rinflow_input::win::keep_process_responsive();
 
     let identity = match identity::load() {
         Ok(identity) => identity,

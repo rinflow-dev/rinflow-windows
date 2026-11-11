@@ -10,6 +10,8 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 
 ### Changed
 
+- A steadier pointer while this PC is busy: the threads that capture and play input run ahead of ordinary work, Windows no longer treats Rinflow as a background program to slow down, and motion that piled up is played as one move instead of one by one.
+- The log records every second in which the link lost packets or delivered input late (`link_quality`), to tell why a pointer stuttered.
 - Settings, the arrangement, paired devices and this PC's device ID are kept in one file, `config.json`, with a backup of the previous version. The files of 0.0.1 are moved into it on the first start.
 - Only your own devices (connected once, or placed) are remembered across restarts, not every device seen on the network.
 - Setup lets Rinflow quit by itself before an upgrade, so connected devices see a clean disconnect.

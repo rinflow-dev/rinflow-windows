@@ -24,8 +24,11 @@ use windows_sys::Win32::System::Registry::{
 };
 use windows_sys::Win32::System::RemoteDesktop::{ProcessIdToSessionId, WTSQueryUserToken};
 use windows_sys::Win32::System::Threading::{
-    GetCurrentProcess, GetCurrentProcessId, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+    GetCurrentProcess, GetCurrentProcessId, GetCurrentThread, OpenProcess, OpenProcessToken,
+    PROCESS_NAME_WIN32, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+    PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+    PROCESS_POWER_THROTTLING_STATE, PROCESS_QUERY_LIMITED_INFORMATION, ProcessPowerThrottling,
+    QueryFullProcessImageNameW, SetProcessInformation, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
 };
 
 /// Null-terminated UTF-16 copy of `text` for `PCWSTR` parameters.
@@ -372,6 +375,49 @@ pub fn is_local_system() -> bool {
 pub fn current_pid() -> u32 {
     // SAFETY: no arguments.
     unsafe { GetCurrentProcessId() }
+}
+
+/// Lets the calling thread go ahead of ordinary work. For the threads input
+/// passes through (the hooks, the players, the pipe between agent and
+/// helper): they do very little, but at the default priority they wait
+/// their turn behind whatever keeps the PC busy, a scheduling slice of 10
+/// to 15 ms at a time, and the pointer stutters while the PC works hard.
+pub fn raise_input_thread() {
+    // SAFETY: changes the priority of the calling thread only.
+    unsafe {
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    }
+}
+
+/// Keeps Windows from slowing this process down as a background program.
+/// The agent and the helper show no window, so Windows 11 may run them on
+/// efficiency cores at a low clock rate and ignore the timer resolution
+/// they ask for: fine for a program that idles in the tray, not for one
+/// that carries the pointer.
+pub fn keep_process_responsive() {
+    let mut state = PROCESS_POWER_THROTTLING_STATE {
+        Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED
+            | PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+        // Controlled and off: never throttled.
+        StateMask: 0,
+    };
+    let set = |state: &PROCESS_POWER_THROTTLING_STATE| {
+        // SAFETY: a properly sized structure for this information class.
+        unsafe {
+            SetProcessInformation(
+                GetCurrentProcess(),
+                ProcessPowerThrottling,
+                (state as *const PROCESS_POWER_THROTTLING_STATE).cast(),
+                size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+            ) != 0
+        }
+    };
+    if !set(&state) {
+        // Windows 10 does not know the timer flag and refuses both.
+        state.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+        let _ = set(&state);
+    }
 }
 
 #[cfg(test)]

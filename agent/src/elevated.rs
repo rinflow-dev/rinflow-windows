@@ -67,6 +67,8 @@ pub fn start(on_status: impl Fn(Status) + Send + 'static) {
     let spawned = std::thread::Builder::new()
         .name("rinflow-elevated".to_owned())
         .spawn(move || {
+            // Input on its way to the helper passes through this thread.
+            rinflow_input::win::raise_input_thread();
             let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()

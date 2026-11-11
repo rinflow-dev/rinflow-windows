@@ -175,6 +175,10 @@ impl Held {
 
 fn main() {
     let dev = std::env::args().any(|argument| argument == "--dev");
+    // Input passes through this process: it is not background work, and
+    // this thread, which reads it from the agent, goes ahead of other work.
+    win::keep_process_responsive();
+    win::raise_input_thread();
     log::init("input");
     // SAFETY: process-wide setting, before any window or DPI query.
     unsafe {
@@ -304,6 +308,7 @@ fn spawn_watcher(shared: Arc<Shared>, states: watch::Sender<State>, dev: bool) {
 fn spawn_injector(shared: Arc<Shared>) -> std::sync::mpsc::Sender<Job> {
     let (jobs, receiver) = std::sync::mpsc::channel::<Job>();
     std::thread::spawn(move || {
+        win::raise_input_thread();
         let mut desktop = ThreadDesktop::default();
         let mut played = 0u64;
         let mut failing = false;

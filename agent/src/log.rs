@@ -117,10 +117,11 @@ fn timestamp() -> String {
 }
 
 /// Logs the core events that tell what happened to connections, pairing
-/// and transfers. Not clipboards (their contents), progress or latency
+/// and transfers, and the seconds in which the link held input up
+/// (`link_quality`). Not clipboards (their contents), progress or latency
 /// (too many).
 pub fn core_event(json: &str) {
-    const LOGGED: [&str; 21] = [
+    const LOGGED: [&str; 22] = [
         "started",
         "stopped",
         "error",
@@ -133,6 +134,7 @@ pub fn core_event(json: &str) {
         "remote_control_started",
         "remote_control_ended",
         "input_sequence_gap",
+        "link_quality",
         "pairing_requested",
         "paired",
         "pairing_ended",

@@ -254,6 +254,9 @@ impl EdgeThread {
         let join = std::thread::Builder::new()
             .name("rinflow-edge".to_owned())
             .spawn(move || {
+                // The hooks run here: every motion of the mouse waits for
+                // this thread, on this PC too.
+                rinflow_input::win::raise_input_thread();
                 // SAFETY: creates the message queue before publishing the id.
                 let thread_id = unsafe {
                     let mut message: MSG = std::mem::zeroed();

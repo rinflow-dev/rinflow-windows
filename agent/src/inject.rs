@@ -143,22 +143,42 @@ impl Injector {
         let join = std::thread::Builder::new()
             .name("rinflow-inject".to_owned())
             .spawn(move || {
+                rinflow_input::win::raise_input_thread();
                 let mut player = Player::default();
                 // Jobs arrive in order, so the key-ups the core sends when a
                 // session ends are always played before Quit.
+                // A job taken while looking for more motion to merge.
+                let mut next: Option<Job> = None;
                 loop {
-                    let job = match receiver.recv_timeout(LOCK_POLL) {
-                        Ok(job) => job,
-                        Err(mpsc::RecvTimeoutError::Timeout) => {
-                            if player.controlled {
-                                player.check_pointer_lock();
+                    let job = match next.take() {
+                        Some(job) => job,
+                        None => match receiver.recv_timeout(LOCK_POLL) {
+                            Ok(job) => job,
+                            Err(mpsc::RecvTimeoutError::Timeout) => {
+                                if player.controlled {
+                                    player.check_pointer_lock();
+                                }
+                                continue;
                             }
-                            continue;
-                        }
-                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        },
                     };
                     match job {
-                        Job::Input(event) => player.play(&event),
+                        Job::Input(mut event) => {
+                            // Motion that piled up (the network held it, or
+                            // this PC was busy) is played as one move: one
+                            // by one, each waits for the window manager,
+                            // and the pointer falls further behind.
+                            while next.is_none()
+                                && let Ok(more) = receiver.try_recv()
+                            {
+                                match more {
+                                    Job::Input(more) if merge_motion(&mut event, &more) => {}
+                                    other => next = Some(other),
+                                }
+                            }
+                            player.play(&event)
+                        }
                         Job::Control { peer_id, active } => {
                             if active {
                                 player.controllers.insert(peer_id);
@@ -193,6 +213,28 @@ impl Drop for Injector {
     }
 }
 
+/// Adds the relative motion `more` to the relative motion `event`; false
+/// (and nothing changed) if either is anything else. An absolute move places
+/// the pointer, and keys, buttons and scrolling keep their place in order.
+fn merge_motion(event: &mut LcInputEvent, more: &LcInputEvent) -> bool {
+    let relative = |event: &LcInputEvent| {
+        event.kind == LC_INPUT_MOUSE_MOVE && event.flags & LC_INPUT_FLAG_ABSOLUTE_POSITION == 0
+    };
+    if !relative(event) || !relative(more) {
+        return false;
+    }
+    event.delta_x += more.delta_x;
+    event.delta_y += more.delta_y;
+    event.buttons = more.buttons;
+    event.modifiers = more.modifiers;
+    true
+}
+
+/// How long the answer to "does a game hold the pointer" is good for while
+/// motion is played: asking takes several calls into the window manager,
+/// too many for every one of hundreds of moves a second.
+const LOCK_CHECK_INTERVAL: Duration = Duration::from_millis(50);
+
 #[derive(Default)]
 struct Player {
     /// Peers currently driving this PC; usually one, but sessions with
@@ -213,6 +255,8 @@ struct Player {
     last_move: Option<(POINT, POINT, Instant)>,
     /// A game or a pointer-lock page holds the pointer (as last reported).
     pointer_locked: bool,
+    /// When that was last looked up.
+    lock_checked: Option<Instant>,
     core: Option<Weak<Core>>,
 }
 
@@ -264,6 +308,7 @@ impl Player {
     /// Whether a game holds the pointer, told to the core when it changes.
     fn check_pointer_lock(&mut self) -> bool {
         let locked = pointer_captured();
+        self.lock_checked = Some(Instant::now());
         if locked != self.pointer_locked {
             self.pointer_locked = locked;
             log!(
@@ -280,7 +325,11 @@ impl Player {
     fn move_by(&mut self, dx: f64, dy: f64) {
         // A game reads raw relative motion: play it as such. The cursor is
         // hidden and confined, so where it is does not matter.
-        if self.check_pointer_lock() {
+        let locked = match self.lock_checked {
+            Some(at) if at.elapsed() < LOCK_CHECK_INTERVAL => self.pointer_locked,
+            _ => self.check_pointer_lock(),
+        };
+        if locked {
             let scale = self.last_cursor.map_or(1.0, monitor_scale);
             let (step_x, rest_x) = scaled_step(dx, scale, self.motion_rest.0);
             let (step_y, rest_y) = scaled_step(dy, scale, self.motion_rest.1);
@@ -654,6 +703,51 @@ mod tests {
     };
     use rinflow_input::VirtualDesktop;
     use windows_sys::Win32::Foundation::RECT;
+
+    #[test]
+    fn only_relative_motion_is_merged() {
+        use super::merge_motion;
+        use rinflow_core::{
+            LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_MOVE,
+            LcInputEvent,
+        };
+        let motion = |dx: f64, dy: f64| LcInputEvent {
+            kind: LC_INPUT_MOUSE_MOVE,
+            delta_x: dx,
+            delta_y: dy,
+            ..LcInputEvent::default()
+        };
+        let mut event = motion(1.5, -2.0);
+        assert!(merge_motion(&mut event, &motion(0.25, 4.0)));
+        assert!(merge_motion(
+            &mut event,
+            &LcInputEvent {
+                buttons: 1,
+                ..motion(1.0, 0.0)
+            }
+        ));
+        assert_eq!(
+            (event.delta_x, event.delta_y, event.buttons),
+            (2.75, 2.0, 1)
+        );
+
+        // A click keeps its place between the moves around it, and the move
+        // that places the pointer is not added to.
+        let click = LcInputEvent {
+            kind: LC_INPUT_MOUSE_BUTTON_DOWN,
+            code: 1,
+            ..LcInputEvent::default()
+        };
+        let placed = LcInputEvent {
+            flags: LC_INPUT_FLAG_ABSOLUTE_POSITION,
+            x: 10.0,
+            ..motion(0.0, 0.0)
+        };
+        assert!(!merge_motion(&mut event, &click));
+        assert!(!merge_motion(&mut event, &placed));
+        assert!(!merge_motion(&mut placed.clone(), &motion(1.0, 1.0)));
+        assert_eq!((event.delta_x, event.delta_y), (2.75, 2.0));
+    }
 
     #[test]
     fn a_clip_smaller_than_the_desktop_holds_the_pointer() {
