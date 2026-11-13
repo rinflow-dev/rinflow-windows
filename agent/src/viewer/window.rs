@@ -22,12 +22,13 @@
 //! decodes them and draws the newest. The title says how the picture is
 //! doing.
 
+use super::audio::{self, Microphone, Player};
 use super::codec::{self, Codec};
 use super::decoder::{self, Decoder, Picture};
 use super::geometry::Screen;
 use super::render::Renderer;
 use crate::i18n::{s, trf};
-use rinflow_core::{Core, MediaFrame};
+use rinflow_core::{Core, MediaAudio, MediaFrame};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -53,6 +54,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
+/// The user shares this PC's microphone with the peers whose picture shows
+/// (the tray menu). Off whenever the agent starts: a microphone is never on
+/// without having been turned on.
+pub static MICROPHONE: AtomicBool = AtomicBool::new(false);
+
 /// New frames are waiting in [`Shared`].
 const WM_FRAMES: u32 = WM_APP + 1;
 /// The link changed ([`Shared::set_link`]).
@@ -62,6 +68,8 @@ const WM_LINK: u32 = WM_APP + 2;
 const WM_MODE: u32 = WM_APP + 3;
 /// Close, from another thread.
 const WM_QUIT_VIEWER: u32 = WM_APP + 4;
+/// Whether the microphone is shared changed ([`Shared::microphone_changed`]).
+const WM_SOUND: u32 = WM_APP + 5;
 const STATS_TIMER: usize = 1;
 const LINGER_TIMER: usize = 2;
 /// How long a hidden picture stays linked before its window closes.
@@ -107,6 +115,8 @@ pub struct Shared {
     closed: AtomicBool,
     /// The user opened the window to watch the peer.
     windowed: AtomicBool,
+    /// Plays the peer's sound while the picture shows.
+    player: Mutex<Option<Player>>,
 }
 
 impl Shared {
@@ -118,6 +128,7 @@ impl Shared {
             screen: Mutex::new(None),
             fullscreen: Mutex::new(None),
             windowed: AtomicBool::new(false),
+            player: Mutex::new(None),
             closed: AtomicBool::new(false),
         })
     }
@@ -149,6 +160,26 @@ impl Shared {
             self.post(WM_FRAMES);
         }
         true
+    }
+
+    /// Sound from the peer: played if the picture shows.
+    pub fn sound(&self, sound: &MediaAudio) {
+        if let Ok(player) = self.player.lock()
+            && let Some(player) = player.as_ref()
+        {
+            player.push(sound);
+        }
+    }
+
+    /// The user turned sharing the microphone on or off.
+    pub fn microphone_changed(&self) {
+        self.post(WM_SOUND);
+    }
+
+    fn stop_sound(&self) {
+        if let Ok(mut player) = self.player.lock() {
+            *player = None;
+        }
     }
 
     pub fn set_link(&self, link: Link) {
@@ -233,6 +264,9 @@ struct Viewer {
     status: Status,
     stats: Stats,
     mode: Mode,
+    /// This PC's microphone, for the peer, while the picture shows and the
+    /// user shares it.
+    microphone: Option<Microphone>,
     /// Where the window was before it went full screen.
     placement: Option<WINDOWPLACEMENT>,
 }
@@ -256,6 +290,7 @@ pub fn spawn(
                 log!("viewer: cannot open the window: {error}");
             }
             shared.closed.store(true, Ordering::Release);
+            shared.stop_sound();
             shared.window.store(0, Ordering::Release);
             closed();
             if com {
@@ -348,6 +383,7 @@ fn run(
                 rate: (0.0, 0.0),
             },
             mode: Mode::Hidden,
+            microphone: None,
             placement: None,
         });
         let (width, height) = initial_size();
@@ -465,6 +501,7 @@ impl Viewer {
                 }
             }
             WM_MODE => self.apply_mode(),
+            WM_SOUND => self.apply_sound(),
             WM_QUIT_VIEWER => {
                 // SAFETY: destroys this thread's window.
                 unsafe {
@@ -619,6 +656,31 @@ impl Viewer {
         }
         self.mode = mode;
         self.update_title();
+        self.apply_sound();
+    }
+
+    /// The peer's sound plays while its picture shows, and this PC's
+    /// microphone is the peer's meanwhile if the user shares it
+    /// ([`MICROPHONE`]). Hidden, the window is silent and hears nothing.
+    fn apply_sound(&mut self) {
+        let shown = self.mode != Mode::Hidden;
+        if let Ok(mut player) = self.shared.player.lock() {
+            if !shown {
+                *player = None;
+            } else if player.is_none() {
+                *player = Some(Player::start());
+            }
+        }
+        if !(shown && MICROPHONE.load(Ordering::Acquire)) {
+            self.microphone = None;
+        } else if self.microphone.is_none() {
+            let (core, peer_id) = (self.core.clone(), self.peer_id.clone());
+            self.microphone = Some(Microphone::start(move |samples| {
+                if let Some(core) = core.upgrade() {
+                    core.send_media_audio_to(&peer_id, audio::microphone_channels(), samples);
+                }
+            }));
+        }
     }
 
     fn client_size(&self) -> (u32, u32) {
@@ -731,7 +793,10 @@ impl Viewer {
             Ok(picture) => picture,
             Err(error) => {
                 log!("viewer: a frame did not decode: {error}");
-                decoder.restart();
+                // A new decoder at the next key frame: this one may be set
+                // for a picture of another size (the peer's screen changed
+                // its resolution), which no restart gets it out of.
+                self.decoder = None;
                 if let Some(core) = self.core.upgrade() {
                     let _ = core.request_media_key_frame(&self.peer_id);
                 }

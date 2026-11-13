@@ -26,6 +26,7 @@
 //! only while driving stays linked, hidden, for `window::LINGER` after:
 //! back and forth, it is there at once.
 
+mod audio;
 mod codec;
 mod decoder;
 mod geometry;
@@ -33,7 +34,7 @@ mod render;
 mod window;
 
 use geometry::Screen;
-use rinflow_core::{Core, MediaFrame};
+use rinflow_core::{Core, MediaAudio, MediaFrame};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
@@ -92,6 +93,12 @@ impl Viewers {
                 Self(viewers).frame(peer_id, frame);
             }
         });
+        let viewers = Arc::downgrade(&self.0);
+        core.set_media_audio_sink(move |peer_id, sound| {
+            if let Some(viewers) = viewers.upgrade() {
+                Self(viewers).sound(peer_id, &sound);
+            }
+        });
     }
 
     fn frame(&self, peer_id: &str, frame: MediaFrame) {
@@ -107,6 +114,37 @@ impl Viewers {
             && let Some(core) = core.upgrade()
         {
             let _ = core.request_media_key_frame(peer_id);
+        }
+    }
+
+    /// Sound from a peer, for its window.
+    fn sound(&self, peer_id: &str, sound: &MediaAudio) {
+        let shared = self
+            .0
+            .lock()
+            .ok()
+            .and_then(|inner| inner.windows.get(peer_id).cloned());
+        if let Some(shared) = shared {
+            shared.sound(sound);
+        }
+    }
+
+    /// Whether this PC's microphone is shared with the peers whose picture
+    /// shows.
+    pub fn microphone(&self) -> bool {
+        window::MICROPHONE.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn set_microphone(&self, shared: bool) {
+        window::MICROPHONE.store(shared, std::sync::atomic::Ordering::Release);
+        log!(
+            "viewer: the microphone is {}",
+            if shared { "shared" } else { "not shared" }
+        );
+        if let Ok(inner) = self.0.lock() {
+            for window in inner.windows.values() {
+                window.microphone_changed();
+            }
         }
     }
 
@@ -338,7 +376,7 @@ pub fn play_file(path: &str, fullscreen: bool) -> Result<(), String> {
                 key_frame: *key_frame,
                 sequence,
                 timestamp_micros: sequence * 33_333,
-                data: data.clone(),
+                data: data.clone().into(),
             });
             if closed_rx
                 .recv_timeout(std::time::Duration::from_micros(33_333))
@@ -443,6 +481,63 @@ fn screen(displays: &Value) -> Option<Screen> {
         width: right - left,
         height: bottom - top,
     })
+}
+
+/// Development: plays a quiet tone on this PC's speakers for two seconds
+/// through [`audio::Player`] and listens to its microphone meanwhile
+/// through [`audio::Microphone`], without a core or a peer, and says what
+/// came of each.
+#[cfg(debug_assertions)]
+pub fn sound_test() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{Duration, Instant};
+    let (heard, loudest) = (Arc::new(AtomicU64::new(0)), Arc::new(AtomicU64::new(0)));
+    let (thread_heard, thread_loudest) = (heard.clone(), loudest.clone());
+    let microphone = audio::Microphone::start(move |samples| {
+        thread_heard.fetch_add(samples.len() as u64, Ordering::Relaxed);
+        let peak = samples
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|sample| u64::from(i16::from_le_bytes(*sample).unsigned_abs()))
+            .max()
+            .unwrap_or(0);
+        thread_loudest.fetch_max(peak, Ordering::Relaxed);
+    });
+    let player = audio::Player::start();
+    let began = Instant::now();
+    let mut sample = 0u64;
+    for packet in 1..=200u32 {
+        let samples: Vec<u8> = (0..480)
+            .flat_map(|_| {
+                let angle = sample as f64 * 440.0 * std::f64::consts::TAU / 48_000.0;
+                sample += 1;
+                ((angle.sin() * 3000.0) as i16).to_le_bytes()
+            })
+            .collect();
+        player.push(&MediaAudio {
+            channels: 1,
+            sequence: packet,
+            samples: samples.into(),
+        });
+        let due = began + Duration::from_millis(10) * packet;
+        std::thread::sleep(due.saturating_duration_since(Instant::now()));
+    }
+    let left = player.waiting();
+    std::thread::sleep(Duration::from_millis(300));
+    println!(
+        "speakers: 2.0 s pushed, {:.0} ms still waiting at the end, {:.0} ms after 0.3 s more",
+        left as f64 / 48.0,
+        player.waiting() as f64 / 48.0
+    );
+    println!(
+        "microphone: {:.2} s heard in {:.2} s, loudest sample {}",
+        heard.load(Ordering::Relaxed) as f64 / 2.0 / 48_000.0,
+        began.elapsed().as_secs_f64(),
+        loudest.load(Ordering::Relaxed)
+    );
+    drop((player, microphone));
+    std::thread::sleep(Duration::from_millis(300));
 }
 
 #[cfg(test)]

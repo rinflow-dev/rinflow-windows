@@ -92,6 +92,14 @@ fn main() {
         return;
     }
 
+    // `--sound-test` (debug builds): a tone on the speakers and what the
+    // microphone hears, without a peer.
+    #[cfg(debug_assertions)]
+    if arguments.first().is_some_and(|flag| flag == "--sound-test") {
+        viewer::sound_test();
+        return;
+    }
+
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
         // Not logged: the running instance owns the log file.
         eprintln!("rinflow-agent: another instance is already running in this session");

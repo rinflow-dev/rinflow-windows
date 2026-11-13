@@ -112,6 +112,11 @@ enum Request {
     OpenViewer {
         peer_id: String,
     },
+    /// Shares this PC's microphone with the peers whose picture shows, or
+    /// stops (the tray menu's switch; see `viewer`).
+    ShareMicrophone {
+        shared: bool,
+    },
     /// Places a peer near this offset (logical points, this PC's space);
     /// the core snaps it to a valid spot and syncs it.
     SetPlacement {
@@ -361,6 +366,12 @@ fn handle_request(
         Request::OpenViewer { peer_id } => crate::viewer::global()
             .ok_or("Rinflow core is not running")?
             .open(&peer_id),
+        Request::ShareMicrophone { shared } => {
+            crate::viewer::global()
+                .ok_or("Rinflow core is not running")?
+                .set_microphone(shared);
+            Ok(())
+        }
         Request::SetPlacement { peer_id, x, y } => {
             core()?.set_placement(&peer_id, Some(Offset { x, y }))
         }

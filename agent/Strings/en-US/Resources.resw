@@ -67,4 +67,5 @@
   <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — This PC cannot decode {1}. Install HEVC Video Extensions from the Microsoft Store.</value></data>
   <data name="ViewerFailed" xml:space="preserve"><value>{0} — Cannot show the picture: {1}</value></data>
   <data name="TrayRemoteDesktop" xml:space="preserve"><value>View screen: {0}</value></data>
+  <data name="TrayMicrophone" xml:space="preserve"><value>Share microphone with viewed screens</value></data>
 </root>

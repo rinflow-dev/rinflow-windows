@@ -67,4 +67,5 @@
   <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — 这台电脑无法解码 {1}。请从 Microsoft Store 安装“HEVC 视频扩展”。</value></data>
   <data name="ViewerFailed" xml:space="preserve"><value>{0} — 无法显示画面：{1}</value></data>
   <data name="TrayRemoteDesktop" xml:space="preserve"><value>查看画面：{0}</value></data>
+  <data name="TrayMicrophone" xml:space="preserve"><value>把麦克风共享给正在查看的电脑</value></data>
 </root>

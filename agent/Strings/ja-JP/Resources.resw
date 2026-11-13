@@ -67,4 +67,5 @@
   <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — この PC では {1} をデコードできません。Microsoft Store から「HEVC ビデオ拡張機能」をインストールしてください。</value></data>
   <data name="ViewerFailed" xml:space="preserve"><value>{0} — 画面を表示できません：{1}</value></data>
   <data name="TrayRemoteDesktop" xml:space="preserve"><value>画面を見る：{0}</value></data>
+  <data name="TrayMicrophone" xml:space="preserve"><value>表示中の画面のコンピューターとマイクを共有</value></data>
 </root>

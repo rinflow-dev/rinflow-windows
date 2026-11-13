@@ -6,6 +6,8 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- Sound with a KVM's picture: while the picture shows, what the computer behind the KVM plays comes out of this PC's speakers, and **Share microphone with viewed screens** in the tray menu makes this PC's microphone that computer's. The microphone is off until turned on, and off again whenever Rinflow starts.
+
 - Automatic updates: Rinflow finds a new version, downloads it in the background and checks its signature, and installs it when you choose **Install and restart** (Windows asks for an administrator once). **Check for updates automatically** turns the daily check off. Versions before this one have to install it by hand once.
 
 ### Changed
@@ -32,6 +34,8 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 First public version.
 
 ### Added
+
+- Sound with a KVM's picture: while the picture shows, what the computer behind the KVM plays comes out of this PC's speakers, and **Share microphone with viewed screens** in the tray menu makes this PC's microphone that computer's. The microphone is off until turned on, and off again whenever Rinflow starts.
 
 - Control a nearby Mac or PC by pushing the pointer through a screen edge, and be controlled by one
 - Drag canvas for arranging devices around this PC's monitors

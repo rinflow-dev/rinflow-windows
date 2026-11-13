@@ -27,11 +27,11 @@ use windows_sys::Win32::UI::Shell::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
-    GetMessageW, HICON, KillTimer, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
-    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_THEMECHANGED,
-    WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+    GetMessageW, HICON, KillTimer, MF_CHECKED, MF_SEPARATOR, MF_STRING, MSG, PostMessageW,
+    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer,
+    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP,
+    WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP,
+    WM_SETTINGCHANGE, WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -39,6 +39,8 @@ const TRAY_ID: u32 = 1;
 const MENU_OPEN: usize = 1;
 const MENU_QUIT: usize = 2;
 const MENU_INSTALL_UPDATE: usize = 3;
+/// This PC's microphone for the computers whose screen is shown, or not.
+const MENU_MICROPHONE: usize = 4;
 /// The remote desktop of each peer with a picture, from this one on.
 const MENU_VIEWER_FIRST: usize = 100;
 /// Retries adding the icon: Explorer may not take it yet (busy at sign-in,
@@ -351,6 +353,9 @@ fn show_menu(window: HWND) {
         .iter()
         .map(|(_, name)| wide(&trf(s::TrayRemoteDesktop, &[name])))
         .collect();
+    // With a screen to show: whether its computer hears this PC's microphone.
+    let share = wide(tr(s::TrayMicrophone));
+    let microphone = crate::viewer::global().is_some_and(crate::viewer::Viewers::microphone);
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
         let menu = CreatePopupMenu();
@@ -360,6 +365,10 @@ fn show_menu(window: HWND) {
         AppendMenuW(menu, MF_STRING, MENU_OPEN, open.as_ptr());
         for (index, item) in viewer_items.iter().enumerate() {
             AppendMenuW(menu, MF_STRING, MENU_VIEWER_FIRST + index, item.as_ptr());
+        }
+        if !viewer_items.is_empty() {
+            let checked = if microphone { MF_CHECKED } else { 0 };
+            AppendMenuW(menu, MF_STRING | checked, MENU_MICROPHONE, share.as_ptr());
         }
         if let Some(install) = &install {
             AppendMenuW(menu, MF_STRING, MENU_INSTALL_UPDATE, install.as_ptr());
@@ -385,6 +394,11 @@ fn show_menu(window: HWND) {
         match command as usize {
             MENU_OPEN => open_app(&[]),
             MENU_INSTALL_UPDATE => crate::update::install(),
+            MENU_MICROPHONE => {
+                if let Some(viewers) = crate::viewer::global() {
+                    viewers.set_microphone(!microphone);
+                }
+            }
             MENU_QUIT => {
                 DestroyWindow(window);
             }
