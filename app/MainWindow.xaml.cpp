@@ -306,6 +306,11 @@ namespace winrt::Rinflow::implementation
             menu.Items().Append(item);
         };
 
+        if (device.picture)
+        {
+            add(RinflowApp::Text(L"MenuRemoteDesktop"), L"\xE7F4", [peerId](MainWindow& self) { self.m_agent->OpenViewer(peerId); });
+            menu.Items().Append(MenuFlyoutSeparator());
+        }
         if (device.connected)
         {
             add(RinflowApp::Text(L"MenuDisconnect"), L"\xE8CD", [peerId](MainWindow& self) { self.m_agent->Disconnect(peerId); });

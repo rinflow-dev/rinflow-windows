@@ -10,7 +10,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 18;
+    constexpr int ProtocolVersion = 19;
 
     // A started agent opens its pipe within a second or two; past this it
     // is stuck (or another agent exited 0 for one that never came up).
@@ -179,6 +179,16 @@ namespace RinflowApp
     void AgentClient::ForgetDevice(std::wstring_view peerId)
     {
         auto message = Request(L"forget_device");
+        message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
+        Send(message);
+    }
+
+    void AgentClient::OpenViewer(std::wstring_view peerId)
+    {
+        // The agent's window comes to the front only with this app's leave:
+        // the click was here.
+        AllowSetForegroundWindow(ASFW_ANY);
+        auto message = Request(L"open_viewer");
         message.Insert(L"peer_id", JsonValue::CreateStringValue(peerId));
         Send(message);
     }

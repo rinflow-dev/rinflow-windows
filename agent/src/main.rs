@@ -35,6 +35,7 @@ mod state;
 mod tray;
 mod trust;
 mod update;
+mod viewer;
 mod win;
 
 use rinflow_core::{Core, CoreConfig};
@@ -75,6 +76,20 @@ fn main() {
         let quit = win::current_user_sid()
             .is_ok_and(|sid| ipc::quit_running_agent(&sid, std::time::Duration::from_secs(15)));
         std::process::exit(i32::from(!quit));
+    }
+    // `--viewer-test <file.h265>` (debug builds): a peer's picture from a
+    // recording, without a peer; `--viewer-test-fullscreen` also shows it
+    // full screen for a while, as while driving the peer.
+    #[cfg(debug_assertions)]
+    if let [flag, path] = arguments.as_slice()
+        && (flag == "--viewer-test" || flag == "--viewer-test-fullscreen")
+    {
+        rinflow_input::win::keep_process_responsive();
+        if let Err(error) = viewer::play_file(path, flag == "--viewer-test-fullscreen") {
+            eprintln!("rinflow-agent: {error}");
+            std::process::exit(1);
+        }
+        return;
     }
 
     let Some(_instance) = win::SingleInstance::acquire(INSTANCE_MUTEX) else {
@@ -169,8 +184,12 @@ fn main() {
         modifier_map: preferences.modifier_map,
         // Devices to find by address where multicast does not reach.
         manual_addresses: preferences.manual_addresses.clone(),
+        // Peers' pictures (a KVM's), shown in remote desktop windows.
+        media: true,
         ..CoreConfig::default()
     };
+    let viewers = viewer::Viewers::new();
+    let viewer_events = viewers.clone();
     let events = state.clone();
     let trust_events = trust.clone();
     let layout_events = arrangement.clone();
@@ -225,6 +244,7 @@ fn main() {
             if let Some(hider) = &hider_events {
                 hider.core_event(&json);
             }
+            viewer_events.core_event(&json);
         },
         move |event| input.play(event),
     ) {
@@ -236,6 +256,9 @@ fn main() {
     };
     // Offered files are decided from the core's first events on.
     clipboard.set_core(Arc::downgrade(&core));
+    // Frames of watched pictures go to their windows.
+    viewers.set_core(&core);
+    viewers.install();
     // Playing input tells the core when a game here holds the pointer.
     injector.handle().set_core(Arc::downgrade(&core));
     // Sharing paused in the settings: peers may not drive this PC either.
@@ -348,6 +371,8 @@ fn main() {
         std::thread::sleep(std::time::Duration::from_millis(150));
 
         let _ = services.set_effect_demo(false);
+        // Remote desktop windows let go of the peers they drive.
+        viewers.close_all();
         // Gives back the keyboard and mouse if a peer is being driven.
         drop(edge);
         drop(clipboard_thread);

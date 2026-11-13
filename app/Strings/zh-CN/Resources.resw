@@ -48,6 +48,7 @@
   <data name="MenuPlaceTop" xml:space="preserve"><value>放在上边</value></data>
   <data name="MenuPlaceBottom" xml:space="preserve"><value>放在下边</value></data>
   <data name="MenuUnplace" xml:space="preserve"><value>取消放置</value></data>
+  <data name="MenuRemoteDesktop" xml:space="preserve"><value>查看画面</value></data>
   <data name="MenuPeerInput" xml:space="preserve"><value>鼠标和滚动…</value></data>
   <data name="MenuForget" xml:space="preserve"><value>移除此设备…</value></data>
   <data name="ForgetTitle" xml:space="preserve"><value>移除 {0}？</value></data>

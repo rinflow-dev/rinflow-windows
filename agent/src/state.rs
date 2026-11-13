@@ -167,6 +167,9 @@ pub struct Snapshot {
     pub switch_hotkeys_blocked: bool,
     /// A newer version: found, downloading, ready to install (see `update.rs`).
     pub update: UpdateView,
+    /// Peers that offer a picture to watch (a KVM: the screen of the
+    /// computer behind it), in the order they offered it (see `viewer`).
+    pub media_peers: Vec<String>,
 }
 
 /// Whether input can reach elevated windows, UAC prompts and the lock screen.
@@ -221,6 +224,7 @@ impl SharedState {
             transfers: Vec::new(),
             switch_hotkeys_blocked: false,
             update: UpdateView::default(),
+            media_peers: Vec::new(),
         })))
     }
 
@@ -597,6 +601,23 @@ impl SharedState {
             "manual_addresses" => {
                 let addresses = event["addresses"].as_array().cloned().unwrap_or_default();
                 replace(&mut snapshot.manual_addresses, addresses)
+            }
+            "media_available" => {
+                let Some(peer_id) = event["peer_id"].as_str() else {
+                    return false;
+                };
+                if snapshot.media_peers.iter().any(|id| id == peer_id) {
+                    return false;
+                }
+                snapshot.media_peers.push(peer_id.to_owned());
+                true
+            }
+            "media_unavailable" => {
+                let before = snapshot.media_peers.len();
+                snapshot
+                    .media_peers
+                    .retain(|id| event["peer_id"].as_str() != Some(id));
+                snapshot.media_peers.len() != before
             }
             _ => false,
         });

@@ -46,7 +46,7 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// replaces `shortcut_remap`.
 /// 18: `check_update`, `install_update`; the snapshot gains `update`, and
 /// the setting `auto_update`.
-pub const PROTOCOL_VERSION: u32 = 18;
+pub const PROTOCOL_VERSION: u32 = 19;
 
 /// The longest request line the agent reads, `\n` excluded. The app's
 /// largest requests (`update_settings` with every manual address and
@@ -105,6 +105,11 @@ enum Request {
         peer_id: String,
     },
     Disconnect {
+        peer_id: String,
+    },
+    /// Opens a remote desktop window on a peer's picture (see `viewer`),
+    /// or brings it to the front.
+    OpenViewer {
         peer_id: String,
     },
     /// Places a peer near this offset (logical points, this PC's space);
@@ -353,6 +358,9 @@ fn handle_request(
         )),
         Request::Connect { peer_id } => core()?.connect(&peer_id),
         Request::Disconnect { peer_id } => core()?.disconnect_peer(&peer_id),
+        Request::OpenViewer { peer_id } => crate::viewer::global()
+            .ok_or("Rinflow core is not running")?
+            .open(&peer_id),
         Request::SetPlacement { peer_id, x, y } => {
             core()?.set_placement(&peer_id, Some(Offset { x, y }))
         }

@@ -66,6 +66,9 @@ namespace RinflowApp
         void UpdateSetting(std::wstring_view key, winrt::Windows::Data::Json::IJsonValue const& value);
         // Disconnects, unplaces and stops listing a device.
         void ForgetDevice(std::wstring_view peerId);
+        // Opens the agent's remote desktop window on a peer's picture (the
+        // snapshot's media_peers), or brings it to the front.
+        void OpenViewer(std::wstring_view peerId);
         // Quits the agent, as the tray's 退出 does; it is not started again.
         void Quit();
         // The user dismissed the agent's last_error.

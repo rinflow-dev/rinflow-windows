@@ -26,6 +26,9 @@ namespace RinflowApp
         bool pairing{ false };
         bool remembered{ false };
         bool placed{ false };
+        // It offers a picture (a KVM: the computer behind it), for a remote
+        // desktop window.
+        bool picture{ false };
         std::optional<uint32_t> latencyMs;
         std::optional<uint64_t> lastSeenMs;
         // left / right / top / bottom, when it touches this PC.

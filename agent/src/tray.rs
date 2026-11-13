@@ -30,8 +30,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetMessageW, HICON, KillTimer, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage,
     RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
-    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE,
-    WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_THEMECHANGED,
+    WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -39,6 +39,8 @@ const TRAY_ID: u32 = 1;
 const MENU_OPEN: usize = 1;
 const MENU_QUIT: usize = 2;
 const MENU_INSTALL_UPDATE: usize = 3;
+/// The remote desktop of each peer with a picture, from this one on.
+const MENU_VIEWER_FIRST: usize = 100;
 /// Retries adding the icon: Explorer may not take it yet (busy at sign-in,
 /// or restarting). The agent works on meanwhile.
 const ICON_RETRY_TIMER: usize = 1;
@@ -341,6 +343,14 @@ fn show_menu(window: HWND) {
     let quit = wide(tr(s::TrayQuit));
     let install =
         crate::update::ready_version().map(|version| wide(&trf(s::TrayInstallUpdate, &[&version])));
+    // Peers with a picture (KVMs): a remote desktop window each.
+    let viewable = crate::viewer::global()
+        .map(crate::viewer::Viewers::available)
+        .unwrap_or_default();
+    let viewer_items: Vec<Vec<u16>> = viewable
+        .iter()
+        .map(|(_, name)| wide(&trf(s::TrayRemoteDesktop, &[name])))
+        .collect();
     // SAFETY: the menu is created, shown modally and destroyed here.
     unsafe {
         let menu = CreatePopupMenu();
@@ -348,6 +358,9 @@ fn show_menu(window: HWND) {
             return;
         }
         AppendMenuW(menu, MF_STRING, MENU_OPEN, open.as_ptr());
+        for (index, item) in viewer_items.iter().enumerate() {
+            AppendMenuW(menu, MF_STRING, MENU_VIEWER_FIRST + index, item.as_ptr());
+        }
         if let Some(install) = &install {
             AppendMenuW(menu, MF_STRING, MENU_INSTALL_UPDATE, install.as_ptr());
         }
@@ -374,6 +387,14 @@ fn show_menu(window: HWND) {
             MENU_INSTALL_UPDATE => crate::update::install(),
             MENU_QUIT => {
                 DestroyWindow(window);
+            }
+            command if command >= MENU_VIEWER_FIRST => {
+                if let Some((peer_id, _)) = viewable.get(command - MENU_VIEWER_FIRST)
+                    && let Some(viewers) = crate::viewer::global()
+                    && let Err(error) = viewers.open(peer_id)
+                {
+                    log!("cannot open the remote desktop: {error}");
+                }
             }
             _ => {}
         }

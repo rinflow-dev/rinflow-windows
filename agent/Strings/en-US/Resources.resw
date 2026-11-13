@@ -60,4 +60,11 @@
   <data name="UpdateNoPackage" xml:space="preserve"><value>The new version has no setup program for this PC.</value></data>
   <data name="UpdateStartFailed" xml:space="preserve"><value>Could not start the setup program: {0}</value></data>
   <data name="UpdateNotInstalled" xml:space="preserve"><value>The update was not installed: the administrator prompt was declined, or setup failed. Details: {0}</value></data>
+  <data name="ViewerConnecting" xml:space="preserve"><value>{0} — Connecting…</value></data>
+  <data name="ViewerWaiting" xml:space="preserve"><value>{0} — Waiting for the picture…</value></data>
+  <data name="ViewerPlaying" xml:space="preserve"><value>{0} — {1} {2} · {3} fps · {4} Mbit/s</value></data>
+  <data name="ViewerEnded" xml:space="preserve"><value>{0} — The picture stopped</value></data>
+  <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — This PC cannot decode {1}. Install HEVC Video Extensions from the Microsoft Store.</value></data>
+  <data name="ViewerFailed" xml:space="preserve"><value>{0} — Cannot show the picture: {1}</value></data>
+  <data name="TrayRemoteDesktop" xml:space="preserve"><value>View screen: {0}</value></data>
 </root>

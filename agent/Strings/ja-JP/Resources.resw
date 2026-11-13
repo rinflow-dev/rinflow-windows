@@ -60,4 +60,11 @@
   <data name="UpdateNoPackage" xml:space="preserve"><value>新しいバージョンにはこの PC 用のセットアップがありません。</value></data>
   <data name="UpdateStartFailed" xml:space="preserve"><value>セットアップを起動できませんでした: {0}</value></data>
   <data name="UpdateNotInstalled" xml:space="preserve"><value>アップデートはインストールされませんでした。管理者の確認が取り消されたか、セットアップに失敗しました。詳細: {0}</value></data>
+  <data name="ViewerConnecting" xml:space="preserve"><value>{0} — 接続しています…</value></data>
+  <data name="ViewerWaiting" xml:space="preserve"><value>{0} — 画面を待っています…</value></data>
+  <data name="ViewerPlaying" xml:space="preserve"><value>{0} — {1} {2} · {3} fps · {4} Mbit/s</value></data>
+  <data name="ViewerEnded" xml:space="preserve"><value>{0} — 画面が途切れました</value></data>
+  <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — この PC では {1} をデコードできません。Microsoft Store から「HEVC ビデオ拡張機能」をインストールしてください。</value></data>
+  <data name="ViewerFailed" xml:space="preserve"><value>{0} — 画面を表示できません：{1}</value></data>
+  <data name="TrayRemoteDesktop" xml:space="preserve"><value>画面を見る：{0}</value></data>
 </root>

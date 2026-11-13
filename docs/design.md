@@ -155,6 +155,8 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Speeds per device | agent | **鼠标和滚动…** in a device's **⋯** menu (`peer_input`): pointer speed 0.25–4×, scrolling speed 0.25–5×, reversed scrolling. Applied here while this PC drives that device, before the pointer is tracked, so the two never disagree on where it is. |
 | Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc and the switch shortcuts still work. |
 | Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc, with the emerge animation. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
+| Peers with a picture | agent ([viewer](../agent/src/viewer/mod.rs)) | A KVM is placed and driven like any peer, but the computer behind it may have no screen in sight. While this PC drives a peer that offers a picture (`media_peers`), the picture fills the monitor the pointer left from: decoded on the graphics processor (H.265, or H.264), on top, never taking the focus, the peer's cursor in it. Coming back puts it away; it stays linked, hidden, for 30 s, so going back is instant. A window opened with **查看画面** goes full screen meanwhile and comes back after. |
+| Attached screens | agent ([inject](../agent/src/inject.rs)), core | A KVM placed right against this PC's own monitors is its attached screen (rinflow-core's `docs/attached-screens.md`): a device driving this PC sees it as one more monitor of this PC and pushes the pointer onto it, with nothing set up on that device. This PC then follows the pointer there itself (the real cursor waits at the edge), passes the input on to the KVM (`relay`) and shows its picture on the monitor the pointer left from; back across the edge, the real cursor carries on. A key or button pressed on this PC is still released here. If another device takes the KVM over, the pointer stays there doing nothing until it comes back. |
 
 The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
 
@@ -345,9 +347,10 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":18}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":19}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
+| `{"type":"open_viewer","peer_id":"…"}` | Show a window with a peer's picture (one of `media_peers`: a KVM shows the computer behind it), or bring it to the front. It only shows: the peer is driven through its edge, as any peer. See [agent/src/viewer](../agent/src/viewer/mod.rs). |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
 | `{"type":"preview_placement","peer_id":"…","x":1440,"y":-11}` | Where `set_placement` would put it, without placing it. Answered with `{"type":"placement_preview","peer_id":"…","offset":{"x":…,"y":…}}` (`offset` is `null` when there is no room). |
 | `{"type":"remove_placement","peer_id":"…"}` | Remove the peer's placement. |
@@ -371,7 +374,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":18,"agent_version":"0.0.1"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":19,"agent_version":"0.0.1"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 
@@ -394,6 +397,7 @@ A `state` message looks like this:
 - `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
 - `demo_side` is `local` or `remote` while the demo runs.
 - `clipboard_sync` is true while the clipboard is shared.
+- `media_peers` lists the device IDs of peers that offer a picture (a NanoKVM running Rinflow's agent). The device's **⋯** menu and the tray menu then offer **查看画面**.
 
 ```json
 {

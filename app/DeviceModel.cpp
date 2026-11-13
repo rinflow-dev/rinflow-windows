@@ -194,6 +194,15 @@ namespace RinflowApp
             device.pairing = true;
             device.connecting = !device.connected;
         }
+        // Peers offering a picture: a remote desktop in the device's menu.
+        for (auto const& value : state.GetNamedArray(L"media_peers", JsonArray{}))
+        {
+            if (value.ValueType() != JsonValueType::String) continue;
+            if (auto found = devices.find(std::wstring(value.GetString())); found != devices.end())
+            {
+                found->second.picture = true;
+            }
+        }
 
         for (auto& [id, device] : devices)
         {

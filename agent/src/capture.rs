@@ -217,6 +217,8 @@ struct Capture {
     park: POINT,
     /// Physical pixels per point on the parking monitor.
     scale: f64,
+    /// The parking monitor, physical pixels: where a peer's picture shows.
+    screen: crate::viewer::MonitorRect,
     /// Where the pointer left this PC, in logical points.
     left_at: (f64, f64),
     /// Buttons and keys (HID usages) the peer has been told are down.
@@ -400,6 +402,14 @@ fn start(
             cursor.x >= p.left && cursor.x < p.right && cursor.y >= p.top && cursor.y < p.bottom
         })
         .or(monitors.first());
+    // A peer with a picture (a KVM) shows it over this monitor meanwhile.
+    let screen = monitor.map_or(
+        (cursor.x, cursor.y, cursor.x + 1, cursor.y + 1),
+        |monitor| {
+            let p = &monitor.physical;
+            (p.left, p.top, p.right, p.bottom)
+        },
+    );
     let (park, scale) = monitor.map_or((cursor, 1.0), |monitor| {
         let p = &monitor.physical;
         (
@@ -461,6 +471,7 @@ fn start(
         pointer,
         park,
         scale,
+        screen,
         left_at,
         buttons: 0,
         keys: HashSet::new(),
@@ -489,7 +500,16 @@ fn start(
         finish();
         return false;
     }
+    show_picture(Some((peer_id, screen)));
     true
+}
+
+/// The picture of the peer being driven, if it has one, over the parking
+/// monitor; `None` puts it away.
+fn show_picture(target: Option<(&str, crate::viewer::MonitorRect)>) {
+    if let Some(viewers) = crate::viewer::global() {
+        viewers.driving(target);
+    }
 }
 
 /// Ends the capture when its peer is no longer connected, or when another
@@ -619,6 +639,8 @@ pub fn revoked(peer_id: &str, stay: bool) {
 /// the hooks.
 pub fn finish() -> Option<Ended> {
     let capture = CAPTURE.with(|slot| slot.borrow_mut().take())?;
+    // The peer's picture goes before the cursor comes back.
+    show_picture(None);
     watch_raw_keyboard(None);
     // SAFETY: removes this thread's hooks and its cursor window.
     unsafe {
@@ -745,6 +767,8 @@ impl Capture {
                 self.stale_keys.insert(usage);
             }
         }
+        // The new peer's picture, if it has one, instead of the old one's.
+        show_picture(Some((peer_id, self.screen)));
         log!("moved on to {peer_id}, arriving at ({arrival_x:.1}, {arrival_y:.1})");
         true
     }

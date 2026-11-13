@@ -121,7 +121,7 @@ fn timestamp() -> String {
 /// (`link_quality`). Not clipboards (their contents), progress or latency
 /// (too many).
 pub fn core_event(json: &str) {
-    const LOGGED: [&str; 22] = [
+    const LOGGED: [&str; 24] = [
         "started",
         "stopped",
         "error",
@@ -144,6 +144,8 @@ pub fn core_event(json: &str) {
         "files_received",
         "files_failed",
         "files_send_ended",
+        "attached_screens",
+        "relay_ended",
     ];
     let Ok(mut event) = serde_json::from_str::<Value>(json) else {
         return;

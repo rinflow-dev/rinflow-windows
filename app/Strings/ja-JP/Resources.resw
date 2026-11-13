@@ -48,6 +48,7 @@
   <data name="MenuPlaceTop" xml:space="preserve"><value>上に配置</value></data>
   <data name="MenuPlaceBottom" xml:space="preserve"><value>下に配置</value></data>
   <data name="MenuUnplace" xml:space="preserve"><value>配置を解除</value></data>
+  <data name="MenuRemoteDesktop" xml:space="preserve"><value>画面を見る</value></data>
   <data name="MenuPeerInput" xml:space="preserve"><value>マウスとスクロール…</value></data>
   <data name="MenuForget" xml:space="preserve"><value>このデバイスを削除…</value></data>
   <data name="ForgetTitle" xml:space="preserve"><value>{0} を削除しますか?</value></data>

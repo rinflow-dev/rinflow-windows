@@ -60,4 +60,11 @@
   <data name="UpdateNoPackage" xml:space="preserve"><value>新版本没有适合这台电脑的安装程序。</value></data>
   <data name="UpdateStartFailed" xml:space="preserve"><value>无法启动安装程序：{0}</value></data>
   <data name="UpdateNotInstalled" xml:space="preserve"><value>更新没有安装：可能取消了管理员确认，或者安装失败。详情见 {0}</value></data>
+  <data name="ViewerConnecting" xml:space="preserve"><value>{0} — 正在连接…</value></data>
+  <data name="ViewerWaiting" xml:space="preserve"><value>{0} — 正在等待画面…</value></data>
+  <data name="ViewerPlaying" xml:space="preserve"><value>{0} — {1} {2} · {3} 帧/秒 · {4} Mbit/s</value></data>
+  <data name="ViewerEnded" xml:space="preserve"><value>{0} — 画面已中断</value></data>
+  <data name="ViewerNoDecoder" xml:space="preserve"><value>{0} — 这台电脑无法解码 {1}。请从 Microsoft Store 安装“HEVC 视频扩展”。</value></data>
+  <data name="ViewerFailed" xml:space="preserve"><value>{0} — 无法显示画面：{1}</value></data>
+  <data name="TrayRemoteDesktop" xml:space="preserve"><value>查看画面：{0}</value></data>
 </root>
