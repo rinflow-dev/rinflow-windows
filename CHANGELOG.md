@@ -4,9 +4,12 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-11-16
+
 ### Added
 
 - Automatic updates: Rinflow finds a new version, downloads it in the background and checks its signature, and installs it when you choose **Install and restart** (Windows asks for an administrator once). **Check for updates automatically** turns the daily check off. Versions before this one have to install it by hand once.
+- An install script, `scripts/install.ps1`: it finds out whether Windows runs on x64 or ARM64, downloads the matching setup program from the latest release, checks its SHA-256 and starts it.
 
 ### Changed
 
@@ -15,6 +18,7 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 - Settings, the arrangement, paired devices and this PC's device ID are kept in one file, `config.json`, with a backup of the previous version. The files of 0.0.1 are moved into it on the first start.
 - Only your own devices (connected once, or placed) are remembered across restarts, not every device seen on the network.
 - Setup lets Rinflow quit by itself before an upgrade, so connected devices see a clean disconnect.
+- Shorter descriptions in the settings and in the add-device dialog. The encryption row shows only while the core is not running, since connections are always encrypted.
 
 ### Fixed
 
