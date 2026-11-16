@@ -63,8 +63,10 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=..\app\Assets\Rinflow.Shell.ico
-; Closes Rinflow when it holds files being replaced.
-CloseApplications=force
+; PrepareToInstall closes Rinflow itself. The Restart Manager is left out:
+; it lists every program that has one of the files open, such as the Windows
+; telemetry service reading a freshly installed EXE, and asks to close that.
+CloseApplications=no
 RestartApplications=no
 UninstallDisplayIcon={app}\Rinflow.exe
 UninstallDisplayName=Rinflow
@@ -125,7 +127,7 @@ Source: "..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; An unpackaged app's shortcuts cannot follow the theme, so they use the EXE's
-; plated icon, which is legible on both.
+; outlined icon, which is legible on both.
 Name: "{autoprograms}\Rinflow"; Filename: "{app}\Rinflow.exe"
 Name: "{autodesktop}\Rinflow"; Filename: "{app}\Rinflow.exe"; Tasks: desktopicon
 
@@ -228,5 +230,8 @@ begin
     Exec(ExpandConstant('{app}\rinflow-service.exe'), '--uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Rinflow.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM rinflow-agent.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // What the agent and the service leave behind when they were ended by force.
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM rinflow-input.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM rinflow-service.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;

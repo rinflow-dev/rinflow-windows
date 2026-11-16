@@ -64,6 +64,15 @@ if (-not $vsPath) {
     throw 'No Visual Studio or Build Tools installation with the C++ tools was found. See docs/building.md.'
 }
 
+# The developer shell below adds its folders to PATH on every run, and PATH
+# belongs to the whole console, not to this script. Past 8191 characters cmd
+# no longer finds programs by name ("'cargo' is not recognized"), after seven
+# builds or so in one console. So PATH is put back when the build ends, and
+# what earlier runs left twice is dropped first.
+$seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+$env:Path = ($env:Path -split ';' | Where-Object { $_ -and $seen.Add($_.TrimEnd('\')) }) -join ';'
+$callerPath = $env:Path
+
 # VsDevCmd.bat runs vswhere.exe from the installer folder by name. With
 # NoDefaultCurrentDirectoryInExePath set, cmd does not look in the current
 # folder, so put the installer on PATH instead.
@@ -113,4 +122,6 @@ if ($EffectDemo) {
 }
 
 & msbuild @arguments
-exit $LASTEXITCODE
+$result = $LASTEXITCODE
+$env:Path = $callerPath
+exit $result
