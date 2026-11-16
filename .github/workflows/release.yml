@@ -1,5 +1,10 @@
 # Builds the setup programs for a version tag (v0.0.1, ...) and publishes
 # them as a GitHub release. Run by hand, it only builds, to try the workflow.
+#
+# Secrets:
+#   RINFLOW_UPDATE_KEY  the minisign key that signs updates
+#   SITE_DEPLOY_TOKEN   a token that may run rinflow-site's workflows
+#                       (Actions: read and write), to update the website
 name: Release
 
 on:
@@ -144,3 +149,18 @@ jobs:
             --title "Rinflow for Windows ${GITHUB_REF_NAME#v}" \
             --notes-file notes.md \
             "${prerelease[@]}"
+
+      # The website reads the downloads when it builds (rinflow-site's
+      # deploy.yml). Rebuild it now so it links to this release at once; its
+      # hourly schedule often runs hours late. Prereleases are not on the site.
+      - name: Update the website
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::The SITE_DEPLOY_TOKEN secret is missing: rinflow.com updates on its next scheduled build."
+            exit 0
+          fi
+          gh workflow run deploy.yml -R rinflow-dev/rinflow-site \
+            || echo "::warning::Could not start the website build: rinflow.com updates on its next scheduled build."
