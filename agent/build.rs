@@ -43,7 +43,7 @@ fn version_info() {
     // Numbers instead of winver.h names, so rc.exe needs no include path:
     // VOS_NT_WINDOWS32, VFT_APP; U.S. English, Unicode.
     // Icons: Explorer shows the lowest ID, which cannot follow the theme, so it
-    // is plated. The tray picks 101 (light) or 102 (dark) itself.
+    // is outlined. The tray picks 101 (light) or 102 (dark) itself.
     let script = format!(
         r#"#pragma code_page(65001)
 100 ICON "{shell_icon}"
