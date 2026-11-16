@@ -29,7 +29,9 @@
 //! input from them (watched with a WinEvent hook and the timer), and
 //! silently removes a hook that took too long to answer. Raw input, which
 //! keeps arriving either way, shows the second: input a hook should have
-//! seen but did not (see `silent_hook`).
+//! seen but did not (see `silent_hook`). Such a hook is installed again
+//! first, which mostly brings the input back unnoticed; only when that did
+//! not help several times in a row do the keyboard and mouse come back.
 
 use crate::arrangement::{Arrangement, Target};
 use crate::displays::{self, PhysicalPortal};
@@ -126,6 +128,9 @@ const HOOK_SILENCE: Duration = Duration::from_millis(500);
 /// A hook that ran this shortly before raw input reported the same event
 /// saw it already: the two arrive in either order.
 const HOOK_ORDER_SLACK: Duration = Duration::from_millis(50);
+/// How often in a row a silent hook is installed again before the keyboard
+/// and mouse are given back to this PC.
+const REHOOK_LIMIT: u32 = 3;
 
 /// Input devices, for telling whether the hooks still see what they get.
 #[derive(Clone, Copy, Debug)]
@@ -143,6 +148,8 @@ struct HookWatch {
     ran_at: Instant,
     /// Since when raw input has reported input the hook has not seen.
     unseen: Option<Instant>,
+    /// How often the hook was installed again since it last ran.
+    rehooked: u32,
 }
 
 impl HookWatch {
@@ -150,11 +157,23 @@ impl HookWatch {
         Self {
             ran_at: now,
             unseen: None,
+            rehooked: 0,
         }
     }
 
     fn hook_ran(&mut self, now: Instant) {
+        (self.ran_at, self.unseen, self.rehooked) = (now, None, 0);
+    }
+
+    /// The hook was installed again: it gets the same time to show that it
+    /// sees the input. False once that has not helped often enough.
+    fn rehooked(&mut self, now: Instant) -> bool {
+        if self.rehooked >= REHOOK_LIMIT {
+            return false;
+        }
+        self.rehooked += 1;
         (self.ran_at, self.unseen) = (now, None);
+        true
     }
 
     fn raw_input(&mut self, now: Instant) {
@@ -513,7 +532,12 @@ pub fn check(connected: impl Fn(&str) -> bool) {
                 Some(GiveBack::Elevated)
             } else {
                 // Nothing to end otherwise.
-                Some(GiveBack::HookLost(capture.silent_hook()?))
+                let device = capture.silent_hook()?;
+                // Mostly the hook is back with this, and nobody notices.
+                if capture.rehook(device) {
+                    return None;
+                }
+                Some(GiveBack::HookLost(device))
             };
             capture.request_end(capture.home());
             reason
@@ -831,6 +855,35 @@ impl Capture {
         } else {
             None
         }
+    }
+
+    /// Installs the silent hook of `device` again: Windows removes a hook
+    /// that answered too slowly once, and says so nowhere. False when that
+    /// did not bring the input back several times in a row, or cannot be done.
+    fn rehook(&mut self, device: Device) -> bool {
+        if !self.watch(device).rehooked(Instant::now()) {
+            return false;
+        }
+        // SAFETY: replaces a hook of this thread, which runs a message loop.
+        // Removing one that Windows removed already fails and changes nothing.
+        let hook = unsafe {
+            let module = GetModuleHandleW(null());
+            match device {
+                Device::Mouse => {
+                    UnhookWindowsHookEx(self.mouse_hook);
+                    self.mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), module, 0);
+                    self.mouse_hook
+                }
+                Device::Keyboard => {
+                    UnhookWindowsHookEx(self.keyboard_hook);
+                    self.keyboard_hook =
+                        SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), module, 0);
+                    self.keyboard_hook
+                }
+            }
+        };
+        log!("the {device:?} hook stopped seeing input; installed it again");
+        !hook.is_null()
     }
 
     /// Handles one mouse event; true swallows it.
@@ -1413,5 +1466,22 @@ mod tests {
         // Counted from the first input it missed, not the latest.
         watch.raw_input(start + ms(2450));
         assert!(watch.silent(start + ms(2600)));
+    }
+
+    #[test]
+    fn a_silent_hook_is_installed_again_a_few_times_only() {
+        let start = Instant::now();
+        let mut watch = HookWatch::new(start);
+        watch.raw_input(start + ms(1000));
+        assert!(watch.silent(start + ms(1600)));
+        // Installed again: it has the same time to show that it works.
+        assert!(watch.rehooked(start + ms(1600)));
+        assert!(!watch.silent(start + ms(1700)));
+        // It ran, so a later silence starts counting anew.
+        watch.hook_ran(start + ms(1800));
+        for attempt in 0..REHOOK_LIMIT {
+            assert!(watch.rehooked(start + ms(2000 + u64::from(attempt))));
+        }
+        assert!(!watch.rehooked(start + ms(3000)));
     }
 }
