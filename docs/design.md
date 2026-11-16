@@ -139,14 +139,14 @@ Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The capture ho
 
 ## Controlling another device
 
-Push the pointer against the edge where a connected peer is placed (see [Arranging devices](#arranging-devices)). The edge resists with the push-through effect, then the pointer crosses: from there this PC's keyboard and mouse drive the peer.
+Push the pointer against the edge where a connected peer is placed (see [Arranging devices](#arranging-devices)). Once the push went far enough and lasted the switch delay, the pointer crosses (nothing is drawn, see [Edge push-through effect](#edge-push-through-effect)): from there this PC's keyboard and mouse drive the peer.
 
 | | Where | What |
 | --- | --- | --- |
 | Crossing | agent ([edge.rs](../agent/src/edge.rs)) | The edge thread measures the push with raw input at the portals of connected peers, like the demo. After crossing, it sends the peer an absolute move to the matching point of its edge, 2 points inside. |
 | While driving | agent ([capture.rs](../agent/src/capture.rs)) | Low-level mouse and keyboard hooks, installed only while driving, swallow local input and send it through the core. The Windows cursor waits in the middle of its monitor, hidden by a tiny window with no cursor and a cursor display count below zero (`ShowCursor`, as Deskflow does), so another program setting a cursor meanwhile does not show it. Motion is measured from there, so Windows' own pointer speed and acceleration apply. Keys go by scan code (→ HID usage), auto-repeats are marked as repeats, and the wheel sends 10 points per notch. |
 | Where the pointer is | core (`layout::RemotePointer`) | Tracks the pointer in the peer's space as the peer plays the same motion. It slides along edges that lead nowhere. Moving out through a portal ends the crossing at the matching local point, 2 points inside the edge. |
-| Coming back | agent | The cursor reappears there with the effect's emerge animation. For the **连续切换免阻力** time, going back across needs no push. |
+| Coming back | agent | The cursor reappears there. For the **连续切换免阻力** time, going back across needs no push. |
 | Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
 | Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
 | Moving on | agent, core | Where the driven device touches another placed device, the pointer moves straight into that one (`RemotePointer::step` reports the neighbour; the capture retargets the core). Modifiers held go along; other held keys are released on the old device. |
@@ -154,7 +154,7 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Switch shortcuts | agent | **用快捷键切换设备** (`switch_hotkeys`, on by default): Ctrl+Alt+Shift+arrow keys (or Ctrl+Alt+arrow keys, `switch_modifiers`) jump to the device on that side of the current one, landing in the middle of its nearest display (`arrangement::World`). Ctrl+Alt+Shift is the default because few programs use it with the arrow keys: Ctrl+Alt alone adds cursors in VS Code and rotates the screen with some graphics drivers. Registered with `RegisterHotKey` while this PC has the pointer; the capture hooks take them while it drives a peer, and holding the modifiers on chains jumps. A combination another program registered first shows as a notice on the settings row (`switch_hotkeys_blocked`). |
 | Speeds per device | agent | **鼠标和滚动…** in a device's **⋯** menu (`peer_input`): pointer speed 0.25–4×, scrolling speed 0.25–5×, reversed scrolling. Applied here while this PC drives that device, before the pointer is tracked, so the two never disagree on where it is. |
 | Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc and the switch shortcuts still work. |
-| Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc, with the emerge animation. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
+| Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
 
 The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
 
@@ -211,7 +211,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 
 ## Edge push-through effect
 
-Inspired by Universal Control. The effect is drawn on the device the cursor is moving into:
+Not shown between real devices for now: only the demo below draws it, until the animation is worth having. The push it visualises (`push_distance`, `warm_seconds`, `corner_dead_zone`) still decides a crossing. Inspired by Universal Control. The effect is drawn on the device the cursor is moving into:
 
 | Stage | What you see |
 | --- | --- |
@@ -222,7 +222,7 @@ Inspired by Universal Control. The effect is drawn on the device the cursor is m
 
 All motion uses a damped spring with SwiftUI-style `response` and damping ratio ([spring.rs](../agent/src/spring.rs)). macOS can use the same values with `Spring(response:dampingRatio:)`, so both platforms move identically.
 
-**Tuning it on one machine.** The tuning page exists in development (Debug) builds only, since the animation is going away in releases. Open it with the button next to the settings button on the **设备** page and turn on **效果演示**. The portals of the arrangement then act as if the placed devices sat beyond them and the screen wrapped around. With nothing placed, the whole right edge of the desktop stands in for a device:
+**Tuning it on one machine.** The tuning page exists in development (Debug) builds only, since nothing else shows the animation. Open it with the button next to the settings button on the **设备** page and turn on **效果演示**. The portals of the arrangement then act as if the placed devices sat beyond them and the screen wrapped around. With nothing placed, the whole right edge of the desktop stands in for a device:
 
 - Push the mouse against a portal. The bump grows; when you have pushed far enough, the cursor comes out of the opposite edge, as it would on the other device.
 - Push against that opposite edge to come back. Returning never has resistance.
@@ -275,7 +275,7 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 诊断日志 | (none) | **打开日志文件夹** opens `%LOCALAPPDATA%\Rinflow\logs`: `agent.log` ([log.rs](../agent/src/log.rs)), moved aside to `agent.1.log` past 2 MB. It records connections, pairing, transfers and errors with the local time (never clipboard contents, keys or the pairing code), and panics. The input service and helper log to `%ProgramFiles%\Rinflow\logs`. |
 | 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
-| 端口 | `port` | The core's UDP port for connections (`null`: 42421). Applies after Rinflow restarts; must not be the discovery port 42420. |
+| (none) | `port` | The core's UDP port for connections (`null`: 42421). Not in the settings, as on the Mac: devices learn each other's port through discovery, so nobody has to set it. `config.json` still takes one, for a network where 42421 cannot be used. Applies after Rinflow restarts; must not be the discovery port 42420. |
 | 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
 | 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |

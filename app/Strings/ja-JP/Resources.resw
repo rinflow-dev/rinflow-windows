@@ -34,8 +34,6 @@
   <data name="TlsOn" xml:space="preserve"><value>TLS 1.3 で暗号化し、相手の証明書を確認します。</value></data>
   <data name="TlsOff" xml:space="preserve"><value>Rinflow は動作していません。この PC の証明書またはポートを使用できないため、今は他のデバイスに接続できません。</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>ポインターは他のデバイスへ移動しません。{0} を押すと解除します。</value></data>
-  <data name="PortPending" xml:space="preserve"><value>Rinflow の再起動後に {0} を使用します。現在は {1} を使用しています。</value></data>
-  <data name="PortHint" xml:space="preserve"><value>変更は Rinflow の再起動後に反映されます。</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>変更には管理者の承認が必要です。</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>セットアップ プログラムでのインストールが必要です。</value></data>
   <data name="ElevatedRecommended" xml:space="preserve"><value>推奨。管理者の承認が必要で、入力サービスがインストールされます。</value></data>
@@ -142,8 +140,6 @@
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>テキスト、画像 (最大 8 MB)、ファイル。512 MB を超えるファイルは先に確認します。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>クリップボードとファイルを同期</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>ネットワークとセキュリティ</value></data>
-  <data name="PortTitle.Text" xml:space="preserve"><value>ポート</value></data>
-  <data name="PortBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ポート</value></data>
   <data name="TlsTitle.Text" xml:space="preserve"><value>暗号化接続 (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>暗号化接続</value></data>
   <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>ペアリング済みのデバイスのみ</value></data>

@@ -721,26 +721,6 @@
                     </Grid>
 
                     <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="NetworkHeader" Text="网络与安全" />
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="PortTitle" Text="端口" />
-                            <TextBlock x:Name="PortHint" Style="{StaticResource RowDescriptionStyle}" />
-                        </StackPanel>
-                        <NumberBox
-                            x:Name="PortBox"
-                            Grid.Column="1"
-                            Width="200"
-                            VerticalAlignment="Center"
-                            x:Uid="PortBox" AutomationProperties.Name="端口"
-                            Maximum="65535"
-                            Minimum="1024"
-                            SpinButtonPlacementMode="Hidden"
-                            ValidationMode="InvalidInputOverwritten" />
-                    </Grid>
                     <Grid x:Name="TlsCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

@@ -34,8 +34,6 @@
   <data name="TlsOn" xml:space="preserve"><value>TLS 1.3, with the other device's certificate checked.</value></data>
   <data name="TlsOff" xml:space="preserve"><value>Rinflow isn&apos;t running: this PC&apos;s certificate or port can&apos;t be used, so it can&apos;t connect to other devices for now.</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>The pointer won&apos;t move to other devices. Press {0} to unlock.</value></data>
-  <data name="PortPending" xml:space="preserve"><value>Rinflow uses {0} after it restarts; {1} for now.</value></data>
-  <data name="PortHint" xml:space="preserve"><value>A change applies after Rinflow restarts.</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>Changing this needs administrator approval.</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>Needs Rinflow installed with its setup program.</value></data>
   <data name="ElevatedRecommended" xml:space="preserve"><value>Recommended. Needs administrator approval and installs the input service.</value></data>
@@ -142,8 +140,6 @@
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>Text, images (up to 8 MB) and files. Files above 512 MB ask first.</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sync clipboard and files</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>Network and security</value></data>
-  <data name="PortTitle.Text" xml:space="preserve"><value>Port</value></data>
-  <data name="PortBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Port</value></data>
   <data name="TlsTitle.Text" xml:space="preserve"><value>Encrypted connections (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Encrypted connections</value></data>
   <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>Only paired devices</value></data>

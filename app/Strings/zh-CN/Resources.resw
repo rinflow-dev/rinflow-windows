@@ -34,8 +34,6 @@
   <data name="TlsOn" xml:space="preserve"><value>TLS 1.3，并核对对方的证书。</value></data>
   <data name="TlsOff" xml:space="preserve"><value>Rinflow 没有启动：本机证书或端口无法使用，暂时连接不了其他设备。</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>光标不会切换到其他设备。按 {0} 解除。</value></data>
-  <data name="PortPending" xml:space="preserve"><value>重新启动 Rinflow 后改用 {0}；现在使用 {1}。</value></data>
-  <data name="PortHint" xml:space="preserve"><value>修改后需重新启动 Rinflow。</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>更改需要管理员确认。</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>需要用安装包安装 Rinflow。</value></data>
   <data name="ElevatedRecommended" xml:space="preserve"><value>建议打开。需要管理员确认，并会安装输入服务。</value></data>
@@ -142,8 +140,6 @@
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>文字、图片（最大 8 MB）和文件。超过 512 MB 的文件会先询问。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>同步剪贴板和文件</value></data>
   <data name="NetworkHeader.Text" xml:space="preserve"><value>网络与安全</value></data>
-  <data name="PortTitle.Text" xml:space="preserve"><value>端口</value></data>
-  <data name="PortBox.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>端口</value></data>
   <data name="TlsTitle.Text" xml:space="preserve"><value>加密传输 (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>加密传输</value></data>
   <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>仅允许已配对设备</value></data>

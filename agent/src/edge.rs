@@ -4,8 +4,8 @@
 
 //! The edge thread: watches the pointer at the arrangement's portals.
 //!
-//! Pushing against the portal of a connected peer feels the resistance of
-//! the edge effect and then crosses into the peer, handing this PC's
+//! Pushing against the portal of a connected peer far and long enough
+//! crosses into the peer (nothing is drawn meanwhile), handing this PC's
 //! keyboard and mouse to [`crate::capture`] until the pointer comes back.
 //!
 //! With the effect demo on, the portals (the whole right edge if nothing is
@@ -669,7 +669,7 @@ impl Tracker {
                 }
                 // Sliding along the edge also lands here and moves the bump.
                 self.pushing = true;
-                self.overlay.send(Command::Approach {
+                self.draw(Command::Approach {
                     at: hit.point,
                     progress,
                 });
@@ -698,7 +698,7 @@ impl Tracker {
                 if progress >= 1.0 {
                     self.cross(&hit, portal);
                 } else {
-                    self.overlay.send(Command::Approach {
+                    self.draw(Command::Approach {
                         at: hit.point,
                         progress,
                     });
@@ -711,9 +711,18 @@ impl Tracker {
         }
     }
 
+    /// The edge animation shows in the demo only, where it is tuned. Between
+    /// real devices nothing is drawn for now: the push and the switch delay
+    /// alone decide a crossing.
+    fn draw(&self, command: Command) {
+        if self.demo {
+            self.overlay.send(command);
+        }
+    }
+
     fn cancel(&mut self) {
         if self.pushing {
-            self.overlay.send(Command::Release);
+            self.draw(Command::Release);
         }
         self.pushing = false;
         self.push = 0.0;
@@ -755,7 +764,7 @@ impl Tracker {
 
     fn cross(&mut self, hit: &Hit, portal: Option<PhysicalPortal>) {
         if self.pushing {
-            self.overlay.send(Command::Pass);
+            self.draw(Command::Pass);
         }
         self.pushing = false;
         self.push = 0.0;
@@ -786,7 +795,7 @@ impl Tracker {
         unsafe {
             SetCursorPos(cursor.x, cursor.y);
         }
-        self.overlay.send(Command::Emerge { at: entry });
+        self.draw(Command::Emerge { at: entry });
         self.start_cooldown();
         self.side = match self.side {
             DemoSide::Local => DemoSide::Remote,
@@ -795,11 +804,11 @@ impl Tracker {
         self.state.set_demo_side(self.side);
     }
 
-    /// The pointer came back from a peer: show it coming in, and let it go
-    /// straight back for a while without pushing again.
+    /// The pointer came back from a peer: let it go straight back for a
+    /// while without pushing again.
     fn returned(&mut self, peer_id: &str, cursor: POINT) {
         if let Some(at) = self.entry_point(peer_id, cursor) {
-            self.overlay.send(Command::Emerge { at });
+            self.draw(Command::Emerge { at });
         }
         self.start_cooldown();
     }
@@ -1178,8 +1187,8 @@ unsafe extern "system" fn window_proc(
             return 0;
         }
         WM_END_CAPTURE => {
-            // Only a pointer that came back through a portal shows the
-            // emerge animation.
+            // Only a pointer that came back through a portal may go straight
+            // back without a push.
             if let Some(ended) = capture::finish()
                 && let Some(cursor) = ended.cursor
                 && !ended.jumped

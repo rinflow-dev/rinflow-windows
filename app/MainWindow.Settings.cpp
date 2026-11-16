@@ -300,20 +300,6 @@ namespace winrt::Rinflow::implementation
             }
         });
 
-        PortBox().ValueChanged([weak](NumberBox const& box, auto&&)
-        {
-            auto self = weak.get();
-            if (!self || self->m_applying) return;
-            double value = box.Value();
-            if (std::isnan(value))
-            {
-                // Emptied: back to the core's default port.
-                self->m_agent->UpdateSetting(L"port", JsonValue::CreateNullValue());
-                return;
-            }
-            self->m_agent->UpdateSetting(L"port", JsonValue::CreateNumberValue(std::round(value)));
-        });
-
         EditHotkeyButton().Click([weak](auto&&, auto&&)
         {
             if (auto self = weak.get()) self->EditHotkey();
@@ -577,19 +563,6 @@ namespace winrt::Rinflow::implementation
         bool locked = state.GetNamedBoolean(L"locked", false);
         LockBar().Message(RinflowApp::Format(L"LockBarMessage", hotkeyText));
         LockBar().IsOpen(locked);
-
-        auto running = static_cast<uint32_t>(state.GetNamedNumber(L"control_port", 0));
-        auto portValue = settings.GetNamedValue(L"port", JsonValue::CreateNullValue());
-        uint32_t configured = portValue.ValueType() == JsonValueType::Number
-            ? static_cast<uint32_t>(portValue.GetNumber())
-            : running;
-        if (PortBox().FocusState() == FocusState::Unfocused && PortBox().Value() != configured)
-        {
-            PortBox().Value(configured);
-        }
-        PortHint().Text(configured != running
-            ? RinflowApp::Format(L"PortPending", configured, running)
-            : RinflowApp::Text(L"PortHint"));
 
         // The input service: running while the feature is on. Installed with
         // setup, the switch can add it; a portable copy cannot.
