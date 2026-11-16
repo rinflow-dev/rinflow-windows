@@ -13,7 +13,7 @@ permissions:
 env:
   # The rinflow-core commit this version is built with. Update it when the
   # Windows client moves to a newer core.
-  CORE_REF: a8d7dea2881f838752259f39ade90a149db62f0e
+  CORE_REF: e65da854c02edbf266106c9aedf9a7bf94dcf27e
 
 jobs:
   build:

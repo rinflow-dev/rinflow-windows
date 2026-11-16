@@ -19,6 +19,7 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 - Only your own devices (connected once, or placed) are remembered across restarts, not every device seen on the network.
 - Setup lets Rinflow quit by itself before an upgrade, so connected devices see a clean disconnect.
 - Shorter descriptions in the settings and in the add-device dialog. The encryption row shows only while the core is not running, since connections are always encrypted.
+- The icon of the program, its shortcuts and the setup program has no plate behind it any more: the mark alone, with a white outline that keeps it visible on a dark taskbar.
 
 ### Fixed
 
@@ -30,6 +31,13 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 - Copying very large text or images could end Rinflow.
 - Saving the arrangement could briefly stall the pointer while controlling another device.
 - One invalid value in the settings no longer resets all the others, and a settings file that cannot be read at the moment is no longer overwritten.
+- While controlling another device, the keyboard and mouse often came back to this PC with the notice that Windows had stopped Rinflow from taking them. Rinflow now takes them again by itself and carries on.
+- Setup could stop at a page asking to close **Connected User Experiences and Telemetry**, a part of Windows that happened to be reading Rinflow's files. Setup now closes only Rinflow.
+
+### Removed
+
+- The animation at the screen edge (the bump while pushing, and the ring where the pointer comes back). Crossing itself is unchanged.
+- The **Port** setting. Devices find each other's port by themselves, and the Mac app never had the setting. A port already set stays in `config.json`.
 
 ## [0.0.1] - 2026-11-05
 
