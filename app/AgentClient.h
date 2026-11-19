@@ -59,6 +59,9 @@ namespace RinflowApp
         void SetEffectDemo(bool enabled);
         void PreviewEffect();
         void SetClipboardSync(bool enabled);
+        // Locks the pointer to this PC, or unlocks it, as the lock shortcut
+        // does (snapshot `locked`).
+        void SetLocked(bool locked);
 
         // Keys of the agent's settings (agent/src/settings.rs), plus
         // launch_at_login.

@@ -4,6 +4,14 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- A **Lock to this PC** switch in the tray panel. It does what the lock shortcut (Ctrl+Alt+L) does: the pointer stays on this PC until you turn it off.
+
+### Fixed
+
+- While another device controlled this PC, full-screen games such as Overwatch did not respond to the mouse, and the pointer seemed stuck. On a PC with one monitor, Rinflow did not notice that the game was holding the pointer. It now does, and sends the game relative motion.
+
 ## [0.0.2] - 2026-11-16
 
 ### Added

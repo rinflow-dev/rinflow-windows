@@ -186,6 +186,8 @@
   <data name="HotkeyInstructions.Text" xml:space="preserve"><value>Press the new combination: at least one of Ctrl, Alt or Win, plus a regular key.</value></data>
   <data name="TraySharingTitle.Text" xml:space="preserve"><value>Keyboard and mouse sharing</value></data>
   <data name="TraySharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keyboard and mouse sharing</value></data>
+  <data name="TrayLockTitle.Text" xml:space="preserve"><value>Lock to this PC</value></data>
+  <data name="TrayLockToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lock to this PC</value></data>
   <data name="TrayDevicesHeader.Text" xml:space="preserve"><value>Devices</value></data>
   <data name="TrayOpenButton.Content" xml:space="preserve"><value>Open Rinflow</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Settings</value></data>

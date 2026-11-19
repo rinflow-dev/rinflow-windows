@@ -186,6 +186,8 @@
   <data name="HotkeyInstructions.Text" xml:space="preserve"><value>新しい組み合わせを押してください: Ctrl、Alt、Win のいずれか 1 つ以上と、通常のキーです。</value></data>
   <data name="TraySharingTitle.Text" xml:space="preserve"><value>キーボードとマウスの共有</value></data>
   <data name="TraySharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>キーボードとマウスの共有</value></data>
+  <data name="TrayLockTitle.Text" xml:space="preserve"><value>この PC にロック</value></data>
+  <data name="TrayLockToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>この PC にロック</value></data>
   <data name="TrayDevicesHeader.Text" xml:space="preserve"><value>デバイス</value></data>
   <data name="TrayOpenButton.Content" xml:space="preserve"><value>Rinflow を開く</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>設定</value></data>

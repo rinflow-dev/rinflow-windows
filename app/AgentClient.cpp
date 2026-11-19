@@ -10,7 +10,7 @@ using namespace winrt::Windows::Data::Json;
 namespace
 {
     // Must match PROTOCOL_VERSION in agent/src/ipc.rs.
-    constexpr int ProtocolVersion = 18;
+    constexpr int ProtocolVersion = 19;
 
     // A started agent opens its pipe within a second or two; past this it
     // is stuck (or another agent exited 0 for one that never came up).
@@ -154,6 +154,13 @@ namespace RinflowApp
     {
         auto message = Request(L"set_clipboard_sync");
         message.Insert(L"enabled", JsonValue::CreateBooleanValue(enabled));
+        Send(message);
+    }
+
+    void AgentClient::SetLocked(bool locked)
+    {
+        auto message = Request(L"set_locked");
+        message.Insert(L"locked", JsonValue::CreateBooleanValue(locked));
         Send(message);
     }
 

@@ -161,6 +161,11 @@ impl Services {
         self.overlay.send(Command::Preview { hold });
     }
 
+    /// The lock belongs to the edge thread, which also takes the shortcut.
+    pub fn set_locked(&self, locked: bool) {
+        self.edge.set_locked(locked);
+    }
+
     /// The demo runs on the edge thread, which also drives real crossings;
     /// turning it off retracts any bump on screen.
     pub fn set_effect_demo(&self, enabled: bool) -> Result<(), String> {

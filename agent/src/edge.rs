@@ -92,6 +92,9 @@ const WM_POINTER_RELEASED: u32 = WM_APP + 7;
 /// Thread message: the arrangement changed (a placement, on either device,
 /// or displays); a driven peer's pointer follows it (`capture::rearranged`).
 const WM_ARRANGEMENT_CHANGED: u32 = WM_APP + 8;
+/// Thread message: lock to the current screen (wparam 1) or unlock, from
+/// the tray panel's switch.
+const WM_SET_LOCK: u32 = WM_APP + 9;
 const HOTKEY_ID: i32 = 1;
 /// The switch shortcuts (arrow keys), registered while no peer is driven (the capture
 /// hooks take them otherwise): ids 2 to 5, in [`SWITCH_SIDES`] order.
@@ -167,6 +170,15 @@ impl EdgeHandle {
         // SAFETY: posts to the edge thread's message queue.
         unsafe {
             PostThreadMessageW(self.thread_id, WM_SETTINGS_CHANGED, 0, 0);
+        }
+    }
+
+    /// Locks the pointer to the current screen, or unlocks it, as the lock
+    /// shortcut does.
+    pub fn set_locked(&self, locked: bool) {
+        // SAFETY: posts to the edge thread's message queue.
+        unsafe {
+            PostThreadMessageW(self.thread_id, WM_SET_LOCK, usize::from(locked), 0);
         }
     }
 
@@ -291,6 +303,11 @@ impl EdgeThread {
                         if message.hwnd.is_null() && message.message == WM_SET_DEMO {
                             let enabled = message.wParam != 0;
                             with_tracker(|tracker| tracker.set_demo(enabled));
+                            continue;
+                        }
+                        if message.hwnd.is_null() && message.message == WM_SET_LOCK {
+                            let locked = message.wParam != 0;
+                            with_tracker(|tracker| tracker.set_locked(locked));
                             continue;
                         }
                         if message.hwnd.is_null() && message.message == WM_SETTINGS_CHANGED {
@@ -560,7 +577,10 @@ impl Tracker {
     }
 
     fn toggle_lock(&mut self) {
-        let locked = !LOCKED.load(Ordering::Relaxed);
+        self.set_locked(!LOCKED.load(Ordering::Relaxed));
+    }
+
+    fn set_locked(&mut self, locked: bool) {
         LOCKED.store(locked, Ordering::Relaxed);
         self.state.set_locked(locked);
         if locked {

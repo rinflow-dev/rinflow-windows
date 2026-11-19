@@ -130,7 +130,7 @@ Core handles everything that is the same on every platform. The agent only trans
 | Keys | agent ([keymap.rs](../agent/src/keymap.rs)) | Played by scan code. The key position counts, so this PC's layout and IME (for example Chinese Pinyin) decide the character. Pause and NumLock are played by virtual key. A key with no Windows scan code still types its character. |
 | Scroll | agent | Trackpad points × 1.2 wheel units (Windows apps scroll about 100 DIPs per 120 units), and notched-wheel lines (10 points) become one Windows line (40 units). Fractions are carried over; horizontal scroll is supported. |
 | Buttons | agent | Left, right, middle, back, forward. |
-| Games | agent, core | A game or a pointer-lock web page hides the cursor and confines it (`ClipCursor`), and reads raw relative motion. While that is so, motion is played as relative moves instead, and the controlling device is told (`set_pointer_locked`, the core's `PointerLock` message) so it stops crossing at the edges: the camera keeps turning. When the game lets go, the controlling device puts the cursor back where it tracks it. |
+| Games | agent, core | A game or a pointer-lock web page hides the cursor (a display count below zero, or no cursor shape: `SetCursor(NULL)`) and confines it (`ClipCursor`) or fills its monitor, and reads raw relative motion, ignoring absolute moves. Full screen counts on its own because on a PC with one monitor a full-screen game's clip is the whole desktop, and some games clip nothing and put the cursor back in the middle every frame; a maximized window with a title bar, or the desktop, does not. While that is so, motion is played as relative moves instead, and the controlling device is told (`set_pointer_locked`, the core's `PointerLock` message) so it stops crossing at the edges: the camera keeps turning. When the game lets go, the controlling device puts the cursor back where it tracks it. |
 | Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. See also [Presence](#presence). |
 | No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
 | After the peer leaves | agent ([hider.rs](../agent/src/hider.rs)) | With **其他设备离开后隐藏光标** (`hide_cursor_on_leave`, on by default), when the last peer driving this PC moves its pointer away (`remote_control_ended`, reason `remote reset`), the cursor is hidden where it was left, as Universal Control, Deskflow and Mouse Without Borders do. A 1×1 topmost window that takes no focus and shows no cursor goes under it, and the hider thread's cursor display count drops below zero (`ShowCursor`), so another program's `SetCursor` does not bring it back; nothing under it gets hover effects. A low-level mouse hook, installed only meanwhile, shows the cursor at the first motion, button or wheel of this PC's own mouse, touchpad, pen or touch screen, before Windows routes that event, so the first click lands where it was aimed. Motion the agent itself played does not count: the last moves of the peer that left often land a little after its reset (the input service plays them asynchronously), so the window follows them and the cursor stays hidden. A peer driving this PC again, this PC starting to drive one, or turning the setting off show it too. A lost connection or a takeover leaves the cursor as it is. |
@@ -273,7 +273,7 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 通过地址添加 (添加设备) | `manual_addresses` | Up to 32 host names or IPv4 addresses (optionally `:port`, the discovery port). See [Arranging devices](#arranging-devices). |
 | 鼠标和滚动 (device menu) | `peer_input` | `{"<device ID>": {"pointer_speed", "scroll_speed", "invert_scroll"}}`. See [Controlling another device](#controlling-another-device). |
 | 诊断日志 | (none) | **打开日志文件夹** opens `%LOCALAPPDATA%\Rinflow\logs`: `agent.log` ([log.rs](../agent/src/log.rs)), moved aside to `agent.1.log` past 2 MB. It records connections, pairing, transfers and errors with the local time (never clipboard contents, keys or the pairing code), and panics. The input service and helper log to `%ProgramFiles%\Rinflow\logs`. |
-| 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. |
+| 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. The tray panel's **锁定在这台电脑** switch sets the same lock (`set_locked`). The lock is not saved: it ends when the agent restarts. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
 | (none) | `port` | The core's UDP port for connections (`null`: 42421). Not in the settings, as on the Mac: devices learn each other's port through discovery, so nobody has to set it. `config.json` still takes one, for a network where 42421 cannot be used. Applies after Rinflow restarts; must not be the discovery port 42420. |
 | 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
@@ -345,7 +345,7 @@ App → agent:
 
 | Message | Effect |
 | --- | --- |
-| `{"type":"hello","protocol":18}` | Sent first. The agent replies with an `error` if the protocol version differs. |
+| `{"type":"hello","protocol":19}` | Sent first. The agent replies with an `error` if the protocol version differs. |
 | `{"type":"connect","peer_id":"…"}` | Connect to a discovered peer. |
 | `{"type":"disconnect","peer_id":"…"}` | Close the session with that peer. Sessions with other peers stay open. |
 | `{"type":"set_placement","peer_id":"…","x":1440,"y":-11}` | Place a peer near this offset (logical points, this PC's space). The core snaps it to a valid spot and syncs it. |
@@ -353,6 +353,7 @@ App → agent:
 | `{"type":"remove_placement","peer_id":"…"}` | Remove the peer's placement. |
 | `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
 | `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `config.json`. |
+| `{"type":"set_locked","locked":true}` | Lock the pointer to this PC, or unlock it, as the lock shortcut does (the snapshot's `locked`). |
 | `{"type":"update_settings","values":{"sharing":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
 | `{"type":"forget_device","peer_id":"…"}` | Disconnect, unplace, unpair and stop listing a device. |
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
@@ -371,7 +372,7 @@ Agent → app:
 
 | Message | Meaning |
 | --- | --- |
-| `{"type":"hello","protocol":18,"agent_version":"0.0.1"}` | Sent once when the app connects. |
+| `{"type":"hello","protocol":19,"agent_version":"0.0.1"}` | Sent once when the app connects. |
 | `{"type":"state", …}` | The full snapshot, sent right after `hello` and again after every change. |
 | `{"type":"error","message":"…"}` | A request failed. |
 

@@ -84,6 +84,14 @@ namespace winrt::Rinflow::implementation
                 self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(self->SharingToggle().IsOn()));
             }
         });
+        LockToggle().Toggled([weak](auto&&, auto&&)
+        {
+            auto self = weak.get();
+            if (self && !self->m_applying)
+            {
+                self->m_agent->SetLocked(self->LockToggle().IsOn());
+            }
+        });
         // The main window opens after this click, then the panel closes.
         auto openMain = [weak](bool settings)
         {
@@ -220,6 +228,8 @@ namespace winrt::Rinflow::implementation
         m_applying = true;
         bool sharing = settings.GetNamedBoolean(L"sharing", true);
         if (SharingToggle().IsOn() != sharing) SharingToggle().IsOn(sharing);
+        bool locked = state.GetNamedBoolean(L"locked", false);
+        if (LockToggle().IsOn() != locked) LockToggle().IsOn(locked);
         m_applying = false;
 
         auto model = RinflowApp::DeviceModel::FromState(state);

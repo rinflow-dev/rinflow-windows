@@ -48,6 +48,21 @@
                     Style="{StaticResource BareSwitchStyle}" />
             </Grid>
 
+            <Grid MinHeight="48" Padding="12,0" ColumnSpacing="12" Style="{StaticResource CardStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon VerticalAlignment="Center" FontSize="16" Glyph="&#xE72E;" />
+                <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" x:Uid="TrayLockTitle" Text="锁定在这台电脑" />
+                <ToggleSwitch
+                    x:Name="LockToggle"
+                    Grid.Column="2"
+                    x:Uid="TrayLockToggle" AutomationProperties.Name="锁定在这台电脑"
+                    Style="{StaticResource BareSwitchStyle}" />
+            </Grid>
+
             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
             <TextBlock

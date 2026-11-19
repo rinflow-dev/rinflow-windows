@@ -25,9 +25,10 @@
 //!   input meant for a UAC prompt or the lock screen; the agent says why
 //!   once (log and notification) until input goes through again.
 //! - A game or a pointer-lock page that hides the cursor and confines it
-//!   (`ClipCursor`) reads raw relative motion: motion is then played as
-//!   relative moves, and the controlling peer is told (`set_pointer_locked`)
-//!   so it stops crossing at the edges meanwhile.
+//!   (`ClipCursor`), or a full-screen one that hides it, reads raw relative
+//!   motion and ignores absolute moves: motion is then played as relative
+//!   moves, and the controlling peer is told (`set_pointer_locked`) so it
+//!   stops crossing at the edges meanwhile.
 
 use crate::displays;
 use crate::elevated;
@@ -48,7 +49,8 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTONULL, MONITORINFO,
+    MonitorFromPoint, MonitorFromWindow,
 };
 use windows_sys::Win32::System::Power::{
     ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState,
@@ -63,9 +65,10 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT, MapVirtualKeyW, SendInput,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CURSOR_SHOWING, CURSORINFO, GetClipCursor, GetCursorInfo, GetCursorPos, GetSystemMetrics,
-    MKF_AVAILABLE, MKF_MOUSEKEYSON, SM_MOUSEPRESENT, SPI_GETMOUSEKEYS, SPI_SETMOUSEKEYS,
-    SPIF_SENDCHANGE, SystemParametersInfoW, XBUTTON1, XBUTTON2,
+    CURSOR_SHOWING, CURSORINFO, GWL_STYLE, GetClassNameW, GetClipCursor, GetCursorInfo,
+    GetCursorPos, GetForegroundWindow, GetShellWindow, GetSystemMetrics, GetWindowLongW,
+    GetWindowRect, IsZoomed, MKF_AVAILABLE, MKF_MOUSEKEYSON, SM_MOUSEPRESENT, SPI_GETMOUSEKEYS,
+    SPI_SETMOUSEKEYS, SPIF_SENDCHANGE, SystemParametersInfoW, WS_CAPTION, XBUTTON1, XBUTTON2,
 };
 
 /// Stored in `dwExtraInfo` of every injected event ("LCIN"), so the agent's
@@ -439,23 +442,80 @@ impl Player {
     }
 }
 
-/// A game or a pointer-lock page holds the pointer: the cursor is hidden and
-/// confined to less than the desktop (`ClipCursor`). Either alone happens
-/// in ordinary use (typing hides it; some apps confine it).
+/// A game or a pointer-lock page holds the pointer: the cursor is hidden
+/// (its display count below zero, or no cursor shape at all, as games that
+/// call `SetCursor(NULL)` leave it), and either confined to less than the
+/// desktop (`ClipCursor`) or the window in front fills its monitor. Hidden
+/// alone happens in ordinary use (typing hides it); so does confined alone
+/// (some apps do it).
+///
+/// Full screen counts because on a PC with one monitor a full-screen game's
+/// clip is that monitor, which is the whole desktop, and some games clip
+/// nothing at all and put the cursor back in the middle every frame. A
+/// full-screen video hiding an idle cursor counts too, but only until the
+/// first move shows the cursor again.
 fn pointer_captured() -> bool {
     // SAFETY: plain queries into properly sized structures.
     unsafe {
         let mut info: CURSORINFO = std::mem::zeroed();
         info.cbSize = size_of::<CURSORINFO>() as u32;
-        if GetCursorInfo(&mut info) == 0 || info.flags & CURSOR_SHOWING != 0 {
+        if GetCursorInfo(&mut info) == 0 {
+            return false;
+        }
+        if info.flags & CURSOR_SHOWING != 0 && !info.hCursor.is_null() {
             return false;
         }
         let mut clip: RECT = std::mem::zeroed();
-        if GetClipCursor(&mut clip) == 0 {
+        if GetClipCursor(&mut clip) != 0 && confined(clip, &VirtualDesktop::current()) {
+            return true;
+        }
+    }
+    foreground_full_screen()
+}
+
+/// The window in front covers its whole monitor: a full-screen game, video
+/// or presentation. Not an ordinary maximized window (title bar; it leaves
+/// the taskbar out unless that hides itself), and not the desktop.
+fn foreground_full_screen() -> bool {
+    // SAFETY: plain window and monitor queries into properly sized
+    // structures; a window that is gone meanwhile only makes them fail.
+    unsafe {
+        let window = GetForegroundWindow();
+        if window.is_null() || window == GetShellWindow() {
             return false;
         }
-        confined(clip, &VirtualDesktop::current())
+        let mut class = [0u16; 16];
+        let length = GetClassNameW(window, class.as_mut_ptr(), class.len() as i32);
+        let class = String::from_utf16_lossy(&class[..length.max(0) as usize]);
+        if class == "Progman" || class == "WorkerW" {
+            return false;
+        }
+        let style = GetWindowLongW(window, GWL_STYLE) as u32;
+        if IsZoomed(window) != 0 && style & WS_CAPTION == WS_CAPTION {
+            return false;
+        }
+        let mut rect: RECT = std::mem::zeroed();
+        if GetWindowRect(window, &mut rect) == 0 {
+            return false;
+        }
+        let monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONULL);
+        if monitor.is_null() {
+            return false;
+        }
+        let mut info: MONITORINFO = std::mem::zeroed();
+        info.cbSize = size_of::<MONITORINFO>() as u32;
+        GetMonitorInfoW(monitor, &mut info) != 0 && covers(rect, info.rcMonitor)
     }
+}
+
+/// `window` covers all of `monitor` (it may reach beyond it).
+fn covers(window: RECT, monitor: RECT) -> bool {
+    monitor.right > monitor.left
+        && monitor.bottom > monitor.top
+        && window.left <= monitor.left
+        && window.top <= monitor.top
+        && window.right >= monitor.right
+        && window.bottom >= monitor.bottom
 }
 
 /// The cursor's clip rectangle leaves out part of the virtual desktop.
@@ -770,6 +830,26 @@ mod tests {
         assert!(confined(rect(0, 0, 2880, 1920), &desktop));
         // Chrome's pointer lock: a tiny rectangle.
         assert!(confined(rect(1440, 960, 1441, 961), &desktop));
+    }
+
+    #[test]
+    fn a_full_screen_window_covers_its_monitor() {
+        use super::covers;
+        let rect = |left, top, right, bottom| RECT {
+            left,
+            top,
+            right,
+            bottom,
+        };
+        let monitor = rect(0, 0, 2880, 1920);
+        assert!(covers(rect(0, 0, 2880, 1920), monitor));
+        // Some games' windows reach a little beyond the monitor.
+        assert!(covers(rect(-8, -8, 2888, 1928), monitor));
+        // A maximized window leaves the taskbar out.
+        assert!(!covers(rect(-8, -8, 2888, 1848), monitor));
+        // A window on the next monitor.
+        assert!(!covers(rect(2880, 0, 5760, 1920), monitor));
+        assert!(!covers(rect(0, 0, 0, 0), rect(0, 0, 0, 0)));
     }
 
     #[test]
