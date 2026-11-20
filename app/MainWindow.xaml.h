@@ -30,7 +30,7 @@ namespace winrt::Rinflow::implementation
             return m_nearby;
         }
 
-        enum class Page { Devices, Settings, Effect };
+        enum class Page { Devices, Settings };
         // Shows a page and brings the window to the front.
         void ShowPage(Page page);
 
@@ -169,20 +169,6 @@ namespace winrt::Rinflow::implementation
         void ShowHotkeyKeys(Microsoft::UI::Xaml::Controls::StackPanel const& panel, uint32_t modifiers, uint32_t key);
         fire_and_forget EditHotkey();
 
-        // ---- Edge animation, development builds (MainWindow.Effect.cpp) ---
-        // One tunable effect parameter: its key in the agent's JSON, the
-        // slider that edits it and the label that shows the value.
-        struct EffectSlider
-        {
-            std::wstring_view key;
-            Microsoft::UI::Xaml::Controls::Slider slider{ nullptr };
-            Microsoft::UI::Xaml::Controls::TextBlock label{ nullptr };
-            std::function<std::wstring(double)> format;
-        };
-        void SetupEffectPage();
-        void ApplyEffect(Windows::Data::Json::JsonObject const& state);
-        void OnEffectEdited();
-        void UpdateEffectLabels();
 
         std::unique_ptr<::RinflowApp::AgentClient> m_agent;
         // Set once the window closed: messages still queued are dropped.
@@ -249,9 +235,6 @@ namespace winrt::Rinflow::implementation
         bool m_previewQueued{ false };
         hstring m_localName;
 
-        std::vector<EffectSlider> m_effectSliders;
-        bool m_applyingEffect{ false };
-        double m_effectRevision{ -1 };
 
         // The shortcut being recorded in the hotkey dialog.
         uint32_t m_newHotkeyModifiers{ 0 };

@@ -54,10 +54,7 @@ namespace RinflowApp
         void RemovePlacement(std::wstring_view peerId);
         void PlaceBeside(std::wstring_view peerId, std::wstring_view side);
 
-        void SetEffect(winrt::Windows::Data::Json::JsonObject const& params);
-        void ResetEffect();
-        void SetEffectDemo(bool enabled);
-        void PreviewEffect();
+
         void SetClipboardSync(bool enabled);
         // Locks the pointer to this PC, or unlocks it, as the lock shortcut
         // does (snapshot `locked`).

@@ -27,7 +27,6 @@
   <data name="SettingInvalidValue" xml:space="preserve"><value>设置的值无效：{0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>主题只能是跟随系统、浅色或深色</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>语言只能是跟随系统、简体中文、英语或日语</value></data>
-  <data name="SwitchDelayTooLong" xml:space="preserve"><value>切换延迟最长 1000 毫秒</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键</value></data>
   <data name="PortInvalid" xml:space="preserve"><value>端口需在 1024–65535 之间，且不能是发现端口 {0}</value></data>
   <data name="AddressesTooMany" xml:space="preserve"><value>最多添加 {0} 个地址</value></data>

@@ -12,7 +12,7 @@
 //!   "settings": { … },   // settings.rs
 //!   "layout": { … },     // arrangement.rs: placements, the user's devices
 //!   "trusted": [ … ],    // trust.rs: paired devices
-//!   "effect": { … }      // effect.rs: only once the tuning page changed it
+//!   "effect": { … }      // left by versions with the edge animation; unread
 //! }
 //! ```
 //!

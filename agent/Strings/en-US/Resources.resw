@@ -27,7 +27,6 @@
   <data name="SettingInvalidValue" xml:space="preserve"><value>Invalid setting value: {0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>Theme must be system, light, or dark</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>Language must be system, Simplified Chinese, English, or Japanese</value></data>
-  <data name="SwitchDelayTooLong" xml:space="preserve"><value>Switch delay can be at most 1000 ms</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>Shortcuts must include Ctrl, Alt, or Win, plus a regular key</value></data>
   <data name="PortInvalid" xml:space="preserve"><value>Ports must be between 1024 and 65535 and not the discovery port {0}</value></data>
   <data name="AddressesTooMany" xml:space="preserve"><value>You can add up to {0} addresses</value></data>

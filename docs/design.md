@@ -4,14 +4,13 @@ The Windows client for Rinflow. It is two programs:
 
 | Program | Language | Role |
 | --- | --- | --- |
-| `rinflow-agent.exe` ([agent/](../agent/)) | Rust | Always running. Links `rinflow-core` directly, owns the tray icon, plays input from a controlling peer, draws the edge push-through effect, and serves a named pipe for the settings app. Keyboard and mouse capture will live here too, because input must never wait on UI or a garbage collector. |
+| `rinflow-agent.exe` ([agent/](../agent/)) | Rust | Always running. Links `rinflow-core` directly, owns the tray icon, plays input from a controlling peer, and serves a named pipe for the settings app. Keyboard and mouse capture will live here too, because input must never wait on UI or a garbage collector. |
 | `Rinflow.exe` ([app/](../app/)) | C++/WinRT, WinUI 3 | The main window (devices, their arrangement around this PC, settings) and the tray panel. It runs only while one of its windows is open, one instance per user, so it costs no memory the rest of the time. |
 
 ```
  Rinflow.exe (WinUI 3)  ── named pipe, JSON lines ──►  rinflow-agent.exe (Rust)
    devices, arrangement,                                    ├ tray icon
    settings, tray panel                                     ├ arrangement (config.json, display watcher)  
-                                                            ├ edge effect overlay (Direct2D + DirectComposition)
                                                             ├ rinflow-core ── UDP 42420 / QUIC 42421 ──► other devices
                                                             ├ input injection (SendInput)
                                                             └ hooks to capture local input
@@ -30,13 +29,10 @@ agent/
   src/config.rs              config.json: one file for everything the agent keeps (see Data folder)
   src/state.rs               folds core events into the snapshot the app renders
   src/ipc.rs                 named-pipe server
-  src/services.rs            what IPC requests act on (core, arrangement, effect, demo)
+  src/services.rs            what IPC requests act on (core, arrangement, settings)
   src/displays.rs            monitors in logical points, display-change watcher, physical portals
   src/arrangement.rs         saved placements and the user's devices (config.json `layout`)
-  src/effect.rs              effect parameters (config.json `effect`)
-  src/spring.rs              damped spring with SwiftUI-style response/damping
-  src/overlay.rs             click-through overlay that draws the edge effect
-  src/edge.rs                edge thread: raw-input push tracking at the portals, crossing, the demo,
+  src/edge.rs                edge thread: raw-input push tracking at the portals, crossing,
                              the lock shortcut
   src/capture.rs             while driving a peer: low-level hooks, hidden parked cursor, return
   src/clipboard.rs           the Windows clipboard ↔ the core: text, HTML (CF_HTML), PNG (and CF_DIB)
@@ -48,6 +44,7 @@ agent/
   src/inject.rs              plays a controlling peer's input with SendInput (or through the input helper)
   src/hider.rs               hides the cursor where a controlling peer's pointer left it
   src/elevated.rs            the agent's end of the input helper's pipe
+  src/fullscreen.rs          full-screen windows and games in front (edges, a peer's motion)
   src/keymap.rs              USB HID usage → Windows scan code
   src/update.rs              updates: latest.json, signed downloads (update/http.rs: WinHTTP), running setup
   src/win.rs                 Win32 helpers: mutex, user SID, pipe security
@@ -69,7 +66,6 @@ app/
   MainWindow.Arrangement.cpp the arrangement canvas: to-scale screens, dragging, the strip of unplaced devices
   MainWindow.Settings.cpp    the 设置 page and the lock-shortcut dialog
   MainWindow.Pairing.cpp     the 配对 dialog (the pairing code)
-  MainWindow.Effect.cpp      the edge animation page (builds with EffectDemo only)
   TrayWindow.xaml(.cpp)      the tray panel (acrylic, closes when it loses focus): the lock switch, and
                              the device driving this PC while one does
   DeviceModel.{h,cpp}        the user's / nearby devices from the agent's snapshot, and their rows
@@ -83,13 +79,13 @@ Everything is kept per user in `%LOCALAPPDATA%\Rinflow` (local, not roaming: the
 
 ```
 %LOCALAPPDATA%\Rinflow\
-  config.json        device ID, settings, arrangement, paired devices, effect parameters
+  config.json        device ID, settings, arrangement, paired devices
   config.json.bak    the version before the last save; used when config.json is damaged
   identity.pem       this PC's certificate and private key (the core's own file)
   logs\agent.log     the agent's log (agent.1.log once it passes 2 MB)
 ```
 
-`config.json` ([config.rs](../agent/src/config.rs)) has one section per owner: `device_id` ([identity.rs](../agent/src/identity.rs)), `settings` ([settings.rs](../agent/src/settings.rs)), `layout` ([arrangement.rs](../agent/src/arrangement.rs)), `trusted` ([trust.rs](../agent/src/trust.rs)) and `effect` ([effect.rs](../agent/src/effect.rs), only once the tuning page changed it), plus `version`.
+`config.json` ([config.rs](../agent/src/config.rs)) has one section per owner: `device_id` ([identity.rs](../agent/src/identity.rs)), `settings` ([settings.rs](../agent/src/settings.rs)), `layout` ([arrangement.rs](../agent/src/arrangement.rs)), `trusted` ([trust.rs](../agent/src/trust.rs)), plus `version`. An `effect` section left by versions with the edge animation is not read.
 
 - **Saving.** A new version is written to `config.json.tmp`, flushed to disk, and replaces the file; the old one becomes `config.json.bak`. A crash or power loss never leaves a half-written file.
 - **Never waited on by the input hooks.** Each owner stages its section under its own lock, so saves keep the order of changes, and writes the file after letting go of it.
@@ -114,7 +110,7 @@ The canvas on the **设备** page draws this PC's monitors (accent outline) and 
 - **Sync.** A placement made on either device syncs to the other while they are connected, mirrored into its own space, and the newer edit wins.
 - **Display changes.** The agent watches for monitor changes (`WM_DISPLAYCHANGE`, DPI and setting changes, plus a 2-second check for drivers that announce nothing). It hands the new monitors to the core, which tells peers and re-fits any placement that no longer touches the desktop.
 - **Persistence.** Placements and the last known name, platform and displays of each device are saved in `config.json` (`layout`, [arrangement.rs](../agent/src/arrangement.rs)), so placed devices still show while offline. Only the user's own devices (connected once, or placed) are saved; other devices seen on the network are known only while the agent runs.
-- **Portals.** The agent converts the touching segments into physical pixels per monitor ([displays.rs](../agent/src/displays.rs)). The effect demo already uses them. Input capture (M2) will use them to decide where the cursor leaves this PC.
+- **Portals.** The agent converts the touching segments into physical pixels per monitor ([displays.rs](../agent/src/displays.rs)). The edge thread uses them to decide where the cursor leaves this PC.
 
 ## Being controlled by another device
 
@@ -134,20 +130,20 @@ Core handles everything that is the same on every platform. The agent only trans
 | Games | agent, core | A game or a pointer-lock web page hides the cursor (a display count below zero, or no cursor shape: `SetCursor(NULL)`) and confines it (`ClipCursor`) or fills its monitor, and reads raw relative motion, ignoring absolute moves. Full screen counts on its own because on a PC with one monitor a full-screen game's clip is the whole desktop, and some games clip nothing and put the cursor back in the middle every frame; a maximized window with a title bar, or the desktop, does not. While that is so, motion is played as relative moves instead, and the controlling device is told (`set_pointer_locked`, the core's `PointerLock` message) so it stops crossing at the edges: the camera keeps turning. When the game lets go, the controlling device puts the cursor back where it tracks it. |
 | Staying awake | agent | While controlled, `SetThreadExecutionState` keeps the system and display on, since nobody touches this PC's own mouse or keyboard. See also [Presence](#presence). |
 | No mouse attached | agent | Windows hides the cursor on a PC with no pointing device. The agent then turns on the MouseKeys accessibility feature, which makes Windows draw it (the same approach as Deskflow). It stays on afterwards, because turning it off can leave the cursor hidden. PCs with a mouse or touchpad are not touched. |
-| After the peer leaves | agent ([hider.rs](../agent/src/hider.rs)) | With **其他设备离开后隐藏光标** (`hide_cursor_on_leave`, on by default), when the last peer driving this PC moves its pointer away (`remote_control_ended`, reason `remote reset`), the cursor is hidden where it was left, as Universal Control, Deskflow and Mouse Without Borders do. A 1×1 topmost window that takes no focus and shows no cursor goes under it, and the hider thread's cursor display count drops below zero (`ShowCursor`), so another program's `SetCursor` does not bring it back; nothing under it gets hover effects. A low-level mouse hook, installed only meanwhile, shows the cursor at the first motion, button or wheel of this PC's own mouse, touchpad, pen or touch screen, before Windows routes that event, so the first click lands where it was aimed. Motion the agent itself played does not count: the last moves of the peer that left often land a little after its reset (the input service plays them asynchronously), so the window follows them and the cursor stays hidden. A peer driving this PC again, this PC starting to drive one, or turning the setting off show it too. A lost connection or a takeover leaves the cursor as it is. |
+| After the peer leaves | agent ([hider.rs](../agent/src/hider.rs)) | When the last peer driving this PC moves its pointer away (`remote_control_ended`, reason `remote reset`), the cursor is hidden where it was left, as Universal Control, Deskflow and Mouse Without Borders do. A 1×1 topmost window that takes no focus and shows no cursor goes under it, and the hider thread's cursor display count drops below zero (`ShowCursor`), so another program's `SetCursor` does not bring it back; nothing under it gets hover effects. A low-level mouse hook, installed only meanwhile, shows the cursor at the first motion, button or wheel of this PC's own mouse, touchpad, pen or touch screen, before Windows routes that event, so the first click lands where it was aimed. Motion the agent itself played does not count: the last moves of the peer that left often land a little after its reset (the input service plays them asynchronously), so the window follows them and the cursor stays hidden. A peer driving this PC again or this PC starting to drive one show it too. A lost connection or a takeover leaves the cursor as it is. |
 
 Every injected event carries `dwExtraInfo = 0x4C43494E` ("LCIN"). The capture hooks use it to skip input the agent itself played.
 
 ## Controlling another device
 
-Push the pointer against the edge where a connected peer is placed (see [Arranging devices](#arranging-devices)). Once the push went far enough and lasted the switch delay, the pointer crosses (nothing is drawn, see [Edge push-through effect](#edge-push-through-effect)): from there this PC's keyboard and mouse drive the peer.
+Push the pointer against the edge where a connected peer is placed (see [Arranging devices](#arranging-devices)). Once the push went far enough and lasted the switch delay, the pointer crosses (see [How a push crosses](#how-a-push-crosses)): from there this PC's keyboard and mouse drive the peer.
 
 | | Where | What |
 | --- | --- | --- |
-| Crossing | agent ([edge.rs](../agent/src/edge.rs)) | The edge thread measures the push with raw input at the portals of connected peers, like the demo. After crossing, it sends the peer an absolute move to the matching point of its edge, 2 points inside. |
+| Crossing | agent ([edge.rs](../agent/src/edge.rs)) | The edge thread measures the push with raw input at the portals of connected peers. After crossing, it sends the peer an absolute move to the matching point of its edge, 2 points inside. |
 | While driving | agent ([capture.rs](../agent/src/capture.rs)) | Low-level mouse and keyboard hooks, installed only while driving, swallow local input and send it through the core. The Windows cursor waits in the middle of its monitor, hidden by a tiny window with no cursor and a cursor display count below zero (`ShowCursor`, as Deskflow does), so another program setting a cursor meanwhile does not show it. Motion is measured from there, so Windows' own pointer speed and acceleration apply. Keys go by scan code (→ HID usage), auto-repeats are marked as repeats, and the wheel sends 10 points per notch. |
 | Where the pointer is | core (`layout::RemotePointer`) | Tracks the pointer in the peer's space as the peer plays the same motion. It slides along edges that lead nowhere. Moving out through a portal ends the crossing at the matching local point, 2 points inside the edge. |
-| Coming back | agent | The cursor reappears there. For the **连续切换免阻力** time, going back across needs no push. |
+| Coming back | agent | The cursor reappears there. For 8 seconds (`WARM_TIME`), going back across needs no push. |
 | Release | agent | **Ctrl+Alt+Esc** gives control back at once, just inside the edge the pointer left through. Losing the session does the same. The peer is told to release every key and button it still holds. |
 | Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
 | Moving on | agent, core | Where the driven device touches another placed device, the pointer moves straight into that one (`RemotePointer::step` reports the neighbour; the capture retargets the core). Modifiers held go along; other held keys are released on the old device. |
@@ -156,7 +152,6 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc still brings the pointer back. |
 | Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
 
-The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
 
 Known limits:
 - The secure desktop (Ctrl+Alt+Del, UAC prompts) cannot be hooked; it takes input back from the hooks.
@@ -209,48 +204,18 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Progress | Files on their way, either way, show as cards on the **设备** page with their progress and a button to stop them (the snapshot's `transfers`, from the core's `files_receiving`, `files_progress`, `files_sending` and `files_send_ended`; `cancel_transfer`). When files arrive, a notification says so; clicking it opens `Downloads\Rinflow`. |
 | Setting | On by default. Saved in `config.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
-## Edge push-through effect
+## How a push crosses
 
-Not shown between real devices for now: only the demo below draws it, until the animation is worth having. The push it visualises (`push_distance`, `warm_seconds`, `corner_dead_zone`) still decides a crossing. Inspired by Universal Control. The effect is drawn on the device the cursor is moving into:
+Fixed in [edge.rs](../agent/src/edge.rs), not settings. Nothing is drawn at the edge.
 
-| Stage | What you see |
-| --- | --- |
-| Approach | While you push against the edge, a soft bump grows out of it under the pointer. It grows quickly at first and then slower, which is the resistance. Near the crossing point a pointer dot appears at its tip. |
-| Release | Stop pushing, or pull away, and the bump springs back. |
-| Pass | Once you have pushed far enough, the bump flicks outward and snaps shut as the cursor goes through. |
-| Emerge | Where the cursor comes in, the edge flicks back with a slight wobble, the dot shrinks onto the pointer and a ring fades out. |
-
-All motion uses a damped spring with SwiftUI-style `response` and damping ratio ([spring.rs](../agent/src/spring.rs)). macOS can use the same values with `Spring(response:dampingRatio:)`, so both platforms move identically.
-
-**Tuning it on one machine.** The tuning page exists in development (Debug) builds only, since nothing else shows the animation. Open it with the button next to the settings button on the **设备** page and turn on **效果演示**. The portals of the arrangement then act as if the placed devices sat beyond them and the screen wrapped around. With nothing placed, the whole right edge of the desktop stands in for a device:
-
-- Push the mouse against a portal. The bump grows; when you have pushed far enough, the cursor comes out of the opposite edge, as it would on the other device.
-- Push against that opposite edge to come back. Returning never has resistance.
-- For the **连续切换免阻力** time after a crossing, crossing again needs no push either.
-- **播放预览** plays the whole sequence on the primary monitor without touching the mouse.
-
-Every slider takes effect on the next push. The demo stops when the settings window closes.
-
-The parameters are saved as the `effect` section of `config.json` ([effect.rs](../agent/src/effect.rs)) once the page changes them. Units are platform-neutral so other clients can share the format:
-
-| Key | Default | Meaning |
+| Constant | Value | What |
 | --- | --- | --- |
-| `push_distance` | 260 | Raw mouse counts to push before the first crossing. This is unaccelerated mouse movement, so the feel depends on the mouse's DPI. |
-| `release_delay` | 0.25 s | Time without pushing after which the bump springs back. |
-| `warm_seconds` | 20 s | After a crossing, crossings within this time need no push. |
-| `corner_dead_zone` | 48 pt | Distance from screen corners in which the edge does not react. |
-| `spring_response` | 0.32 s | Spring response; smaller is snappier. |
-| `spring_damping` | 0.78 | Damping ratio; 1 settles without overshoot, lower values wobble. |
-| `bump_depth` / `bump_width` | 26 / 72 pt | How far the bump bulges in, and half its length along the edge. |
-| `dot_size` | 18 pt | Diameter of the pointer dot. |
-| `opacity` | 0.92 | Opacity of the material. |
-| `ripple` | true | The ring where the cursor comes in. |
-| `theme` | `auto` | `auto` follows the Windows app theme; `light` / `dark` force one. |
-
-**How it is drawn.** [overlay.rs](../agent/src/overlay.rs) owns a topmost, click-through window. It is created with `WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT` and covers the virtual desktop only while an effect is on screen; otherwise it is hidden. Each active spot on an edge is one DirectComposition visual with a small Direct2D surface: the bump outline, a Gaussian shadow, the dot and the ripple. Its own thread steps the springs once per compositor frame (`DwmFlush`) and sleeps when nothing moves, so an idle agent uses no CPU. The dot and ripple have a contrasting rim, like the system pointer, so they stay visible over both light and dark content.
-
-**How the push is measured.** [edge.rs](../agent/src/edge.rs) registers for raw mouse input (`RIDEV_INPUTSINK`). Raw input keeps reporting motion while the cursor is pinned against the edge. Only outer edges of the desktop count, meaning edges with no monitor beyond them, and only within a portal. A push crosses once it is far enough (`push_distance`) and has lasted the switch delay (see [Settings](#settings)); a push that is far enough crosses when the delay is up even if the pointer holds still. Sending the push progress to the peer, so it draws the approach on its own edge, is still to come (M3).
-
+| `PUSH_DISTANCE` | 130 raw counts | How far the mouse has to push against a portal. Raw input keeps reporting motion while the cursor is pinned to the edge. |
+| `SWITCH_DELAY` | 150 ms | How long the push has to last. A push that went far enough crosses when the delay is up, even if the pointer then holds still. |
+| `RELEASE_DELAY` | 150 ms | A push ends after this long without pushing. |
+| `WARM_TIME` | 8 s | After the pointer came back from a peer, crossing again needs no push for this long. |
+| `CORNER_DEAD_ZONE` | 40 pt | With **屏幕角落不触发切换** on, this much next to each screen corner never crosses (at most a quarter of a short portal). |
+| `CROSS_COOLDOWN` | 250 ms | Pushes right after a crossing are ignored, so leftover motion does not bounce back. |
 ## Settings
 
 The **设置** page. Preferences live in the `settings` section of `config.json` ([settings.rs](../agent/src/settings.rs)); the agent applies every change at once. A saved value that is not valid (edited by hand, or from a newer version) falls back to its default alone; the others are kept.
@@ -260,11 +225,9 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 开机时启动 | (registry) | The `Rinflow` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `config.json`. |
 | 主题 | `theme` | `system`, `light` or `dark`, for both windows. |
 | 语言 | `language` | `system` (the first of the user's Windows languages that Rinflow has, then English), `en-US`, `zh-CN` or `ja-JP`. The app reads it from `config.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (notifications, errors) switches at once. See [Languages](#languages). |
-| 切换延迟 | `switch_delay_ms` | 0–500 ms (default 150): how long a push must last before it crosses. Crossing back within the effect's warm time needs no push. |
-| 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
-| 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
+| 屏幕角落不触发切换 | `corner_guard` | On: the 40 pt next to each corner never crosses (`CORNER_DEAD_ZONE`, see [How a push crosses](#how-a-push-crosses)). |
+| 全屏游戏时锁定在本机 | `lock_in_game` | On by default. No push starts, and no quick crossing back happens, while a full-screen game is in front ([fullscreen.rs](../agent/src/fullscreen.rs)): a window that fills its monitor (not a maximized window with a title bar, not the desktop) and that is Direct3D exclusive full screen, hides the cursor while the mouse moves, or is in Windows' list of games (`HKCU\System\GameConfigStore\Children`, `MatchedExeFullPath`; the list Game Bar and Game Mode go by, undocumented and incomplete). A full-screen video shows the cursor once the mouse moves, so it does not count, nor do presentations. Replaces `pause_in_fullscreen` (off by default, any full-screen app), so the new default applies to saved settings too. The agent logs when a game comes to the front or leaves. |
 | Mac 控制本机时的修饰键 | `modifier_map` | Mac 习惯 (⌘ and ⌃ swapped) by default. See [Being controlled by another device](#being-controlled-by-another-device). |
-| 其他设备离开后隐藏光标 | `hide_cursor_on_leave` | On by default. See [Being controlled by another device](#being-controlled-by-another-device) (After the peer leaves). |
 | 在其他设备上工作时保持唤醒 | `keep_awake` | On by default. See [Presence](#presence). |
 | 一起锁定 | `lock_sync` | Off by default. See [Presence](#presence). |
 | 通过地址添加 (添加设备) | `manual_addresses` | Up to 32 host names or IPv4 addresses (optionally `:port`, the discovery port). See [Arranging devices](#arranging-devices). |
@@ -357,10 +320,6 @@ App → agent:
 | `{"type":"quit"}` | Quit the agent, as the tray's 退出. |
 | `{"type":"check_update"}` | Look for a newer version now (the snapshot's `update`). |
 | `{"type":"install_update"}` | Run the setup program of the update that is ready. |
-| `{"type":"set_effect","params":{…}}` | Replace the effect parameters (keys as in `config.json` `effect`; missing keys take their defaults) and save them. |
-| `{"type":"reset_effect"}` | Restore the default parameters. |
-| `{"type":"set_effect_demo","enabled":true}` | Start or stop the single-machine demo. The demo belongs to the connection that started it and stops when that connection closes. |
-| `{"type":"effect_preview"}` | Play the effect once on the primary monitor. With `"hold":0.6` the bump freezes at that progress until the next effect command, which helps when inspecting it. |
 
 Agent → app:
 
@@ -384,9 +343,6 @@ A `state` message looks like this:
 - `manual_addresses` lists the addresses the user added, as the core reports them: `{"address", "status"}` with `status` `searching`, `found` (with `peer_id` and `name`), `no_response`, or `unresolved` (with `error`).
 - `update` is `{"status"}`, `status` one of `idle`, `checking`, `up_to_date`, `downloading`, `ready`, `installing` or `failed`, with `version` and `notes_url` once a newer version was found, `progress` (0 to 1) while downloading, and `error` (for the user) when the last step failed. See [Updates](#updates).
 - `transfers` lists files on their way: `{"transfer", "peer_id", "peer_name", "direction"` (`receiving` or `sending`), `"name"` (the first top-level item), `"items"`, `"count"` (files), `"done"`, `"total"}` (bytes).
-- `effect` holds the current parameters.
-- `effect_revision` changes only when the agent reloads them (at start-up or on `reset_effect`), not on the app's own `set_effect`. The app copies `effect` into its controls only when the revision changes, so a snapshot cannot move a slider the user is dragging.
-- `demo_side` is `local` or `remote` while the demo runs.
 - `clipboard_sync` is true while the clipboard is shared.
 
 ```json
@@ -406,10 +362,7 @@ A `state` message looks like this:
       "side": "right"
     }]
   },
-  "effect": { "push_distance": 260.0, "spring_response": 0.32, "spring_damping": 0.78, "bump_depth": 26.0, "…": "…" },
-  "effect_revision": 1,
-  "effect_demo": false,
-  "demo_side": "local"
+  "clipboard_sync": true
 }
 ```
 

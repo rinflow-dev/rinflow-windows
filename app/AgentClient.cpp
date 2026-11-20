@@ -131,24 +131,6 @@ namespace RinflowApp
         Send(message);
     }
 
-    void AgentClient::SetEffect(JsonObject const& params)
-    {
-        auto message = Request(L"set_effect");
-        message.Insert(L"params", params);
-        Send(message);
-    }
-
-    void AgentClient::ResetEffect()
-    {
-        Send(Request(L"reset_effect"));
-    }
-
-    void AgentClient::SetEffectDemo(bool enabled)
-    {
-        auto message = Request(L"set_effect_demo");
-        message.Insert(L"enabled", JsonValue::CreateBooleanValue(enabled));
-        Send(message);
-    }
 
     void AgentClient::SetClipboardSync(bool enabled)
     {
@@ -164,10 +146,6 @@ namespace RinflowApp
         Send(message);
     }
 
-    void AgentClient::PreviewEffect()
-    {
-        Send(Request(L"effect_preview"));
-    }
 
     void AgentClient::UpdateSettings(JsonObject const& values)
     {

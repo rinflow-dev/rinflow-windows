@@ -15,22 +15,20 @@ mod clipboard;
 mod config;
 mod displays;
 mod edge;
-mod effect;
 mod elevated;
+mod fullscreen;
 mod hider;
 mod i18n;
 mod identity;
 mod inject;
 mod ipc;
 mod keymap;
-mod overlay;
 mod power;
 mod presence;
 #[cfg(test)]
 mod resw;
 mod services;
 mod settings;
-mod spring;
 mod state;
 mod tray;
 mod trust;
@@ -50,7 +48,6 @@ const PAIRING_WINDOW_INTERVAL: std::time::Duration = std::time::Duration::from_s
 /// normal end, or another agent already running in this session.
 mod exit_code {
     pub const IDENTITY: i32 = 2;
-    pub const OVERLAY: i32 = 3;
     pub const INJECTION: i32 = 4;
     pub const CORE: i32 = 5;
     pub const EDGE: i32 = 6;
@@ -95,7 +92,6 @@ fn main() {
         }
     };
 
-    let effects = effect::EffectStore::load();
     let settings = Arc::new(settings::SettingsStore::load());
     let preferences = settings.get();
     // The language of the tray icon, notifications and messages.
@@ -107,19 +103,12 @@ fn main() {
     let state = state::SharedState::new(
         &identity.device_id,
         &identity.device_name,
-        effects.get(),
         preferences.clone(),
         settings::autostart::enabled(),
         control_port,
     );
     let clipboard = clipboard::ClipboardHandle::new(clipboard_sync);
-    let overlay = match overlay::Overlay::spawn(effects.clone()) {
-        Ok(overlay) => overlay,
-        Err(error) => {
-            log!("cannot start the edge overlay: {error}");
-            std::process::exit(exit_code::OVERLAY);
-        }
-    };
+
     let injector = match inject::Injector::spawn() {
         Ok(injector) => injector,
         Err(error) => {
@@ -186,7 +175,7 @@ fn main() {
     let presence_slot = Arc::new(OnceLock::<presence::PresenceHandle>::new());
     let presence_events = presence_slot.clone();
     // This PC's cursor hides where a peer's pointer left it.
-    let hider = match hider::Hider::start(settings.clone()) {
+    let hider = match hider::Hider::start() {
         Ok(hider) => Some(hider),
         Err(error) => {
             log!("cannot start the cursor hider: {error}");
@@ -269,10 +258,8 @@ fn main() {
         log!("cannot watch display changes: {error}");
     }
 
-    // Watches the pointer at the portals: crossing into peers, and the demo.
+    // Watches the pointer at the portals: crossing into peers.
     let edge = match edge::EdgeThread::start(
-        overlay.handle(),
-        effects.clone(),
         settings.clone(),
         state.clone(),
         arrangement.clone(),
@@ -325,8 +312,6 @@ fn main() {
     let services = Arc::new(Services::new(
         Arc::downgrade(&core),
         state,
-        effects,
-        overlay.handle(),
         edge.handle(),
         clipboard,
         settings,
@@ -344,13 +329,11 @@ fn main() {
         services.state.set_quitting();
         std::thread::sleep(std::time::Duration::from_millis(150));
 
-        let _ = services.set_effect_demo(false);
         // Gives back the keyboard and mouse if a peer is being driven.
         drop(edge);
         drop(clipboard_thread);
         drop(presence);
         drop(power);
-        drop(overlay);
         // Shows the cursor if it is hidden.
         drop(hider);
         // The IPC thread only holds a weak reference, so this stops the core

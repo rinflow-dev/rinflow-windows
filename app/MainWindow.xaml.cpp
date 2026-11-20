@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // The main window: the 设备 page (lock notice, arrangement, the user's
-// devices), the 设置 page (MainWindow.Settings.cpp) and, in development
-// builds, the edge animation page (MainWindow.Effect.cpp). Everything shown
+// devices) and the 设置 page (MainWindow.Settings.cpp). Everything shown
 // comes from the agent's state snapshots; edits go back as requests.
 
 #include "pch.h"
@@ -25,13 +24,6 @@ using namespace winrt::Windows::Data::Json;
 
 namespace
 {
-#if defined(RINFLOW_EFFECT_DEMO)
-    // The edge animation's tuning page, a development aid: only in builds
-    // with EffectDemo (on in Debug by default; setup never has it).
-    constexpr bool EffectDemo = true;
-#else
-    constexpr bool EffectDemo = false;
-#endif
 
     // What a row shows, to skip rebuilding rows that did not change. The
     // latency changes all the time and is updated in place instead.
@@ -145,7 +137,6 @@ namespace winrt::Rinflow::implementation
         SetupDevicesPage();
         SetupArrangement();
         SetupSettingsPage();
-        SetupEffectPage();
         SetupPairing();
         SetupTransfers();
 
@@ -157,11 +148,7 @@ namespace winrt::Rinflow::implementation
         {
             if (auto self = weak.get()) self->ShowPage(Page::Settings);
         });
-        EffectButton().Visibility(EffectDemo ? Visibility::Visible : Visibility::Collapsed);
-        EffectButton().Click([weak](auto&&, auto&&)
-        {
-            if (auto self = weak.get()) self->ShowPage(Page::Effect);
-        });
+
 
         ErrorBar().CloseButtonClick([weak](auto&&, auto&&)
         {
@@ -202,7 +189,6 @@ namespace winrt::Rinflow::implementation
         };
         show(DevicesPage(), page == Page::Devices);
         show(SettingsPage(), page == Page::Settings);
-        show(EffectPage(), page == Page::Effect && EffectDemo);
         show(BackButton(), page != Page::Devices);
         if (page == Page::Devices && m_layoutDirty && !m_drag && !m_settling)
         {
@@ -408,7 +394,6 @@ namespace winrt::Rinflow::implementation
         apply(&MainWindow::ApplyTransfers);
         apply(&MainWindow::ApplyAddresses);
         apply(&MainWindow::ApplyLayout);
-        apply(&MainWindow::ApplyEffect);
         m_lastState = state;
         apply(&MainWindow::ApplyPairing);
     }
@@ -460,8 +445,7 @@ namespace winrt::Rinflow::implementation
             m_nearby.Clear();
             m_connectedPeerIds.clear();
             DevicesEmptyText().Visibility(Visibility::Visible);
-            // A restarted agent may have different values; reload them.
-            m_effectRevision = -1;
+
             m_layoutSignature.clear();
             m_agentError = L"";
             m_transferSignature.clear();

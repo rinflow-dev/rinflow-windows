@@ -5,7 +5,7 @@
 //! This PC's monitors, in the two coordinate systems the agent needs.
 //!
 //! The arrangement (rinflow-core `layout`) works in logical points, which
-//! makes sizes comparable across devices. Hooks, `SendInput` and the overlay
+//! makes sizes comparable across devices. Hooks, `SendInput` and the edges
 //! work in physical pixels. Each monitor keeps both, so a point on a logical
 //! edge converts exactly through the monitor it belongs to.
 

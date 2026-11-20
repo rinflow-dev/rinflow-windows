@@ -225,16 +225,6 @@
                                     <TextBlock x:Uid="AddDeviceLabel" Text="添加设备" />
                                 </StackPanel>
                             </Button>
-                            <!-- The edge animation's tuning page: only in
-                                 builds with EffectDemo (docs/building.md). -->
-                            <Button
-                                x:Name="EffectButton"
-                                AutomationProperties.Name="动画效果（开发版）"
-                                Style="{StaticResource IconButtonStyle}"
-                                ToolTipService.ToolTip="动画效果（仅开发版）"
-                                Visibility="Collapsed">
-                                <FontIcon FontSize="16" Glyph="&#xE9E9;" />
-                            </Button>
                             <Button
                                 x:Name="SettingsButton"
                                 x:Uid="SettingsButton" AutomationProperties.Name="设置"
@@ -480,31 +470,6 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="72" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="DelayTitle" Text="切换延迟" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="DelayDescription" Text="光标在屏幕边缘停留多久后切换。" />
-                        </StackPanel>
-                        <Slider
-                            x:Name="SwitchDelaySlider"
-                            Grid.Column="1"
-                            Width="240"
-                            VerticalAlignment="Center"
-                            x:Uid="DelaySlider" AutomationProperties.Name="切换延迟"
-                            Maximum="500"
-                            Minimum="0"
-                            StepFrequency="10" />
-                        <TextBlock
-                            x:Name="SwitchDelayValue"
-                            Grid.Column="2"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
@@ -520,11 +485,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FullscreenTitle" Text="全屏游戏时暂停" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FullscreenDescription" Text="游戏、视频或演示全屏时不切换。" />
+                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FullscreenTitle" Text="全屏游戏时锁定在本机" />
+                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FullscreenDescription" Text="全屏游戏运行时，光标不会切换到其他设备。视频和演示不受影响。" />
                         </StackPanel>
                         <TextBlock x:Name="FullscreenState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" x:Uid="FullscreenToggle" AutomationProperties.Name="全屏游戏时暂停" Style="{StaticResource BareSwitchStyle}" />
+                        <ToggleSwitch x:Name="FullscreenToggle" Grid.Column="2" x:Uid="FullscreenToggle" AutomationProperties.Name="全屏游戏时锁定在本机" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
@@ -597,19 +562,6 @@
                         <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="⌥ Option" />
                         <ComboBox x:Name="ModifierAltCombo" Grid.Row="2" Grid.Column="1" MinWidth="200" AutomationProperties.Name="⌥ Option" />
                     </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock x:Uid="HideCursorTitle" Style="{StaticResource RowTitleStyle}" Text="其他设备离开后隐藏光标" />
-                            <TextBlock x:Uid="HideCursorDescription" Style="{StaticResource RowDescriptionStyle}" Text="移动本机的鼠标或触摸板后重新显示。" />
-                        </StackPanel>
-                        <TextBlock x:Name="HideCursorState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="HideCursorToggle" x:Uid="HideCursorToggle" Grid.Column="2" AutomationProperties.Name="其他设备离开后隐藏光标" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
 
                     <TextBlock x:Uid="PresenceHeader" Style="{StaticResource SectionHeaderStyle}" Text="锁屏与唤醒" />
                     <Grid Style="{StaticResource CardStyle}">
@@ -638,7 +590,7 @@
                         <ToggleSwitch x:Name="LockSyncToggle" x:Uid="LockSyncToggle" Grid.Column="2" AutomationProperties.Name="一起锁定" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="ClipboardHeader" Text="剪贴板" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="ClipboardHeader" Text="共享" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -718,215 +670,6 @@
                             Grid.Column="1"
                             VerticalAlignment="Center"
                             Content="打开日志文件夹" />
-                    </Grid>
-                </StackPanel>
-            </ScrollView>
-
-            <!-- ================= Edge animation (development builds) ================= -->
-            <ScrollView
-                x:Name="EffectPage"
-                Grid.Row="1"
-                ContentOrientation="Vertical"
-                Visibility="Collapsed">
-                <StackPanel MaxWidth="1040" Padding="28,8,28,24" Spacing="12">
-                    <StackPanel Spacing="4">
-                        <TextBlock Style="{StaticResource PageTitleStyle}" Text="动画效果" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="仅开发版提供，用来调校屏幕边缘的推动动画；正式版会移除。"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="4">
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="效果演示" />
-                            <TextBlock
-                                Style="{StaticResource RowDescriptionStyle}"
-                                Text="开启后，把鼠标推向放置了设备的那段屏幕边缘（还没有放置设备时用右边缘）：边缘会鼓起，推够距离后光标从对边出现，就像进入了那台设备；再往回推即可回来。关闭本窗口时自动停止。" />
-                            <TextBlock
-                                x:Name="DemoSideText"
-                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Visibility="Collapsed" />
-                        </StackPanel>
-                        <ToggleSwitch x:Name="DemoToggle" Grid.Column="1" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="PreviewButton" Content="播放预览" Style="{StaticResource AccentButtonStyle}" />
-                        <Button x:Name="ResetEffectButton" Content="恢复默认" />
-                    </StackPanel>
-
-                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="手感" />
-                    <Grid Padding="16" Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="推动距离" ToolTipService.ToolTip="第一次穿过边缘前需要推动的鼠标原始计数，越大阻力越强" />
-                                <TextBlock x:Name="PushDistanceValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="PushDistanceSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="800" Minimum="40" StepFrequency="10" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="停推后回弹" ToolTipService.ToolTip="停止推动多久后鼓包缩回" />
-                                <TextBlock x:Name="ReleaseDelayValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="ReleaseDelaySlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="1" Minimum="0" StepFrequency="0.05" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="连续切换免阻力" ToolTipService.ToolTip="穿过一次后，这段时间内再次穿过不需要推" />
-                                <TextBlock x:Name="WarmSecondsValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="WarmSecondsSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="60" Minimum="0" StepFrequency="1" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="角落死区" ToolTipService.ToolTip="“屏幕角落不触发切换”打开时，角落附近这么大的范围不触发" />
-                                <TextBlock x:Name="CornerDeadZoneValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="CornerDeadZoneSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="200" Minimum="0" StepFrequency="4" />
-                            </Grid>
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="动画" />
-                    <Grid Padding="16" Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="弹簧响应" ToolTipService.ToolTip="动画到位所需的大致时间，越小越干脆" />
-                                <TextBlock x:Name="SpringResponseValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="SpringResponseSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="0.8" Minimum="0.1" StepFrequency="0.01" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="阻尼比" ToolTipService.ToolTip="1 为不回弹，越小回弹晃动越明显" />
-                                <TextBlock x:Name="SpringDampingValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="SpringDampingSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="1" Minimum="0.3" StepFrequency="0.01" />
-                            </Grid>
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" Text="外观" />
-                    <Grid Padding="16" Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="鼓包高度" />
-                                <TextBlock x:Name="BumpDepthValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="BumpDepthSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="60" Minimum="8" StepFrequency="1" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="鼓包宽度" />
-                                <TextBlock x:Name="BumpWidthValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="BumpWidthSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="160" Minimum="30" StepFrequency="2" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="光点大小" />
-                                <TextBlock x:Name="DotSizeValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="DotSizeSlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="40" Minimum="0" StepFrequency="1" />
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="不透明度" />
-                                <TextBlock x:Name="OpacityValue" Grid.Column="1" Style="{StaticResource SliderValueStyle}" />
-                                <Slider x:Name="OpacitySlider" Grid.Row="1" Grid.ColumnSpan="2" Maximum="1" Minimum="0.3" StepFrequency="0.01" />
-                            </Grid>
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center" Text="穿过时的涟漪" />
-                                <ToggleSwitch x:Name="RippleToggle" Grid.Column="1" Style="{StaticResource BareSwitchStyle}" />
-                            </Grid>
-                            <Grid ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center" Text="颜色" />
-                                <ComboBox x:Name="EffectThemeCombo" Grid.Column="1" MinWidth="140">
-                                    <ComboBoxItem Content="跟随系统" Tag="auto" />
-                                    <ComboBoxItem Content="浅色" Tag="light" />
-                                    <ComboBoxItem Content="深色" Tag="dark" />
-                                </ComboBox>
-                            </Grid>
-                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </ScrollView>

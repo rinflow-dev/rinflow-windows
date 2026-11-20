@@ -21,7 +21,6 @@
     <ClCompile Include="MainWindow.xaml.cpp" />
     <ClCompile Include="MainWindow.Arrangement.cpp" />
     <ClCompile Include="MainWindow.Settings.cpp" />
-    <ClCompile Include="MainWindow.Effect.cpp" />
     <ClCompile Include="MainWindow.Pairing.cpp" />
     <ClCompile Include="TrayWindow.xaml.cpp" />
     <ClCompile Include="PeerItem.cpp" />

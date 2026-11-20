@@ -27,7 +27,6 @@
   <data name="SettingInvalidValue" xml:space="preserve"><value>設定の値が無効です: {0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>テーマはシステム設定、ライト、ダークのいずれかにしてください</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>言語はシステム設定、簡体字中国語、英語、日本語のいずれかにしてください</value></data>
-  <data name="SwitchDelayTooLong" xml:space="preserve"><value>切り替えの遅延は最大 1000 ミリ秒です</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>ショートカットには Ctrl、Alt、Win のいずれかと、通常のキーを含めてください</value></data>
   <data name="PortInvalid" xml:space="preserve"><value>ポートは 1024 ~ 65535 の範囲で、検出用ポート {0} 以外にしてください</value></data>
   <data name="AddressesTooMany" xml:space="preserve"><value>追加できるアドレスは {0} 個までです</value></data>

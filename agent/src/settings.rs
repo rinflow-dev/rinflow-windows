@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Agent preferences other than the effect and the arrangement: the
+//! Agent preferences other than the arrangement: the
 //! `settings` section of `config.json` (see `config.rs`). Starting at login
 //! is not kept there: the `Run` registry value is the truth (see
 //! [`autostart`]).
@@ -30,13 +30,13 @@ pub struct Settings {
     pub clipboard: bool,
     /// The settings app's theme: `system`, `light` or `dark`.
     pub theme: String,
-    /// How long the pointer has to push against a portal before it crosses.
-    pub switch_delay_ms: u32,
-    /// Screen corners never cross (the size is the effect's dead zone), so
+    /// Screen corners never cross (`CORNER_DEAD_ZONE` in `edge.rs`), so
     /// the Start button, menus and hot corners stay usable.
     pub corner_guard: bool,
-    /// No crossing while a full-screen game or presentation runs.
-    pub pause_in_fullscreen: bool,
+    /// No crossing out of a full-screen game (`fullscreen.rs`): the pointer
+    /// stays on this PC. A new key, on by default, also where the old
+    /// `pause_in_fullscreen` (off by default, any full-screen app) was saved.
+    pub lock_in_game: bool,
     /// Toggles "locked to the current screen": no crossing either way.
     pub lock_hotkey: Hotkey,
     /// The core's control port (UDP); `None` uses the core's default.
@@ -47,10 +47,6 @@ pub struct Settings {
     /// copies, and the Mac's Control is the Windows key. The settings page
     /// offers that, keeping keys where they are, or a choice per key.
     pub modifier_map: rinflow_core::ModifierMap,
-    /// When a peer that drove this PC moves its pointer away, this PC's
-    /// cursor is hidden where it was left, until this PC's own mouse moves
-    /// or a peer drives it again (see `hider.rs`).
-    pub hide_cursor_on_leave: bool,
     /// While one of the other devices is in use, this PC's screen stays on
     /// and does not lock for being idle.
     pub keep_awake: bool,
@@ -110,13 +106,11 @@ impl Default for Settings {
         Self {
             clipboard: true,
             theme: "system".to_owned(),
-            switch_delay_ms: 150,
             corner_guard: true,
-            pause_in_fullscreen: false,
+            lock_in_game: true,
             lock_hotkey: Hotkey::default(),
             port: None,
             modifier_map: rinflow_core::ModifierMap::SWAP,
-            hide_cursor_on_leave: true,
             keep_awake: true,
             lock_sync: false,
             manual_addresses: Vec::new(),
@@ -179,9 +173,6 @@ impl Settings {
         }
         if !LANGUAGES.contains(&merged.language.as_str()) {
             return Err(tr(s::LanguageInvalid).to_owned());
-        }
-        if merged.switch_delay_ms > 1000 {
-            return Err(tr(s::SwitchDelayTooLong).to_owned());
         }
         if !merged.lock_hotkey.is_valid() {
             return Err(tr(s::ShortcutInvalid).to_owned());
@@ -380,7 +371,6 @@ mod tests {
         let settings: Settings = serde_json::from_str(r#"{"clipboard":false}"#).unwrap();
         assert!(!settings.clipboard);
         assert!(settings.corner_guard);
-        assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.lock_hotkey, Hotkey::default());
     }
 
@@ -389,7 +379,6 @@ mod tests {
         let saved = json!({
             "corner_guard": false,
             "theme": "dark",
-            "switch_delay_ms": 5000,
             "port": "not a port",
             "from_a_newer_version": true,
             "manual_addresses": ["192.168.1.20"]
@@ -398,7 +387,6 @@ mod tests {
         assert!(!settings.corner_guard);
         assert_eq!(settings.theme, "dark");
         assert_eq!(settings.manual_addresses, ["192.168.1.20"]);
-        assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.port, None);
 
         // Settings of older versions that are gone now are ignored.
@@ -407,7 +395,10 @@ mod tests {
             "switch_hotkeys": false,
             "switch_modifiers": 3,
             "paired_only": false,
-            "keep_in_tray": false
+            "keep_in_tray": false,
+            "pause_in_fullscreen": false,
+            "switch_delay_ms": 400,
+            "hide_cursor_on_leave": false
         });
         assert_eq!(Settings::from_saved(Some(&older)), Settings::default());
 
@@ -467,7 +458,6 @@ mod tests {
             json!({"theme": "blue"}),
             json!({"port": 80}),
             json!({"port": 42420}),
-            json!({"switch_delay_ms": 5000}),
             json!({"corner_guard": "yes"}),
             json!({"lock_hotkey": {"modifiers": 4, "key": 76}}),
             json!({"lock_hotkey": {"modifiers": 2, "key": 0x11}}),
@@ -485,7 +475,7 @@ mod tests {
     fn addresses_and_per_device_input_are_checked() {
         let settings = Settings::default();
         assert_eq!(settings.modifier_map, rinflow_core::ModifierMap::SWAP);
-        assert!(settings.keep_awake && settings.hide_cursor_on_leave);
+        assert!(settings.keep_awake);
         assert!(!settings.lock_sync);
         let merged = settings
             .merged(&values(json!({

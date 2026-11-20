@@ -12,11 +12,13 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 
 - The tray panel no longer lists the devices. It shows only which device is controlling this PC, while one is.
 - Right-clicking the tray icon opens the same panel as left-clicking, instead of a separate menu. An update that is ready is installed from the notification or the **Settings** page.
-- **Sync clipboard and files** is on by default. Settings you already saved are kept.
+- **Sync clipboard and files** is on by default. Settings you already saved are kept. Its section in **Settings** is now called **Sharing**.
+- **Pause during full-screen games** is now **Stay on this PC during full-screen games**, and it is on by default, also if you had turned the old switch off. It recognizes games only: a full-screen window that uses Direct3D exclusive full screen, keeps the cursor hidden while the mouse moves, or that Windows lists as a game. Full-screen videos and presentations no longer stop the pointer from switching.
 
 ### Fixed
 
 - Changing the lock shortcut did nothing: the dialog ignored every key pressed.
+- On the lock screen or a UAC prompt, the pointer of a device controlling this PC did not move if that device had not controlled it yet since Rinflow started.
 - The tray panel could cover the taskbar, when the taskbar hides itself or is the taller one of tablet mode. It now opens above the taskbar.
 - While another device controlled this PC, full-screen games such as Overwatch did not respond to the mouse, and the pointer seemed stuck. On a PC with one monitor, Rinflow did not notice that the game was holding the pointer. It now does, and sends the game relative motion.
 
@@ -27,6 +29,7 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 - The **Only paired devices** switch. Pairing is now always required: a new device connects only after both sides confirm the 6-digit code. Devices already paired are not affected; if you had turned the switch off, unpaired devices are asked to pair the next time they connect.
 - **Keep running in the notification area when the window closes**. Closing the main window always leaves Rinflow running; quit it from the tray icon.
 - The **Encrypted connections (TLS)** row, a switch that could not be changed (every connection is encrypted), and **This PC's fingerprint**, which pairing with the 6-digit code makes unnecessary. **Network and security** is now called **Security**.
+- The **Switch delay** slider and the **Hide the cursor after another device leaves** switch. The delay is fixed at 150 ms, the default before, and the cursor is always hidden where another device's pointer left it, until this PC's mouse moves. Values you had set are no longer used.
 
 ## [0.0.2] - 2026-11-16
 

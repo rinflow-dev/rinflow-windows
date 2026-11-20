@@ -94,14 +94,11 @@
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>语言</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>跟随系统</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>屏幕切换</value></data>
-  <data name="DelayTitle.Text" xml:space="preserve"><value>切换延迟</value></data>
-  <data name="DelayDescription.Text" xml:space="preserve"><value>光标在屏幕边缘停留多久后切换。</value></data>
-  <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切换延迟</value></data>
   <data name="CornerTitle.Text" xml:space="preserve"><value>屏幕角落不触发切换</value></data>
   <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>屏幕角落不触发切换</value></data>
-  <data name="FullscreenTitle.Text" xml:space="preserve"><value>全屏游戏时暂停</value></data>
-  <data name="FullscreenDescription.Text" xml:space="preserve"><value>游戏、视频或演示全屏时不切换。</value></data>
-  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全屏游戏时暂停</value></data>
+  <data name="FullscreenTitle.Text" xml:space="preserve"><value>全屏游戏时锁定在本机</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>全屏游戏运行时，光标不会切换到其他设备。视频和演示不受影响。</value></data>
+  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全屏游戏时锁定在本机</value></data>
   <data name="LockTitle.Text" xml:space="preserve"><value>锁定到当前屏幕</value></data>
   <data name="LockDescription.Text" xml:space="preserve"><value>按快捷键锁定，再按一次解除。</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>修改快捷键</value></data>
@@ -116,15 +113,12 @@
   <data name="ModifierCustomDescription" xml:space="preserve"><value>逐个指定每个修饰键。</value></data>
   <data name="ModifierNone" xml:space="preserve"><value>无</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>锁屏与唤醒</value></data>
-  <data name="HideCursorTitle.Text" xml:space="preserve"><value>其他设备离开后隐藏光标</value></data>
-  <data name="HideCursorDescription.Text" xml:space="preserve"><value>移动本机的鼠标或触摸板后重新显示。</value></data>
-  <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>其他设备离开后隐藏光标</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>在其他设备上工作时保持唤醒</value></data>
   <data name="LockSyncTitle.Text" xml:space="preserve"><value>一起锁定</value></data>
   <data name="LockSyncDescription.Text" xml:space="preserve"><value>任一设备锁定时，其他设备一起锁定。两端都需打开。</value></data>
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>一起锁定</value></data>
-  <data name="ClipboardHeader.Text" xml:space="preserve"><value>剪贴板</value></data>
+  <data name="ClipboardHeader.Text" xml:space="preserve"><value>共享</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>同步剪贴板和文件</value></data>
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>文字、图片（最大 8 MB）和文件。超过 512 MB 的文件会先询问。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>同步剪贴板和文件</value></data>

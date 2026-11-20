@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::effect::EffectParams;
 use crate::i18n::{s, tr, trf};
 use crate::settings::Settings;
 use crate::update::UpdateView;
@@ -107,14 +106,6 @@ pub struct TransferView {
     pub total: u64,
 }
 
-/// Which side of the simulated edge the cursor is on in the effect demo.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DemoSide {
-    Local,
-    Remote,
-}
-
 /// Everything the settings app renders. The agent pushes the whole snapshot
 /// on every change, so the app never has to replay individual core events.
 #[derive(Clone, Debug, Serialize)]
@@ -127,12 +118,7 @@ pub struct Snapshot {
     pub layout: LayoutView,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
-    pub effect: EffectParams,
-    /// Changes when the parameters change for a reason other than the app's
-    /// own `set_effect` (start-up, reset), telling the app to reload them.
-    pub effect_revision: u64,
-    pub effect_demo: bool,
-    pub demo_side: DemoSide,
+
     /// The clipboard is shared with peers (see `clipboard.rs`).
     pub clipboard_sync: bool,
     /// Preferences (see `settings.rs`).
@@ -186,7 +172,6 @@ impl SharedState {
     pub fn new(
         device_id: &str,
         device_name: &str,
-        effect: EffectParams,
         settings: Settings,
         launch_at_login: bool,
         control_port: u16,
@@ -199,10 +184,7 @@ impl SharedState {
             sessions: Vec::new(),
             layout: LayoutView::default(),
             last_error: None,
-            effect,
-            effect_revision: 1,
-            effect_demo: false,
-            demo_side: DemoSide::Local,
+
             clipboard_sync: settings.clipboard,
             settings,
             launch_at_login,
@@ -284,38 +266,9 @@ impl SharedState {
             .any(|session| session.peer_id == peer_id && session.status == SessionStatus::Connected)
     }
 
-    /// `reload` bumps the revision so the settings app re-reads the values.
-    pub fn set_effect(&self, effect: EffectParams, reload: bool) {
-        self.0.send_if_modified(|snapshot| {
-            if snapshot.effect == effect && !reload {
-                return false;
-            }
-            snapshot.effect = effect;
-            if reload {
-                snapshot.effect_revision += 1;
-            }
-            true
-        });
-    }
-
     pub fn set_layout(&self, layout: LayoutView) {
         self.0
             .send_if_modified(|snapshot| replace(&mut snapshot.layout, layout));
-    }
-
-    pub fn set_effect_demo(&self, enabled: bool) {
-        self.0.send_if_modified(|snapshot| {
-            let changed = replace(&mut snapshot.effect_demo, enabled);
-            if !enabled {
-                snapshot.demo_side = DemoSide::Local;
-            }
-            changed
-        });
-    }
-
-    pub fn set_demo_side(&self, side: DemoSide) {
-        self.0
-            .send_if_modified(|snapshot| replace(&mut snapshot.demo_side, side));
     }
 
     pub fn set_error(&self, message: impl Into<String>) {
@@ -683,17 +636,9 @@ fn parse_peer(value: &Value) -> Option<Peer> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::effect::EffectParams;
 
     fn state() -> SharedState {
-        SharedState::new(
-            "this-pc",
-            "This PC",
-            EffectParams::default(),
-            Settings::default(),
-            false,
-            42421,
-        )
+        SharedState::new("this-pc", "This PC", Settings::default(), false, 42421)
     }
 
     fn apply(state: &SharedState, event: serde_json::Value) {

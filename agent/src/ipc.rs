@@ -5,11 +5,10 @@
 //! Named-pipe endpoint for the settings app.
 //!
 //! Each message is one UTF-8 JSON object per line. The app sends requests
-//! (`hello`, `connect`, `set_effect`, …); the agent answers `hello` and then
+//! (`hello`, `connect`, `update_settings`, …); the agent answers `hello` and then
 //! pushes a full `state` snapshot whenever anything changes. See docs/design.md
 //! for the message shapes.
 
-use crate::effect::EffectParams;
 use crate::services::Services;
 use crate::state::Snapshot;
 use crate::win::PipeSecurity;
@@ -51,12 +50,17 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// `switch_modifiers` are gone, and so is the snapshot's
 /// `switch_hotkeys_blocked`; the setting `paired_only` is gone too (pairing is
 /// always required), and so is `keep_in_tray` (closing the window always
-/// leaves Rinflow in the tray).
+/// leaves Rinflow in the tray). The setting `pause_in_fullscreen` becomes
+/// `lock_in_game` (full-screen games only, on by default). The settings
+/// `switch_delay_ms` and `hide_cursor_on_leave` are gone (fixed in the agent).
+/// The edge animation is gone: `set_effect`, `reset_effect`,
+/// `set_effect_demo`, `effect_preview` and the snapshot's `effect`,
+/// `effect_revision`, `effect_demo` and `demo_side`.
 pub const PROTOCOL_VERSION: u32 = 19;
 
 /// The longest request line the agent reads, `\n` excluded. The app's
 /// largest requests (`update_settings` with every manual address and
-/// per-device speed, `set_effect`) are a few KB; a client sending more is
+/// per-device speed) are a few KB; a client sending more is
 /// dropped instead of growing the agent's memory without bound.
 const MAX_REQUEST_LINE: usize = 1024 * 1024;
 
@@ -134,19 +138,7 @@ enum Request {
         peer_id: String,
         side: Side,
     },
-    SetEffect {
-        params: EffectParams,
-    },
-    ResetEffect,
-    /// The demo belongs to the client that enabled it and stops when that
-    /// client disconnects, so closing the settings window ends it.
-    SetEffectDemo {
-        enabled: bool,
-    },
-    EffectPreview {
-        #[serde(default)]
-        hold: Option<f32>,
-    },
+
     SetClipboardSync {
         enabled: bool,
     },
@@ -275,14 +267,10 @@ fn create_instance(
 }
 
 async fn handle_client(pipe: NamedPipeServer, services: Arc<Services>) {
-    let mut owns_demo = false;
-    serve_client(pipe, &services, &mut owns_demo).await;
-    if owns_demo {
-        let _ = services.set_effect_demo(false);
-    }
+    serve_client(pipe, &services).await;
 }
 
-async fn serve_client(pipe: NamedPipeServer, services: &Services, owns_demo: &mut bool) {
+async fn serve_client(pipe: NamedPipeServer, services: &Services) {
     let (reader, mut writer) = tokio::io::split(pipe);
     let mut reader = BufReader::new(reader);
     // Kept across loop turns: what `read_line` read before `select!` took
@@ -316,7 +304,7 @@ async fn serve_client(pipe: NamedPipeServer, services: &Services, owns_demo: &mu
                         break;
                     }
                 };
-                let reply = match handle_request(&line, services, owns_demo) {
+                let reply = match handle_request(&line, services) {
                     Ok(reply) => reply,
                     Err(message) => Some(Message::Error { message }),
                 };
@@ -340,11 +328,7 @@ async fn serve_client(pipe: NamedPipeServer, services: &Services, owns_demo: &mu
 }
 
 /// Acts on one request; some are answered with a message of their own.
-fn handle_request(
-    line: &str,
-    services: &Services,
-    owns_demo: &mut bool,
-) -> Result<Option<Message<'static>>, String> {
+fn handle_request(line: &str, services: &Services) -> Result<Option<Message<'static>>, String> {
     let request = serde_json::from_str::<Request>(line)
         .map_err(|error| format!("invalid request: {error}"))?;
     let core = || {
@@ -369,23 +353,7 @@ fn handle_request(
         }
         Request::RemovePlacement { peer_id } => core()?.set_placement(&peer_id, None),
         Request::PlaceBeside { peer_id, side } => core()?.place_beside(&peer_id, side),
-        Request::SetEffect { params } => {
-            services.set_effect(params);
-            Ok(())
-        }
-        Request::ResetEffect => {
-            services.reset_effect();
-            Ok(())
-        }
-        Request::SetEffectDemo { enabled } => {
-            services.set_effect_demo(enabled)?;
-            *owns_demo = enabled;
-            Ok(())
-        }
-        Request::EffectPreview { hold } => {
-            services.preview_effect(hold);
-            Ok(())
-        }
+
         Request::SetClipboardSync { enabled } => {
             services.set_clipboard_sync(enabled);
             Ok(())

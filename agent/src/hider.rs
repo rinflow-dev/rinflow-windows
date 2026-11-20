@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Hides this PC's cursor where a peer's pointer left it (setting
-//! `hide_cursor_on_leave`), as Universal Control, Deskflow and Mouse Without
-//! Borders do: the device the pointer is not on shows none.
+//! Hides this PC's cursor where a peer's pointer left it, as Universal
+//! Control, Deskflow and Mouse Without Borders do: the device the pointer is
+//! not on shows none. Always on; not a setting.
 //!
 //! - When the last peer driving this PC gives control back
 //!   (`remote_control_ended`, reason `remote reset`: its pointer moved on),
@@ -24,14 +24,13 @@
 //! - Motion the agent played does not show it: the last moves of the peer
 //!   that left often arrive a little after its reset (the input service
 //!   plays them asynchronously), and the window follows them instead.
-//! - A peer driving this PC again, this PC starting to drive a peer
-//!   (`capture.rs`) and the setting turned off show it at once.
+//! - A peer driving this PC again and this PC starting to drive a peer
+//!   (`capture.rs`) show it at once.
 //!
 //! Other ends of remote control (the connection lost, control taken over)
 //! leave the cursor as it is.
 
 use crate::inject::INJECTED_MARKER;
-use crate::settings::SettingsStore;
 use crate::win::wide;
 use serde_json::Value;
 use std::cell::RefCell;
@@ -221,7 +220,7 @@ fn replay_input(message: u32, mouse_data: u32) -> Option<(u32, u32)> {
 }
 
 impl Hider {
-    pub fn start(settings: Arc<SettingsStore>) -> io::Result<Self> {
+    pub fn start() -> io::Result<Self> {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let join = std::thread::Builder::new()
             .name("rinflow-hider".to_owned())
@@ -242,11 +241,7 @@ impl Hider {
                     let mut message: MSG = std::mem::zeroed();
                     while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
                         match (message.hwnd.is_null(), message.message) {
-                            (true, WM_HIDE) => {
-                                if settings.get().hide_cursor_on_leave {
-                                    hide();
-                                }
-                            }
+                            (true, WM_HIDE) => hide(),
                             (true, WM_REPLAY) => replay(),
                             (true, WM_REVEAL) => {
                                 replay();

@@ -7,9 +7,7 @@
 use crate::arrangement::Arrangement;
 use crate::clipboard::ClipboardHandle;
 use crate::edge::EdgeHandle;
-use crate::effect::{EffectParams, EffectStore};
 use crate::i18n::{s, tr, trf};
-use crate::overlay::{Command, OverlayHandle};
 use crate::settings::{SettingsStore, autostart};
 use crate::state::SharedState;
 use crate::update::UpdateHandle;
@@ -21,8 +19,6 @@ use std::sync::{Arc, Weak};
 pub struct Services {
     pub core: Weak<Core>,
     pub state: SharedState,
-    pub effects: EffectStore,
-    pub overlay: OverlayHandle,
     edge: EdgeHandle,
     clipboard: ClipboardHandle,
     settings: Arc<SettingsStore>,
@@ -31,12 +27,9 @@ pub struct Services {
 }
 
 impl Services {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         core: Weak<Core>,
         state: SharedState,
-        effects: EffectStore,
-        overlay: OverlayHandle,
         edge: EdgeHandle,
         clipboard: ClipboardHandle,
         settings: Arc<SettingsStore>,
@@ -46,8 +39,6 @@ impl Services {
         Self {
             core,
             state,
-            effects,
-            overlay,
             edge,
             clipboard,
             settings,
@@ -93,9 +84,6 @@ impl Services {
         {
             let _ = core.set_manual_addresses(settings.manual_addresses.clone());
         }
-        if values.contains_key("hide_cursor_on_leave") && !settings.hide_cursor_on_leave {
-            crate::hider::reveal();
-        }
         self.edge.settings_changed();
         // A shortcut that failed to register may work now; the edge thread
         // reports it again if not.
@@ -137,30 +125,8 @@ impl Services {
         core.reject_pairing(peer_id)
     }
 
-    pub fn set_effect(&self, params: EffectParams) {
-        let params = self.effects.set(params);
-        self.state.set_effect(params, false);
-    }
-
-    pub fn reset_effect(&self) {
-        let params = self.effects.set(EffectParams::default());
-        self.state.set_effect(params, true);
-    }
-
-    pub fn preview_effect(&self, hold: Option<f32>) {
-        self.overlay.send(Command::Preview { hold });
-    }
-
     /// The lock belongs to the edge thread, which also takes the shortcut.
     pub fn set_locked(&self, locked: bool) {
         self.edge.set_locked(locked);
-    }
-
-    /// The demo runs on the edge thread, which also drives real crossings;
-    /// turning it off retracts any bump on screen.
-    pub fn set_effect_demo(&self, enabled: bool) -> Result<(), String> {
-        self.edge.set_demo(enabled);
-        self.state.set_effect_demo(enabled);
-        Ok(())
     }
 }

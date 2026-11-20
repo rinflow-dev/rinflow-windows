@@ -18,7 +18,6 @@ use windows_sys::Win32::Security::{
     TokenUser,
 };
 use windows_sys::Win32::System::Com::CoCreateGuid;
-use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
 use windows_sys::Win32::System::Threading::{CreateMutexW, GetCurrentProcess, OpenProcessToken};
 use windows_sys::core::GUID;
 
@@ -111,28 +110,6 @@ pub fn current_user_sid() -> io::Result<String> {
     let sid = unsafe { from_wide(sid_string) };
     unsafe { LocalFree(sid_string.cast()) };
     Ok(sid)
-}
-
-/// Whether the user picked the light app theme in Settings > Personalization.
-/// Defaults to light, as Windows does, if the value is missing.
-pub fn apps_use_light_theme() -> bool {
-    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-    let value = wide("AppsUseLightTheme");
-    let mut data = 1u32;
-    let mut size = size_of::<u32>() as u32;
-    // SAFETY: `data` is a DWORD-sized buffer and `size` says so.
-    let status = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            key.as_ptr(),
-            value.as_ptr(),
-            RRF_RT_REG_DWORD,
-            null_mut(),
-            (&mut data as *mut u32).cast(),
-            &mut size,
-        )
-    };
-    status != 0 || data != 0
 }
 
 /// Random GUID as a lowercase hyphenated string, used as the device ID.

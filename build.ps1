@@ -17,7 +17,7 @@ scripts without a BOM in the system code page.
 .\build.cmd
 .\build.cmd -Configuration Release
 .\build.cmd -Language en-US
-.\build.cmd -Configuration Release -EffectDemo On
+.\build.cmd -SkipAgent -Rebuild
 #>
 [CmdletBinding()]
 param(
@@ -32,12 +32,12 @@ param(
     # Visual Studio language packs that are installed (see docs/building.md).
     [string]$Language = 'zh-CN',
 
-    # The edge animation's tuning page and its button. Without this, Debug
-    # builds have it and Release builds do not.
-    [ValidateSet('On', 'Off')]
-    [string]$EffectDemo,
 
-    [switch]$SkipAgent
+    [switch]$SkipAgent,
+
+    # Builds the app from scratch. The build after a failed one does so by
+    # itself (see below).
+    [switch]$Rebuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -117,11 +117,27 @@ $arguments = @(
 if ($SkipAgent) {
     $arguments += '-p:SkipAgentBuild=true'
 }
-if ($EffectDemo) {
-    $arguments += "-p:RinflowEffectDemo=$(if ($EffectDemo -eq 'On') { 'true' } else { 'false' })"
+
+
+# A build that stops part way (the compiler out of memory, for one) can leave
+# object files from before beside headers the XAML compiler just generated,
+# and the next build may link them as they are: the window's parts then
+# disagree on its layout, and it crashes as it opens. So after a failed build
+# the next one starts from scratch.
+$failed = Join-Path $PSScriptRoot "app\Rinflow\$Platform\$Configuration\last-build-failed"
+if ($Rebuild -or (Test-Path $failed)) {
+    if (-not $Rebuild) {
+        Write-Host 'The last build failed: building the app from scratch.'
+    }
+    $arguments += '-t:Rebuild'
 }
 
 & msbuild @arguments
 $result = $LASTEXITCODE
+if ($result -ne 0) {
+    New-Item -ItemType File -Force $failed | Out-Null
+} elseif (Test-Path $failed) {
+    Remove-Item $failed
+}
 $env:Path = $callerPath
 exit $result

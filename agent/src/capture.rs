@@ -249,10 +249,9 @@ enum Exit {
     Stay,
 }
 
-/// How a capture ended: the peer it drove, and where the cursor reappeared
-/// if it came back to this PC.
+/// How a capture ended: where the cursor reappeared if it came back to this
+/// PC.
 pub struct Ended {
-    pub peer_id: String,
     pub cursor: Option<POINT>,
 }
 
@@ -633,10 +632,7 @@ pub fn finish() -> Option<Ended> {
     // The peer releases whatever it still holds and ends its control. After
     // a revoke the core has done so already and this only acknowledges it.
     let _ = capture.core.reset_input();
-    Some(Ended {
-        peer_id: capture.peer_id,
-        cursor,
-    })
+    Some(Ended { cursor })
 }
 
 /// A game or a pointer-lock page on `peer_id` let go of its pointer: the

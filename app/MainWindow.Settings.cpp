@@ -153,10 +153,9 @@ namespace winrt::Rinflow::implementation
         };
         wire(LaunchToggle(), LaunchState(), L"launch_at_login");
         wire(CornerToggle(), CornerState(), L"corner_guard");
-        wire(FullscreenToggle(), FullscreenState(), L"pause_in_fullscreen");
+        wire(FullscreenToggle(), FullscreenState(), L"lock_in_game");
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
         wire(KeepAwakeToggle(), KeepAwakeState(), L"keep_awake");
-        wire(HideCursorToggle(), HideCursorState(), L"hide_cursor_on_leave");
         wire(LockSyncToggle(), LockSyncState(), L"lock_sync");
 
         // The agent's log folder (agent/src/log.rs).
@@ -248,30 +247,6 @@ namespace winrt::Rinflow::implementation
             }
         });
 
-        // The delay is sent once the slider rests, not at every step.
-        auto delayTimer = DispatcherQueue().CreateTimer();
-        delayTimer.Interval(std::chrono::milliseconds(300));
-        delayTimer.IsRepeating(false);
-        delayTimer.Tick([weak](auto&& timer, auto&&)
-        {
-            timer.Stop();
-            if (auto self = weak.get())
-            {
-                self->m_agent->UpdateSetting(L"switch_delay_ms",
-                    JsonValue::CreateNumberValue(std::round(self->SwitchDelaySlider().Value())));
-            }
-        });
-        SwitchDelaySlider().ValueChanged([weak, delayTimer](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (!self) return;
-            self->SwitchDelayValue().Text(hstring(std::format(L"{:.0f} ms", self->SwitchDelaySlider().Value())));
-            if (!self->m_applying)
-            {
-                delayTimer.Stop();
-                delayTimer.Start();
-            }
-        });
 
         EditHotkeyButton().Click([weak](auto&&, auto&&)
         {
@@ -423,7 +398,7 @@ namespace winrt::Rinflow::implementation
 
         SetSwitch(LaunchToggle(), LaunchState(), state.GetNamedBoolean(L"launch_at_login", false));
         SetSwitch(CornerToggle(), CornerState(), settings.GetNamedBoolean(L"corner_guard", true));
-        SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"pause_in_fullscreen", false));
+        SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"lock_in_game", true));
         SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", true));
         // A Mac's modifier keys: Command and Control swapped by default.
         {
@@ -452,7 +427,6 @@ namespace winrt::Rinflow::implementation
             }
         }
         SetSwitch(KeepAwakeToggle(), KeepAwakeState(), settings.GetNamedBoolean(L"keep_awake", true));
-        SetSwitch(HideCursorToggle(), HideCursorState(), settings.GetNamedBoolean(L"hide_cursor_on_leave", true));
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
         SetSwitch(AutoUpdateToggle(), AutoUpdateState(), settings.GetNamedBoolean(L"auto_update", true));
 
@@ -469,15 +443,6 @@ namespace winrt::Rinflow::implementation
             LanguageCombo().SelectedIndex(languageIndex);
         }
         ApplyTheme(theme);
-
-        // Not while the user works the slider: the snapshot may still carry
-        // the value from before.
-        double delay = settings.GetNamedNumber(L"switch_delay_ms", 150);
-        if (SwitchDelaySlider().Value() != delay && SwitchDelaySlider().FocusState() == FocusState::Unfocused)
-        {
-            SwitchDelaySlider().Value(delay);
-        }
-        SwitchDelayValue().Text(hstring(std::format(L"{:.0f} ms", SwitchDelaySlider().Value())));
 
         auto hotkey = settings.GetNamedObject(L"lock_hotkey", JsonObject{});
         auto modifiers = static_cast<uint32_t>(hotkey.GetNamedNumber(L"modifiers", DefaultModifiers));

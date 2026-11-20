@@ -94,14 +94,11 @@
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Language</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>Use system setting</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>Moving between screens</value></data>
-  <data name="DelayTitle.Text" xml:space="preserve"><value>Switch delay</value></data>
-  <data name="DelayDescription.Text" xml:space="preserve"><value>How long the pointer waits at a screen edge before it switches.</value></data>
-  <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Switch delay</value></data>
   <data name="CornerTitle.Text" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
   <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Don&apos;t switch at screen corners</value></data>
-  <data name="FullscreenTitle.Text" xml:space="preserve"><value>Pause during full-screen games</value></data>
-  <data name="FullscreenDescription.Text" xml:space="preserve"><value>No switching while a game, video or presentation is full screen.</value></data>
-  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Pause during full-screen games</value></data>
+  <data name="FullscreenTitle.Text" xml:space="preserve"><value>Stay on this PC during full-screen games</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>The pointer doesn't switch to other devices while a full-screen game runs. Videos and presentations aren't affected.</value></data>
+  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stay on this PC during full-screen games</value></data>
   <data name="LockTitle.Text" xml:space="preserve"><value>Lock to the current screen</value></data>
   <data name="LockDescription.Text" xml:space="preserve"><value>Press the shortcut to lock, and again to unlock.</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Change shortcut</value></data>
@@ -116,15 +113,12 @@
   <data name="ModifierCustomDescription" xml:space="preserve"><value>Set each modifier key yourself.</value></data>
   <data name="ModifierNone" xml:space="preserve"><value>None</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>Lock and sleep</value></data>
-  <data name="HideCursorTitle.Text" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
-  <data name="HideCursorDescription.Text" xml:space="preserve"><value>It comes back when you move this PC's mouse or touchpad.</value></data>
-  <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hide the pointer after another device leaves</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stay awake while I work on other devices</value></data>
   <data name="LockSyncTitle.Text" xml:space="preserve"><value>Lock together</value></data>
   <data name="LockSyncDescription.Text" xml:space="preserve"><value>Locking one device locks the others. Turn it on on both devices.</value></data>
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lock together</value></data>
-  <data name="ClipboardHeader.Text" xml:space="preserve"><value>Clipboard</value></data>
+  <data name="ClipboardHeader.Text" xml:space="preserve"><value>Sharing</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>Sync clipboard and files</value></data>
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>Text, images (up to 8 MB) and files. Files above 512 MB ask first.</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sync clipboard and files</value></data>

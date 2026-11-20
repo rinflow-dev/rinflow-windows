@@ -94,14 +94,11 @@
   <data name="LanguageCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>言語</value></data>
   <data name="LanguageSystem.Content" xml:space="preserve"><value>システム設定に従う</value></data>
   <data name="SwitchingHeader.Text" xml:space="preserve"><value>画面間の移動</value></data>
-  <data name="DelayTitle.Text" xml:space="preserve"><value>切り替えの遅延</value></data>
-  <data name="DelayDescription.Text" xml:space="preserve"><value>ポインターを画面の端に押し当ててから切り替わるまでの時間です。</value></data>
-  <data name="DelaySlider.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切り替えの遅延</value></data>
   <data name="CornerTitle.Text" xml:space="preserve"><value>画面の隅では切り替えない</value></data>
   <data name="CornerToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>画面の隅では切り替えない</value></data>
-  <data name="FullscreenTitle.Text" xml:space="preserve"><value>全画面のゲーム中は一時停止</value></data>
-  <data name="FullscreenDescription.Text" xml:space="preserve"><value>ゲーム、動画、プレゼンテーションの全画面表示中は切り替えません。</value></data>
-  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全画面のゲーム中は一時停止</value></data>
+  <data name="FullscreenTitle.Text" xml:space="preserve"><value>全画面のゲーム中はこの PC に固定</value></data>
+  <data name="FullscreenDescription.Text" xml:space="preserve"><value>全画面のゲームを実行中は、ポインターが他のデバイスに切り替わりません。動画やプレゼンテーションには影響しません。</value></data>
+  <data name="FullscreenToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>全画面のゲーム中はこの PC に固定</value></data>
   <data name="LockTitle.Text" xml:space="preserve"><value>現在の画面にロック</value></data>
   <data name="LockDescription.Text" xml:space="preserve"><value>ショートカットでロックし、もう一度押すと解除します。</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ショートカットを変更</value></data>
@@ -116,15 +113,12 @@
   <data name="ModifierCustomDescription" xml:space="preserve"><value>修飾キーを個別に指定します。</value></data>
   <data name="ModifierNone" xml:space="preserve"><value>なし</value></data>
   <data name="PresenceHeader.Text" xml:space="preserve"><value>ロックとスリープ</value></data>
-  <data name="HideCursorTitle.Text" xml:space="preserve"><value>他のデバイスが離れた後にポインターを隠す</value></data>
-  <data name="HideCursorDescription.Text" xml:space="preserve"><value>この PC のマウスやタッチパッドを動かすと再表示されます。</value></data>
-  <data name="HideCursorToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>他のデバイスが離れた後にポインターを隠す</value></data>
   <data name="KeepAwakeTitle.Text" xml:space="preserve"><value>他のデバイスで作業中はスリープしない</value></data>
   <data name="KeepAwakeToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>他のデバイスで作業中はスリープしない</value></data>
   <data name="LockSyncTitle.Text" xml:space="preserve"><value>一緒にロック</value></data>
   <data name="LockSyncDescription.Text" xml:space="preserve"><value>どれかをロックすると他のデバイスもロックされます。両方でオンにしてください。</value></data>
   <data name="LockSyncToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>一緒にロック</value></data>
-  <data name="ClipboardHeader.Text" xml:space="preserve"><value>クリップボード</value></data>
+  <data name="ClipboardHeader.Text" xml:space="preserve"><value>共有</value></data>
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>クリップボードとファイルを同期</value></data>
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>テキスト、画像 (最大 8 MB)、ファイル。512 MB を超えるファイルは先に確認します。</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>クリップボードとファイルを同期</value></data>
