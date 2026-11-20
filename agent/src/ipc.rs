@@ -50,7 +50,8 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// the settings `sharing` (quitting Rinflow does that), `switch_hotkeys` and
 /// `switch_modifiers` are gone, and so is the snapshot's
 /// `switch_hotkeys_blocked`; the setting `paired_only` is gone too (pairing is
-/// always required).
+/// always required), and so is `keep_in_tray` (closing the window always
+/// leaves Rinflow in the tray).
 pub const PROTOCOL_VERSION: u32 = 19;
 
 /// The longest request line the agent reads, `\n` excluded. The app's

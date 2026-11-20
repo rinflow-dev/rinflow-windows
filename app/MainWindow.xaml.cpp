@@ -188,11 +188,7 @@ namespace winrt::Rinflow::implementation
             auto self = weak.get();
             if (!self) return;
             self->m_closed = true;
-            // 关闭窗口时保留在托盘 off: closing the window quits Rinflow.
-            if (!self->m_keepInTray && !RinflowApp::IsRelaunching())
-            {
-                self->m_agent->Quit();
-            }
+            // Rinflow keeps running in the tray; the tray's 退出 quits it.
             self->m_agent->Stop();
         });
     }

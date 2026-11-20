@@ -5,8 +5,6 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
-  <data name="TrayOpen" xml:space="preserve"><value>Open Rinflow</value></data>
-  <data name="TrayQuit" xml:space="preserve"><value>Quit</value></data>
   <data name="ControlBackTitle" xml:space="preserve"><value>Keyboard and mouse are back on this PC</value></data>
   <data name="ControlBackElevated" xml:space="preserve"><value>A window running as administrator came to the front, so Rinflow can't take its keyboard input. Click another window first, then move to the other device.</value></data>
   <data name="ControlBackHooksRemoved" xml:space="preserve"><value>Windows stopped Rinflow from taking the keyboard and mouse, as it does when the system is busy. Move to the other device again to carry on.</value></data>
@@ -46,7 +44,6 @@
   <data name="PairingTimedOut" xml:space="preserve"><value>Pairing timed out. It wasn't confirmed within two minutes.</value></data>
   <data name="UnpairedDisconnected" xml:space="preserve"><value>An unpaired device was disconnected. Pair it first.</value></data>
   <data name="Unpaired" xml:space="preserve"><value>Unpaired.</value></data>
-  <data name="TrayInstallUpdate" xml:space="preserve"><value>Install update {0}</value></data>
   <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} is ready to install</value></data>
   <data name="UpdateReadyText" xml:space="preserve"><value>Click here to install it from the settings, or use the tray menu.</value></data>
   <data name="UpdatedTitle" xml:space="preserve"><value>Rinflow was updated</value></data>

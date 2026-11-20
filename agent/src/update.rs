@@ -37,7 +37,7 @@ use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// The newest release's `latest.json`. `RINFLOW_UPDATE_FEED` replaces it,
@@ -118,9 +118,7 @@ impl UpdateHandle {
     }
 }
 
-/// The running updater, for the tray menu.
-static HANDLE: OnceLock<UpdateHandle> = OnceLock::new();
-/// The version ready to install, for the tray menu.
+/// The version ready to install, for the tray notification.
 static READY: Mutex<Option<String>> = Mutex::new(None);
 
 /// The version that can be installed now, if any.
@@ -128,19 +126,11 @@ pub fn ready_version() -> Option<String> {
     READY.lock().ok()?.clone()
 }
 
-/// Installs the update that is ready (the tray menu's 安装更新).
-pub fn install() {
-    if let Some(handle) = HANDLE.get() {
-        handle.install();
-    }
-}
-
 /// Starts the update thread. Without it Rinflow works on; it only does not
 /// update itself.
 pub fn start(state: SharedState, settings: Arc<SettingsStore>) -> UpdateHandle {
     let (sender, receiver) = mpsc::channel();
     let handle = UpdateHandle(sender);
-    let _ = HANDLE.set(handle.clone());
     let started = std::thread::Builder::new()
         .name("update".to_owned())
         .spawn(move || {

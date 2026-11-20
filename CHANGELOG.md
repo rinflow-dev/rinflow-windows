@@ -11,9 +11,13 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 ### Changed
 
 - The tray panel no longer lists the devices. It shows only which device is controlling this PC, while one is.
+- Right-clicking the tray icon opens the same panel as left-clicking, instead of a separate menu. An update that is ready is installed from the notification or the **Settings** page.
+- **Sync clipboard and files** is on by default. Settings you already saved are kept.
 
 ### Fixed
 
+- Changing the lock shortcut did nothing: the dialog ignored every key pressed.
+- The tray panel could cover the taskbar, when the taskbar hides itself or is the taller one of tablet mode. It now opens above the taskbar.
 - While another device controlled this PC, full-screen games such as Overwatch did not respond to the mouse, and the pointer seemed stuck. On a PC with one monitor, Rinflow did not notice that the game was holding the pointer. It now does, and sends the game relative motion.
 
 ### Removed
@@ -21,6 +25,8 @@ Notable changes are recorded here. The format follows [Keep a Changelog](https:/
 - The **Share keyboard and mouse** switch, on the Devices page and in the tray panel. To stop sharing, quit Rinflow. If you had turned it off, sharing is on again after the update.
 - **Switch devices with shortcuts** (Ctrl+Alt+Shift+arrow keys) and its setting. Move the pointer across a screen edge instead. Ctrl+Alt+Esc still brings the pointer back to this PC.
 - The **Only paired devices** switch. Pairing is now always required: a new device connects only after both sides confirm the 6-digit code. Devices already paired are not affected; if you had turned the switch off, unpaired devices are asked to pair the next time they connect.
+- **Keep running in the notification area when the window closes**. Closing the main window always leaves Rinflow running; quit it from the tray icon.
+- The **Encrypted connections (TLS)** row, a switch that could not be changed (every connection is encrypted), and **This PC's fingerprint**, which pairing with the 6-digit code makes unnecessary. **Network and security** is now called **Security**.
 
 ## [0.0.2] - 2026-11-16
 

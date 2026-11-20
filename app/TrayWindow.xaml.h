@@ -33,7 +33,12 @@ namespace winrt::Rinflow::implementation
 
     private:
         void ApplyState(Windows::Data::Json::JsonObject const& state);
+        // Finds the taskbar by the pointer: the side the panel rises from,
+        // and the room it has.
+        void FindPlace();
         void FitToContent();
+
+        enum class Edge { Bottom, Top, Left, Right };
 
         std::unique_ptr<::RinflowApp::AgentClient> m_agent;
         Windows::Foundation::Collections::IObservableVector<Windows::Foundation::IInspectable> m_devices{
@@ -45,6 +50,9 @@ namespace winrt::Rinflow::implementation
         hstring m_theme;
         // Where the pointer was when the panel opened, in physical pixels.
         POINT m_anchor{};
+        // The part of that monitor clear of the taskbar, in physical pixels.
+        RECT m_area{};
+        Edge m_edge{ Edge::Bottom };
         double m_scale{ 1.0 };
     };
 }

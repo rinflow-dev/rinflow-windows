@@ -28,6 +28,30 @@ namespace
     constexpr double Gap = 10;
     // Devices driving this PC beyond this many are left out.
     constexpr size_t MaxRows = 8;
+
+    // The taskbar on this monitor as it is drawn now, in physical pixels,
+    // cut to the monitor. The work area only leaves out a taskbar that
+    // always shows: one that hides itself, or the taller one of a tablet,
+    // lies over it.
+    std::optional<RECT> TaskbarOn(HMONITOR monitor, RECT const& screen)
+    {
+        for (auto className : { L"Shell_TrayWnd", L"Shell_SecondaryTrayWnd" })
+        {
+            HWND bar = nullptr;
+            while ((bar = FindWindowExW(nullptr, bar, className, nullptr)) != nullptr)
+            {
+                RECT rect{}, shown{};
+                if (IsWindowVisible(bar)
+                    && MonitorFromWindow(bar, MONITOR_DEFAULTTONULL) == monitor
+                    && GetWindowRect(bar, &rect)
+                    && IntersectRect(&shown, &rect, &screen))
+                {
+                    return shown;
+                }
+            }
+        }
+        return std::nullopt;
+    }
 }
 
 namespace winrt::Rinflow::implementation
@@ -152,6 +176,7 @@ namespace winrt::Rinflow::implementation
     void TrayWindow::ShowNearPointer()
     {
         GetCursorPos(&m_anchor);
+        FindPlace();
         FitToContent();
         Activate();
         HWND hwnd{};
@@ -159,11 +184,43 @@ namespace winrt::Rinflow::implementation
         SetForegroundWindow(hwnd);
     }
 
-    void TrayWindow::FitToContent()
+    void TrayWindow::FindPlace()
     {
         auto monitor = MonitorFromPoint(m_anchor, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(info) };
         GetMonitorInfoW(monitor, &info);
+        auto const& full = info.rcMonitor;
+        m_area = info.rcWork;
+
+        // Once, as the panel opens: a tablet's taskbar may shrink back as
+        // soon as the panel takes the focus, and the panel stays put.
+        if (auto bar = TaskbarOn(monitor, full))
+        {
+            if (bar->right - bar->left >= bar->bottom - bar->top)
+            {
+                m_edge = bar->top - full.top < full.bottom - bar->bottom ? Edge::Top : Edge::Bottom;
+            }
+            else
+            {
+                m_edge = bar->left - full.left < full.right - bar->right ? Edge::Left : Edge::Right;
+            }
+            switch (m_edge)
+            {
+            case Edge::Top: m_area.top = (std::max)(m_area.top, bar->bottom); break;
+            case Edge::Bottom: m_area.bottom = (std::min)(m_area.bottom, bar->top); break;
+            case Edge::Left: m_area.left = (std::max)(m_area.left, bar->right); break;
+            case Edge::Right: m_area.right = (std::min)(m_area.right, bar->left); break;
+            }
+        }
+        else if (m_area.top > full.top) m_edge = Edge::Top;
+        else if (m_area.left > full.left) m_edge = Edge::Left;
+        else if (m_area.right < full.right) m_edge = Edge::Right;
+        else m_edge = Edge::Bottom;
+    }
+
+    void TrayWindow::FitToContent()
+    {
+        auto monitor = MonitorFromPoint(m_anchor, MONITOR_DEFAULTTONEAREST);
         UINT dpiX = 96, dpiY = 96;
         if (FAILED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY))) dpiX = 96;
         m_scale = dpiX / 96.0;
@@ -177,31 +234,17 @@ namespace winrt::Rinflow::implementation
         int h = static_cast<int>(std::lround(height * m_scale));
         int gap = static_cast<int>(std::lround(Gap * m_scale));
 
-        auto const& work = info.rcWork;
-        auto const& full = info.rcMonitor;
+        // Beside the taskbar, never on it, and by the pointer along it.
+        auto const& area = m_area;
         auto clamp = [](long value, long low, long high) { return (std::max)(low, (std::min)(value, high)); };
-        long x, y;
-        if (work.top > full.top)
+        long x = clamp(m_anchor.x - w / 2, area.left + gap, area.right - w - gap);
+        long y = clamp(m_anchor.y - h / 2, area.top + gap, area.bottom - h - gap);
+        switch (m_edge)
         {
-            // Taskbar at the top.
-            x = clamp(m_anchor.x - w / 2, work.left + gap, work.right - w - gap);
-            y = work.top + gap;
-        }
-        else if (work.left > full.left)
-        {
-            x = work.left + gap;
-            y = clamp(m_anchor.y - h / 2, work.top + gap, work.bottom - h - gap);
-        }
-        else if (work.right < full.right)
-        {
-            x = work.right - w - gap;
-            y = clamp(m_anchor.y - h / 2, work.top + gap, work.bottom - h - gap);
-        }
-        else
-        {
-            // Taskbar at the bottom (or hidden): rise from it.
-            x = clamp(m_anchor.x - w / 2, work.left + gap, work.right - w - gap);
-            y = work.bottom - h - gap;
+        case Edge::Top: y = area.top + gap; break;
+        case Edge::Bottom: y = area.bottom - h - gap; break;
+        case Edge::Left: x = area.left + gap; break;
+        case Edge::Right: x = area.right - w - gap; break;
         }
         AppWindow().MoveAndResize({ static_cast<int32_t>(x), static_cast<int32_t>(y), w, h });
     }

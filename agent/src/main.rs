@@ -98,7 +98,7 @@ fn main() {
     let effects = effect::EffectStore::load();
     let settings = Arc::new(settings::SettingsStore::load());
     let preferences = settings.get();
-    // The language of the tray menu, notifications and messages.
+    // The language of the tray icon, notifications and messages.
     i18n::set_language(&preferences.language);
     let clipboard_sync = preferences.clipboard;
     let control_port = preferences

@@ -31,8 +31,6 @@
   <data name="PairingWaiting" xml:space="preserve"><value>Waiting for the other device…</value></data>
   <data name="PairingTitle" xml:space="preserve"><value>Pair {0}</value></data>
   <data name="PairingInstruction" xml:space="preserve"><value>Done once Pair is selected on both devices.</value></data>
-  <data name="TlsOn" xml:space="preserve"><value>TLS 1.3, with the other device's certificate checked.</value></data>
-  <data name="TlsOff" xml:space="preserve"><value>Rinflow isn&apos;t running: this PC&apos;s certificate or port can&apos;t be used, so it can&apos;t connect to other devices for now.</value></data>
   <data name="LockBarMessage" xml:space="preserve"><value>The pointer won&apos;t move to other devices. Press {0} to unlock.</value></data>
   <data name="ElevatedOn" xml:space="preserve"><value>Changing this needs administrator approval.</value></data>
   <data name="ElevatedOff" xml:space="preserve"><value>Needs Rinflow installed with its setup program.</value></data>
@@ -87,8 +85,6 @@
   <data name="GeneralHeader.Text" xml:space="preserve"><value>General</value></data>
   <data name="LaunchTitle.Text" xml:space="preserve"><value>Start when I sign in</value></data>
   <data name="LaunchToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Start when I sign in</value></data>
-  <data name="TrayTitle.Text" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
-  <data name="TrayToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep running in the notification area when the window closes</value></data>
   <data name="ThemeTitle.Text" xml:space="preserve"><value>Theme</value></data>
   <data name="ThemeCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Theme</value></data>
   <data name="ThemeSystem.Content" xml:space="preserve"><value>Use system setting</value></data>
@@ -132,15 +128,9 @@
   <data name="ClipboardTitle.Text" xml:space="preserve"><value>Sync clipboard and files</value></data>
   <data name="ClipboardDescription.Text" xml:space="preserve"><value>Text, images (up to 8 MB) and files. Files above 512 MB ask first.</value></data>
   <data name="ClipboardToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sync clipboard and files</value></data>
-  <data name="NetworkHeader.Text" xml:space="preserve"><value>Network and security</value></data>
-  <data name="TlsTitle.Text" xml:space="preserve"><value>Encrypted connections (TLS)</value></data>
-  <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Encrypted connections</value></data>
+  <data name="NetworkHeader.Text" xml:space="preserve"><value>Security</value></data>
   <data name="ElevatedTitle.Text" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
   <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Admin windows, UAC and the lock screen while controlled</value></data>
-  <data name="FingerprintTitle.Text" xml:space="preserve"><value>This PC&apos;s fingerprint</value></data>
-  <data name="FingerprintDescription.Text" xml:space="preserve"><value>Other devices recognize this PC by it.</value></data>
-  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy fingerprint</value></data>
-  <data name="CopyIdButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Copy</value></data>
   <data name="AboutHeader.Text" xml:space="preserve"><value>About</value></data>
   <data name="CheckUpdateButton.Content" xml:space="preserve"><value>Check for updates</value></data>
   <data name="LogsTitle.Text" xml:space="preserve"><value>Diagnostic logs</value></data>

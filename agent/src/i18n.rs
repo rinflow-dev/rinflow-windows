@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! The text the agent shows itself: the tray menu, notifications and the
+//! The text the agent shows itself: the tray icon, notifications and the
 //! errors the settings app displays.
 //!
 //! Strings live in `Strings\<language>\Resources.resw`, the format the
@@ -163,12 +163,19 @@ mod tests {
 
     #[test]
     fn the_setting_wins_over_the_system_language() {
-        for (setting, expected) in [("en-US", "Quit"), ("zh-CN", "退出"), ("ja-JP", "終了")] {
+        for (setting, expected) in [
+            ("en-US", "Keyboard and mouse didn't switch"),
+            ("zh-CN", "键盘和鼠标没有切换"),
+            ("ja-JP", "キーボードとマウスを切り替えられませんでした"),
+        ] {
             set_language(setting);
-            assert_eq!(tr(s::TrayQuit), expected);
+            assert_eq!(tr(s::SwitchFailedTitle), expected);
         }
         set_language("system");
-        assert_eq!(tr(s::TrayQuit), s::TrayQuit.0[system_language() as usize]);
+        assert_eq!(
+            tr(s::SwitchFailedTitle),
+            s::SwitchFailedTitle.0[system_language() as usize]
+        );
     }
 
     #[test]

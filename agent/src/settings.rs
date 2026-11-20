@@ -26,12 +26,8 @@ const DISCOVERY_PORT: u16 = 42420;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// Share the clipboard with peers. Off by default: clipboards can hold
-    /// passwords, and a device that is not paired could be on the other end.
+    /// Share the clipboard (and copied files) with peers. On by default.
     pub clipboard: bool,
-    /// Closing the settings window leaves the agent (and its tray icon)
-    /// running. Off quits the agent with the window.
-    pub keep_in_tray: bool,
     /// The settings app's theme: `system`, `light` or `dark`.
     pub theme: String,
     /// How long the pointer has to push against a portal before it crosses.
@@ -112,8 +108,7 @@ pub const MAX_MANUAL_ADDRESSES: usize = 32;
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            clipboard: false,
-            keep_in_tray: true,
+            clipboard: true,
             theme: "system".to_owned(),
             switch_delay_ms: 150,
             corner_guard: true,
@@ -382,9 +377,9 @@ mod tests {
 
     #[test]
     fn old_files_keep_their_values_and_gain_defaults() {
-        let settings: Settings = serde_json::from_str(r#"{"clipboard":true}"#).unwrap();
-        assert!(settings.clipboard);
-        assert!(settings.keep_in_tray && settings.corner_guard);
+        let settings: Settings = serde_json::from_str(r#"{"clipboard":false}"#).unwrap();
+        assert!(!settings.clipboard);
+        assert!(settings.corner_guard);
         assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.lock_hotkey, Hotkey::default());
     }
@@ -392,7 +387,7 @@ mod tests {
     #[test]
     fn one_bad_saved_value_keeps_the_others() {
         let saved = json!({
-            "keep_in_tray": false,
+            "corner_guard": false,
             "theme": "dark",
             "switch_delay_ms": 5000,
             "port": "not a port",
@@ -400,7 +395,7 @@ mod tests {
             "manual_addresses": ["192.168.1.20"]
         });
         let settings = Settings::from_saved(Some(&saved));
-        assert!(!settings.keep_in_tray);
+        assert!(!settings.corner_guard);
         assert_eq!(settings.theme, "dark");
         assert_eq!(settings.manual_addresses, ["192.168.1.20"]);
         assert_eq!(settings.switch_delay_ms, 150);
@@ -411,7 +406,8 @@ mod tests {
             "sharing": false,
             "switch_hotkeys": false,
             "switch_modifiers": 3,
-            "paired_only": false
+            "paired_only": false,
+            "keep_in_tray": false
         });
         assert_eq!(Settings::from_saved(Some(&older)), Settings::default());
 
@@ -459,10 +455,10 @@ mod tests {
         let settings = Settings::default();
         let merged = settings
             .merged(&values(
-                json!({"keep_in_tray": false, "port": 24800, "theme": "dark"}),
+                json!({"corner_guard": false, "port": 24800, "theme": "dark"}),
             ))
             .unwrap();
-        assert!(!merged.keep_in_tray);
+        assert!(!merged.corner_guard);
         assert_eq!(merged.port, Some(24800));
         assert_eq!(merged.theme, "dark");
 
@@ -472,7 +468,7 @@ mod tests {
             json!({"port": 80}),
             json!({"port": 42420}),
             json!({"switch_delay_ms": 5000}),
-            json!({"keep_in_tray": "yes"}),
+            json!({"corner_guard": "yes"}),
             json!({"lock_hotkey": {"modifiers": 4, "key": 76}}),
             json!({"lock_hotkey": {"modifiers": 2, "key": 0x11}}),
         ] {

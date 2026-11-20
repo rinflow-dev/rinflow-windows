@@ -7,7 +7,6 @@
 //! it with `--tray`, which shows its tray panel (the lock switch, devices,
 //! the way to the main window).
 
-use crate::i18n::{s, tr, trf};
 use crate::win::wide;
 use std::cell::RefCell;
 use std::io;
@@ -15,7 +14,7 @@ use std::path::PathBuf;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use std::time::Duration;
-use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::System::Console::{CTRL_CLOSE_EVENT, SetConsoleCtrlHandler};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
@@ -25,20 +24,15 @@ use windows_sys::Win32::UI::Shell::{
     NIN_BALLOONUSERCLICK, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    ASFW_ANY, AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, CreateWindowExW,
-    DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
-    GetMessageW, HICON, KillTimer, MF_SEPARATOR, MF_STRING, MSG, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer, TPM_NONOTIFY,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_DESTROY,
-    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP, WM_SETTINGCHANGE,
-    WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
+    ASFW_ANY, AllowSetForegroundWindow, CreateWindowExW, DefWindowProcW, DestroyIcon,
+    DestroyWindow, DispatchMessageW, GetMessageW, HICON, KillTimer, MSG, PostMessageW,
+    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetTimer, TranslateMessage, WM_APP,
+    WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_ENDSESSION, WM_LBUTTONUP, WM_RBUTTONUP,
+    WM_SETTINGCHANGE, WM_THEMECHANGED, WM_TIMER, WNDCLASSW, WS_OVERLAPPED,
 };
 
 const WM_TRAY: u32 = WM_APP + 1;
 const TRAY_ID: u32 = 1;
-const MENU_OPEN: usize = 1;
-const MENU_QUIT: usize = 2;
-const MENU_INSTALL_UPDATE: usize = 3;
 /// Retries adding the icon: Explorer may not take it yet (busy at sign-in,
 /// or restarting). The agent works on meanwhile.
 const ICON_RETRY_TIMER: usize = 1;
@@ -52,7 +46,7 @@ static WINDOW: AtomicIsize = AtomicIsize::new(0);
 // Owned by the tray thread. Retain until Explorer receives a replacement.
 static ICON: AtomicIsize = AtomicIsize::new(0);
 
-/// Quits the agent as the tray menu's 退出 does: the icon goes away and the
+/// Quits the agent as the tray panel's 退出 does: the icon goes away and the
 /// core stops, so peers see a clean disconnect. False before the tray exists.
 pub fn quit() -> bool {
     let window = WINDOW.load(Ordering::Acquire);
@@ -211,8 +205,8 @@ unsafe extern "system" fn window_proc(
     match message {
         WM_TRAY => {
             match lparam as u32 {
-                WM_LBUTTONUP => open_app(&["--tray"]),
-                WM_RBUTTONUP => show_menu(window),
+                // Either button opens the same panel.
+                WM_LBUTTONUP | WM_RBUTTONUP => open_app(&["--tray"]),
                 // The notification that an update is ready: the settings
                 // page, where it is installed.
                 NIN_BALLOONUSERCLICK if crate::update::ready_version().is_some() => {
@@ -334,50 +328,6 @@ fn load_tray_icon() -> HICON {
         );
     }
     icon
-}
-
-fn show_menu(window: HWND) {
-    let open = wide(tr(s::TrayOpen));
-    let quit = wide(tr(s::TrayQuit));
-    let install =
-        crate::update::ready_version().map(|version| wide(&trf(s::TrayInstallUpdate, &[&version])));
-    // SAFETY: the menu is created, shown modally and destroyed here.
-    unsafe {
-        let menu = CreatePopupMenu();
-        if menu.is_null() {
-            return;
-        }
-        AppendMenuW(menu, MF_STRING, MENU_OPEN, open.as_ptr());
-        if let Some(install) = &install {
-            AppendMenuW(menu, MF_STRING, MENU_INSTALL_UPDATE, install.as_ptr());
-        }
-        AppendMenuW(menu, MF_SEPARATOR, 0, null());
-        AppendMenuW(menu, MF_STRING, MENU_QUIT, quit.as_ptr());
-
-        let mut cursor = POINT { x: 0, y: 0 };
-        GetCursorPos(&mut cursor);
-        // Without this the menu does not close when the user clicks elsewhere.
-        SetForegroundWindow(window);
-        let command = TrackPopupMenu(
-            menu,
-            TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY,
-            cursor.x,
-            cursor.y,
-            0,
-            window,
-            null(),
-        );
-        DestroyMenu(menu);
-
-        match command as usize {
-            MENU_OPEN => open_app(&[]),
-            MENU_INSTALL_UPDATE => crate::update::install(),
-            MENU_QUIT => {
-                DestroyWindow(window);
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Launches the settings app: `RINFLOW_APP_PATH`, or `Rinflow.exe`

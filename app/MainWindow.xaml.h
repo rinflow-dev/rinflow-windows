@@ -218,10 +218,7 @@ namespace winrt::Rinflow::implementation
         bool m_updateReady{ false };
         Windows::Data::Json::JsonObject m_settings{ nullptr };
         hstring m_theme;
-        bool m_keepInTray{ true };
         hstring m_deviceId;
-        // This PC's certificate fingerprint, as "3F:A2:…" (empty without QUIC).
-        hstring m_fingerprint;
 
         std::vector<LayoutRect> m_localDisplays;
         std::vector<LayoutDevice> m_layoutDevices;

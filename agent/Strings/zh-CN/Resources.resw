@@ -5,8 +5,6 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
-  <data name="TrayOpen" xml:space="preserve"><value>打开主窗口</value></data>
-  <data name="TrayQuit" xml:space="preserve"><value>退出</value></data>
   <data name="ControlBackTitle" xml:space="preserve"><value>键盘和鼠标已回到这台电脑</value></data>
   <data name="ControlBackElevated" xml:space="preserve"><value>以管理员身份运行的窗口到了前台，Rinflow 无法接管它的键盘输入。先点一下其他窗口，再移到另一台设备。</value></data>
   <data name="ControlBackHooksRemoved" xml:space="preserve"><value>Windows 暂停了 Rinflow 对键盘和鼠标的接管（系统繁忙时会这样）。再移到另一台设备即可继续。</value></data>
@@ -46,7 +44,6 @@
   <data name="PairingTimedOut" xml:space="preserve"><value>配对超时，没有在两分钟内确认。</value></data>
   <data name="UnpairedDisconnected" xml:space="preserve"><value>未配对的设备已断开，请先配对。</value></data>
   <data name="Unpaired" xml:space="preserve"><value>已取消配对。</value></data>
-  <data name="TrayInstallUpdate" xml:space="preserve"><value>安装更新 {0}</value></data>
   <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} 可以安装了</value></data>
   <data name="UpdateReadyText" xml:space="preserve"><value>点按这里在设置页安装，或者从托盘菜单安装。</value></data>
   <data name="UpdatedTitle" xml:space="preserve"><value>Rinflow 已更新</value></data>

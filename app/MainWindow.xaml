@@ -439,18 +439,6 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TrayTitle" Text="关闭窗口时保留在托盘" />
-                        </StackPanel>
-                        <TextBlock x:Name="TrayState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="TrayToggle" Grid.Column="2" x:Uid="TrayToggle" AutomationProperties.Name="关闭窗口时保留在托盘" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="ThemeTitle" Text="主题" />
                         <ComboBox
@@ -665,21 +653,7 @@
                         <ToggleSwitch x:Name="ClipboardToggle" Grid.Column="2" x:Uid="ClipboardToggle" AutomationProperties.Name="同步剪贴板和文件" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
 
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="NetworkHeader" Text="网络与安全" />
-                    <Grid x:Name="TlsCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="TlsTitle" Text="加密传输 (TLS)" />
-                            <TextBlock x:Name="TlsDescription" Style="{StaticResource RowDescriptionStyle}" />
-                        </StackPanel>
-                        <!-- Always on, so the row shows only when the core could not start. -->
-                        <TextBlock x:Name="TlsState" Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" x:Uid="TlsToggle" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="NetworkHeader" Text="安全" />
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -692,33 +666,6 @@
                         </StackPanel>
                         <TextBlock x:Name="ElevatedInputState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="ElevatedInputToggle" Grid.Column="2" x:Uid="ElevatedInputToggle" AutomationProperties.Name="被控时可操作管理员窗口、UAC 和锁屏" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="FingerprintTitle" Text="本机指纹" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="FingerprintDescription" Text="其他设备靠它识别这台电脑。" />
-                        </StackPanel>
-                        <TextBlock
-                            x:Name="DeviceIdText"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            FontFamily="Consolas"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            IsTextSelectionEnabled="True" />
-                        <Button
-                            x:Name="CopyIdButton"
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            x:Uid="CopyIdButton" AutomationProperties.Name="复制本机指纹"
-                            Style="{StaticResource SubtleIconButtonStyle}"
-                            ToolTipService.ToolTip="复制">
-                            <FontIcon FontSize="16" Glyph="&#xE8C8;" />
-                        </Button>
                     </Grid>
 
                     <TextBlock Style="{StaticResource SectionHeaderStyle}" x:Uid="AboutHeader" Text="关于" />
@@ -1186,12 +1133,23 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     x:Uid="HotkeyInstructions" Text="按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。"
                     TextWrapping="Wrap" />
-                <StackPanel
-                    x:Name="HotkeyPreview"
-                    MinHeight="36"
-                    HorizontalAlignment="Center"
-                    Orientation="Horizontal"
-                    Spacing="6" />
+                <!--  Takes the keys: the dialog's own events never see them,
+                      its template is shown in a popup of its own.  -->
+                <ContentControl
+                    x:Name="HotkeyCapture"
+                    MinHeight="48"
+                    Padding="8"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    IsTabStop="True"
+                    UseSystemFocusVisuals="True">
+                    <StackPanel
+                        x:Name="HotkeyPreview"
+                        MinHeight="36"
+                        Orientation="Horizontal"
+                        Spacing="6" />
+                </ContentControl>
                 <TextBlock
                     x:Name="HotkeyHint"
                     HorizontalAlignment="Center"

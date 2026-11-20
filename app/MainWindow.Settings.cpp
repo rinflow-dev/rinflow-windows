@@ -91,19 +91,6 @@ namespace
         state.Text(RinflowApp::Text(on ? L"On" : L"Off"));
     }
 
-    // "3fa27c…" (64 hex digits) as "3F:A2:7C:…", the way certificate
-    // fingerprints are usually shown.
-    std::wstring ColonHex(std::wstring_view hex)
-    {
-        std::wstring text;
-        for (size_t i = 0; i < hex.size(); ++i)
-        {
-            if (i > 0 && i % 2 == 0) text.push_back(L':');
-            text.push_back(static_cast<wchar_t>(towupper(hex[i])));
-        }
-        return text;
-    }
-
     JsonObject HotkeyValue(uint32_t modifiers, uint32_t key)
     {
         JsonObject value;
@@ -165,7 +152,6 @@ namespace winrt::Rinflow::implementation
             });
         };
         wire(LaunchToggle(), LaunchState(), L"launch_at_login");
-        wire(TrayToggle(), TrayState(), L"keep_in_tray");
         wire(CornerToggle(), CornerState(), L"corner_guard");
         wire(FullscreenToggle(), FullscreenState(), L"pause_in_fullscreen");
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
@@ -349,25 +335,6 @@ namespace winrt::Rinflow::implementation
             }).detach();
         });
 
-        CopyIdButton().Click([weak](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (!self || self->m_fingerprint.empty()) return;
-            try
-            {
-                Windows::ApplicationModel::DataTransfer::DataPackage package;
-                package.SetText(self->m_fingerprint);
-                Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
-                // Still there after Rinflow closes.
-                Windows::ApplicationModel::DataTransfer::Clipboard::Flush();
-            }
-            catch (hresult_error const&)
-            {
-                // Another program holds the clipboard; the button can be
-                // clicked again.
-            }
-        });
-
         // Checks now, or installs the update the agent has ready (setup asks
         // for an administrator, then Rinflow restarts by itself).
         CheckUpdateButton().Click([weak](auto&&, auto&&)
@@ -455,11 +422,9 @@ namespace winrt::Rinflow::implementation
         } applied{ m_applying };
 
         SetSwitch(LaunchToggle(), LaunchState(), state.GetNamedBoolean(L"launch_at_login", false));
-        m_keepInTray = settings.GetNamedBoolean(L"keep_in_tray", true);
-        SetSwitch(TrayToggle(), TrayState(), m_keepInTray);
         SetSwitch(CornerToggle(), CornerState(), settings.GetNamedBoolean(L"corner_guard", true));
         SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"pause_in_fullscreen", false));
-        SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", false));
+        SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", true));
         // A Mac's modifier keys: Command and Control swapped by default.
         {
             auto map = settings.GetNamedObject(L"modifier_map", JsonObject{});
@@ -490,17 +455,6 @@ namespace winrt::Rinflow::implementation
         SetSwitch(HideCursorToggle(), HideCursorState(), settings.GetNamedBoolean(L"hide_cursor_on_leave", true));
         SetSwitch(LockSyncToggle(), LockSyncState(), settings.GetNamedBoolean(L"lock_sync", false));
         SetSwitch(AutoUpdateToggle(), AutoUpdateState(), settings.GetNamedBoolean(L"auto_update", true));
-
-        // Encryption is not a choice: every connection is encrypted, so there
-        // is nothing to show for it. Without a fingerprint the core is not
-        // running (no certificate or port): only then the row appears.
-        auto fingerprint = state.GetNamedValue(L"fingerprint", JsonValue::CreateNullValue());
-        bool encrypted = fingerprint.ValueType() == JsonValueType::String && !fingerprint.GetString().empty();
-        TlsCard().Visibility(encrypted ? Visibility::Collapsed : Visibility::Visible);
-        SetSwitch(TlsToggle(), TlsState(), encrypted);
-        TlsDescription().Text(encrypted
-            ? RinflowApp::Text(L"TlsOn")
-            : RinflowApp::Text(L"TlsOff"));
 
         auto theme = settings.GetNamedString(L"theme", L"system");
         int themeIndex = theme == L"light" ? 1 : theme == L"dark" ? 2 : 0;
@@ -560,14 +514,6 @@ namespace winrt::Rinflow::implementation
             ? RinflowApp::Text(L"ElevatedRecommended")
             : RinflowApp::Text(L"ElevatedOff"));
 
-        // The first four and last three bytes; the tooltip and 复制 give all 32.
-        m_fingerprint = encrypted ? hstring(ColonHex(fingerprint.GetString())) : hstring();
-        auto full = std::wstring(m_fingerprint);
-        DeviceIdText().Text(full.size() > 24
-            ? hstring(full.substr(0, 11) + L" … " + full.substr(full.size() - 8))
-            : hstring(full.empty() ? L"—" : full));
-        ToolTipService::SetToolTip(DeviceIdText(), full.empty() ? nullptr : box_value(m_fingerprint));
-        CopyIdButton().IsEnabled(!full.empty());
         VersionText().Text(RinflowApp::Format(L"Version", std::wstring(state.GetNamedString(L"agent_version", L"—"))));
         ApplyUpdate(state);
     }
@@ -599,7 +545,12 @@ namespace winrt::Rinflow::implementation
         HotkeyDialog().IsPrimaryButtonEnabled(true);
 
         auto weak = get_weak();
-        auto token = HotkeyDialog().PreviewKeyDown([weak](auto&&, KeyRoutedEventArgs const& args)
+        // The dialog opens with 保存 focused; the keys go to the capture box.
+        auto opened = HotkeyDialog().Opened([weak](auto&&, auto&&)
+        {
+            if (auto self = weak.get()) self->HotkeyCapture().Focus(FocusState::Keyboard);
+        });
+        auto token = HotkeyCapture().PreviewKeyDown([weak](auto&&, KeyRoutedEventArgs const& args)
         {
             auto self = weak.get();
             if (!self) return;
@@ -634,7 +585,8 @@ namespace winrt::Rinflow::implementation
         {
             // Another dialog is open (or still closing): nothing changes.
         }
-        HotkeyDialog().PreviewKeyDown(token);
+        HotkeyDialog().Opened(opened);
+        HotkeyCapture().PreviewKeyDown(token);
         if (m_closed)
         {
             co_return;

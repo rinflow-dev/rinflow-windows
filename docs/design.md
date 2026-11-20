@@ -207,7 +207,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Copied files | Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`, with their names as text. The core sends a manifest, and the peer pulls the files while this PC runs. Files a peer copied land in `Downloads\Rinflow` (folders kept, names never overwritten). They are then put on the clipboard as `CF_HDROP` with a copy drop effect, so Ctrl+V in Explorer copies them. |
 | Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While **同步剪贴板和文件** is off it is refused. A failed transfer shows as the error bar. |
 | Progress | Files on their way, either way, show as cards on the **设备** page with their progress and a button to stop them (the snapshot's `transfers`, from the core's `files_receiving`, `files_progress`, `files_sending` and `files_send_ended`; `cancel_transfer`). When files arrive, a notification says so; clicking it opens `Downloads\Rinflow`. |
-| Setting | Off by default. Saved in `config.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
+| Setting | On by default. Saved in `config.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
 ## Edge push-through effect
 
@@ -258,9 +258,8 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | Setting | Key | How it works |
 | --- | --- | --- |
 | 开机时启动 | (registry) | The `Rinflow` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `config.json`. |
-| 关闭窗口时保留在托盘 | `keep_in_tray` | Off: closing the main window also quits the agent. |
 | 主题 | `theme` | `system`, `light` or `dark`, for both windows. |
-| 语言 | `language` | `system` (the first of the user's Windows languages that Rinflow has, then English), `en-US`, `zh-CN` or `ja-JP`. The app reads it from `config.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (tray menu, notifications, errors) switches at once. See [Languages](#languages). |
+| 语言 | `language` | `system` (the first of the user's Windows languages that Rinflow has, then English), `en-US`, `zh-CN` or `ja-JP`. The app reads it from `config.json` before its first window and restarts itself on the settings page when it changes; the agent's own text (notifications, errors) switches at once. See [Languages](#languages). |
 | 切换延迟 | `switch_delay_ms` | 0–500 ms (default 150): how long a push must last before it crosses. Crossing back within the effect's warm time needs no push. |
 | 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
@@ -274,8 +273,6 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 锁定到当前屏幕 | `lock_hotkey` | `{"modifiers": MOD_* bits, "key": virtual key}`, default Ctrl+Alt+L. Registered with `RegisterHotKey` on the edge thread; while driving a peer the capture hooks recognise it instead. Locked, the pointer neither crosses into a peer nor comes back from the one it drives (it slides along the edge); the main window says so. The tray panel's **锁定在这台电脑** switch sets the same lock (`set_locked`). The lock is not saved: it ends when the agent restarts. |
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
 | (none) | `port` | The core's UDP port for connections (`null`: 42421). Not in the settings, as on the Mac: devices learn each other's port through discovery, so nobody has to set it. `config.json` still takes one, for a network where 42421 cannot be used. Applies after Rinflow restarts; must not be the discovery port 42420. |
-| 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
-| 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
 | 被控时可操作管理员窗口、UAC 和锁屏 | (machine-wide) | `HKLM\SOFTWARE\Rinflow\ElevatedInput`, set by the setup program (on by default). Changing it asks for an administrator. Disabled when the input service is not installed. See [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen). |
 | 自动检查更新 | `auto_update` | On by default. See [Updates](#updates). |
 
@@ -288,8 +285,8 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | Where | Every release carries `latest.json` (version, release notes, and per architecture the setup program's URL, size and signature). GitHub serves the newest release's at `releases/latest/download/latest.json`; pre-releases are never offered. Fetched with WinHTTP, so the system's proxy settings apply. |
 | When | A minute after the agent starts and then once a day, while **自动检查更新** (`auto_update`) is on; and whenever the user selects **检查更新** on the 设置 page. |
 | Trust | Each setup program is signed with the project's minisign key; the public key is built into the agent (`PUBLIC_KEY`). The signed comment names the file and its version (`file:Rinflow-Setup-0.0.2-x64.exe`, `version:0.0.2`), so a changed `latest.json` can neither offer a file the key did not sign, nor an older version as a newer one. The download is checked while it arrives into `%LOCALAPPDATA%\Rinflow\updates`, deleted when it does not match, and checked again just before it runs. |
-| Ready | The tray shows a notification (clicking it opens the 设置 page), the tray menu gains **安装更新 x.y.z**, and the 设置 page shows the version and **安装并重启**, with a link to the release notes. |
-| Installing | The setup program runs with `/VERYSILENT /RinflowUpdate=1`; Windows asks for an administrator once (UAC), as for any install into Program Files. Setup runs `rinflow-agent.exe --quit` as the user, so the agent quits as from its tray menu (peers see a clean disconnect, the settings app closes with it), replaces the files, and starts the agent again as the user, not elevated. Starting at sign-in stays as the user set it. Declined or failed, Rinflow keeps running and the update stays ready; the 设置 page says so and where setup's log is (`updates\setup.log`). |
+| Ready | The tray shows a notification (clicking it opens the 设置 page), and the 设置 page shows the version and **安装并重启**, with a link to the release notes. |
+| Installing | The setup program runs with `/VERYSILENT /RinflowUpdate=1`; Windows asks for an administrator once (UAC), as for any install into Program Files. Setup runs `rinflow-agent.exe --quit` as the user, so the agent quits as from its tray panel (peers see a clean disconnect, the settings app closes with it), replaces the files, and starts the agent again as the user, not elevated. Starting at sign-in stays as the user set it. Declined or failed, Rinflow keeps running and the update stays ready; the 设置 page says so and where setup's log is (`updates\setup.log`). |
 | Afterwards | The first start of a new version says so in a notification and deletes the downloaded setup program. |
 
 The signing key's secret half is the release workflow's `RINFLOW_UPDATE_KEY` secret (see [Building and running](building.md#releases)). Not yet: Authenticode signatures (SmartScreen, and a second check of the publisher before running setup), updating without UAC through the service.
@@ -351,7 +348,7 @@ App → agent:
 | `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
 | `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `config.json`. |
 | `{"type":"set_locked","locked":true}` | Lock the pointer to this PC, or unlock it, as the lock shortcut does (the snapshot's `locked`). |
-| `{"type":"update_settings","values":{"keep_in_tray":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
+| `{"type":"update_settings","values":{"corner_guard":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
 | `{"type":"forget_device","peer_id":"…"}` | Disconnect, unplace, unpair and stop listing a device. |
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
 | `{"type":"reject_pairing","peer_id":"…"}` | The user declined the pairing; the connection closes. |
