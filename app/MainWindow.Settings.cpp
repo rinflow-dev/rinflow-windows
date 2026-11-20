@@ -169,8 +169,6 @@ namespace winrt::Rinflow::implementation
         wire(CornerToggle(), CornerState(), L"corner_guard");
         wire(FullscreenToggle(), FullscreenState(), L"pause_in_fullscreen");
         wire(ClipboardToggle(), ClipboardState(), L"clipboard");
-        wire(PairedOnlyToggle(), PairedOnlyState(), L"paired_only");
-        wire(SwitchHotkeysToggle(), SwitchHotkeysState(), L"switch_hotkeys");
         wire(KeepAwakeToggle(), KeepAwakeState(), L"keep_awake");
         wire(HideCursorToggle(), HideCursorState(), L"hide_cursor_on_leave");
         wire(LockSyncToggle(), LockSyncState(), L"lock_sync");
@@ -232,17 +230,6 @@ namespace winrt::Rinflow::implementation
             self->m_agent->UpdateSetting(L"modifier_map", preset == L"keep"
                 ? ModifierMapValue(L"super", L"control", L"alt")
                 : ModifierMapValue(L"control", L"super", L"alt"));
-        });
-
-        SwitchModifiersCombo().SelectionChanged([weak](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (!self || self->m_applying) return;
-            if (auto item = self->SwitchModifiersCombo().SelectedItem().try_as<ComboBoxItem>())
-            {
-                auto modifiers = std::stod(std::wstring(unbox_value_or<hstring>(item.Tag(), L"7")));
-                self->m_agent->UpdateSetting(L"switch_modifiers", JsonValue::CreateNumberValue(modifiers));
-            }
         });
 
         // Every string is loaded again in the new language: the app starts
@@ -467,25 +454,12 @@ namespace winrt::Rinflow::implementation
             ~Applied() { flag = false; }
         } applied{ m_applying };
 
-        SetSwitch(SharingToggle(), SharingState(), settings.GetNamedBoolean(L"sharing", true));
         SetSwitch(LaunchToggle(), LaunchState(), state.GetNamedBoolean(L"launch_at_login", false));
         m_keepInTray = settings.GetNamedBoolean(L"keep_in_tray", true);
         SetSwitch(TrayToggle(), TrayState(), m_keepInTray);
         SetSwitch(CornerToggle(), CornerState(), settings.GetNamedBoolean(L"corner_guard", true));
         SetSwitch(FullscreenToggle(), FullscreenState(), settings.GetNamedBoolean(L"pause_in_fullscreen", false));
         SetSwitch(ClipboardToggle(), ClipboardState(), settings.GetNamedBoolean(L"clipboard", false));
-        SetSwitch(PairedOnlyToggle(), PairedOnlyState(), settings.GetNamedBoolean(L"paired_only", true));
-        bool switchHotkeys = settings.GetNamedBoolean(L"switch_hotkeys", true);
-        SetSwitch(SwitchHotkeysToggle(), SwitchHotkeysState(), switchHotkeys);
-        int modifiersIndex = settings.GetNamedNumber(L"switch_modifiers", 7) == 3 ? 1 : 0;
-        if (SwitchModifiersCombo().SelectedIndex() != modifiersIndex)
-        {
-            SwitchModifiersCombo().SelectedIndex(modifiersIndex);
-        }
-        SwitchModifiersCombo().IsEnabled(switchHotkeys);
-        // A combination another program registered first.
-        SwitchHotkeysWarning().Visibility(switchHotkeys && state.GetNamedBoolean(L"switch_hotkeys_blocked", false)
-            ? Visibility::Visible : Visibility::Collapsed);
         // A Mac's modifier keys: Command and Control swapped by default.
         {
             auto map = settings.GetNamedObject(L"modifier_map", JsonObject{});

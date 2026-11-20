@@ -161,10 +161,11 @@ fn main() {
         ),
         max_auto_receive_bytes: 0,
         // Encryption and pairing (QUIC with TLS): this PC's certificate,
-        // the devices the user paired, and whether only those may connect.
+        // the devices the user paired. Only those may connect: a new device
+        // pairs first (both users confirm a code).
         identity_path: Some(trust::identity_path().to_string_lossy().into_owned()),
         trusted_peers: trust.peers(),
-        require_pairing: preferences.paired_only,
+        require_pairing: true,
         // What a Mac's modifier keys play as here (the user's setting).
         modifier_map: preferences.modifier_map,
         // Devices to find by address where multicast does not reach.
@@ -238,10 +239,6 @@ fn main() {
     clipboard.set_core(Arc::downgrade(&core));
     // Playing input tells the core when a game here holds the pointer.
     injector.handle().set_core(Arc::downgrade(&core));
-    // Sharing paused in the settings: peers may not drive this PC either.
-    if !preferences.sharing {
-        let _ = core.set_remote_control_allowed(false);
-    }
 
     // Sleep, wake and network changes: sessions end in order before sleep
     // and come back right after waking or a network change.

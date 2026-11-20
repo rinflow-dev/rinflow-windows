@@ -4,7 +4,7 @@
 
 //! Notification-area icon. Keeping the tray in the agent means the settings
 //! app only runs while one of its windows is open: clicking the icon starts
-//! it with `--tray`, which shows its tray panel (devices, the sharing switch,
+//! it with `--tray`, which shows its tray panel (the lock switch, devices,
 //! the way to the main window).
 
 use crate::i18n::{s, tr, trf};

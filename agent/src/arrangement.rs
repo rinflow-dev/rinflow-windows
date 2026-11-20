@@ -15,7 +15,7 @@ use crate::config;
 use crate::displays::{self, Monitor, PhysicalPortal};
 use crate::state::{DeviceView, LayoutView, SharedState};
 use rinflow_core::PlacementRecord;
-use rinflow_core::layout::{self, Display, Neighbor, Offset, Portal, Side};
+use rinflow_core::layout::{self, Display, Neighbor, Offset, Portal};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -106,77 +106,6 @@ pub struct Target {
     pub neighbors: Vec<Neighbor>,
 }
 
-/// This PC and every placed peer, in this PC's space: for moving to the
-/// device on one side by shortcut.
-pub struct World {
-    pub local: Vec<Display>,
-    pub peers: Vec<Neighbor>,
-}
-
-impl World {
-    /// The device next to `from` (`None`: this PC) toward `side`: the
-    /// nearest whose middle lies that way. `Some(None)` is this PC.
-    pub fn toward(&self, from: Option<&str>, side: Side) -> Option<Option<String>> {
-        let bounds_of = |displays: &[Display]| layout::bounds(displays);
-        let current = match from {
-            None => bounds_of(&self.local)?,
-            Some(id) => bounds_of(&self.peers.iter().find(|peer| peer.id == id)?.displays)?,
-        };
-        let middle = |(left, top, right, bottom): (f64, f64, f64, f64)| {
-            ((left + right) / 2.0, (top + bottom) / 2.0)
-        };
-        let (cx, cy) = middle(current);
-        let candidates = std::iter::once((None, bounds_of(&self.local)))
-            .chain(
-                self.peers
-                    .iter()
-                    .map(|peer| (Some(peer.id.clone()), bounds_of(&peer.displays))),
-            )
-            .filter(|(id, _)| id.as_deref() != from);
-        candidates
-            .filter_map(|(id, bounds)| {
-                let (x, y) = middle(bounds?);
-                let (along, across) = match side {
-                    Side::Right => (x - cx, y - cy),
-                    Side::Left => (cx - x, y - cy),
-                    Side::Bottom => (y - cy, x - cx),
-                    Side::Top => (cy - y, x - cx),
-                };
-                // That way, and more that way than sideways.
-                (along > 1.0 && across.abs() <= along * 2.0)
-                    .then_some((along + 2.0 * across.abs(), id))
-            })
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, id)| id)
-    }
-
-    /// Where the pointer lands when it jumps to `to` (`None`: this PC) from
-    /// `from`: the middle of the display of `to` nearest to `from`.
-    pub fn landing(&self, from: Option<&str>, to: Option<&str>) -> Option<(f64, f64)> {
-        let displays_of = |id: Option<&str>| match id {
-            None => Some(self.local.as_slice()),
-            Some(id) => self
-                .peers
-                .iter()
-                .find(|peer| peer.id == id)
-                .map(|peer| peer.displays.as_slice()),
-        };
-        let (left, top, right, bottom) = layout::bounds(displays_of(from)?)?;
-        let (cx, cy) = ((left + right) / 2.0, (top + bottom) / 2.0);
-        displays_of(to)?
-            .iter()
-            .map(|display| {
-                let (x, y) = (
-                    display.x + display.width / 2.0,
-                    display.y + display.height / 2.0,
-                );
-                ((x - cx).hypot(y - cy), (x, y))
-            })
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, point)| point)
-    }
-}
-
 struct Inner {
     saved: Saved,
     monitors: Vec<Monitor>,
@@ -241,15 +170,6 @@ impl Arrangement {
             offset,
             portals,
             neighbors,
-        })
-    }
-
-    /// This PC and every placed peer, in this PC's space.
-    pub fn world(&self) -> Option<World> {
-        let inner = self.inner.lock().ok()?;
-        Some(World {
-            local: displays::logical(&inner.monitors),
-            peers: inner.placed(),
         })
     }
 
@@ -384,7 +304,7 @@ impl Arrangement {
 
     /// Shows a change to the saved arrangement, then writes `config.json`
     /// once the lock is let go. The input hooks read the arrangement
-    /// (crossing into a neighbouring device, the switch shortcuts), and
+    /// (crossing into a neighbouring device), and
     /// Windows silently removes a hook that waits too long: it must never
     /// wait for the disk, slowed by a virus scanner, say.
     fn commit(&self, mut inner: MutexGuard<'_, Inner>) {
@@ -531,67 +451,5 @@ mod tests {
                 .devices
                 .is_empty()
         );
-    }
-
-    fn screen(x: f64, y: f64, width: f64, height: f64) -> Display {
-        Display {
-            x,
-            y,
-            width,
-            height,
-            scale: 1.0,
-        }
-    }
-
-    /// This PC in the middle, a Mac to its right, a PC right of the Mac,
-    /// and a tablet above this PC.
-    fn world() -> World {
-        World {
-            local: vec![screen(0.0, 0.0, 1920.0, 1080.0)],
-            peers: vec![
-                Neighbor {
-                    id: "mac".into(),
-                    displays: vec![screen(1920.0, 0.0, 1512.0, 982.0)],
-                },
-                Neighbor {
-                    id: "pc".into(),
-                    displays: vec![screen(3432.0, 0.0, 1920.0, 1080.0)],
-                },
-                Neighbor {
-                    id: "tablet".into(),
-                    displays: vec![screen(400.0, -800.0, 1280.0, 800.0)],
-                },
-            ],
-        }
-    }
-
-    #[test]
-    fn shortcuts_move_to_the_nearest_device_on_that_side() {
-        let world = world();
-        assert_eq!(world.toward(None, Side::Right), Some(Some("mac".into())));
-        assert_eq!(
-            world.toward(Some("mac"), Side::Right),
-            Some(Some("pc".into()))
-        );
-        assert_eq!(world.toward(Some("mac"), Side::Left), Some(None));
-        assert_eq!(world.toward(None, Side::Top), Some(Some("tablet".into())));
-        assert_eq!(world.toward(Some("tablet"), Side::Bottom), Some(None));
-        // Nothing that way.
-        assert_eq!(world.toward(None, Side::Left), None);
-        assert_eq!(world.toward(Some("pc"), Side::Right), None);
-    }
-
-    #[test]
-    fn a_jump_lands_in_the_middle_of_the_nearest_display() {
-        let world = World {
-            local: vec![
-                screen(0.0, 0.0, 1920.0, 1080.0),
-                screen(-1600.0, 0.0, 1600.0, 900.0),
-            ],
-            peers: world().peers,
-        };
-        assert_eq!(world.landing(None, Some("mac")), Some((2676.0, 491.0)));
-        // Back from the Mac: the right-hand monitor of this PC, not the left.
-        assert_eq!(world.landing(Some("mac"), None), Some((960.0, 540.0)));
     }
 }

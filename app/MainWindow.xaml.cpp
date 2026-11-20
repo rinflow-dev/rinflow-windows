@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// The main window: the 设备 page (sharing switch, arrangement, the user's
+// The main window: the 设备 page (lock notice, arrangement, the user's
 // devices), the 设置 page (MainWindow.Settings.cpp) and, in development
 // builds, the edge animation page (MainWindow.Effect.cpp). Everything shown
 // comes from the agent's state snapshots; edits go back as requests.
@@ -217,17 +217,6 @@ namespace winrt::Rinflow::implementation
     void MainWindow::SetupDevicesPage()
     {
         auto weak = get_weak();
-        SharingToggle().Toggled([weak](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (!self) return;
-            bool on = self->SharingToggle().IsOn();
-            self->SharingState().Text(RinflowApp::Text(on ? L"On" : L"Off"));
-            if (!self->m_applying)
-            {
-                self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(on));
-            }
-        });
         AddDeviceButton().Click([weak](auto&&, auto&&)
         {
             if (auto self = weak.get()) self->ShowAddDevice();

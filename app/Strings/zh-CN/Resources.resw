@@ -78,8 +78,6 @@
   <data name="SettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设置</value></data>
   <data name="SettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>设置</value></data>
   <data name="LockBar.Title" xml:space="preserve"><value>已锁定到当前屏幕</value></data>
-  <data name="SharingTitle.Text" xml:space="preserve"><value>共享键盘和鼠标</value></data>
-  <data name="SharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>共享键盘和鼠标</value></data>
   <data name="MyDevicesHeader.Text" xml:space="preserve"><value>我的设备</value></data>
   <data name="RowConnect.Content" xml:space="preserve"><value>连接</value></data>
   <data name="RowMore.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>更多操作</value></data>
@@ -112,11 +110,6 @@
   <data name="LockDescription.Text" xml:space="preserve"><value>按快捷键锁定，再按一次解除。</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>修改快捷键</value></data>
   <data name="EditHotkeyButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>修改快捷键</value></data>
-  <data name="SwitchHotkeysTitle.Text" xml:space="preserve"><value>用快捷键切换设备</value></data>
-  <data name="SwitchHotkeysDescription.Text" xml:space="preserve"><value>组合键加方向键，移到那一侧的设备。</value></data>
-  <data name="SwitchHotkeysWarning.Text" xml:space="preserve"><value>部分组合键已被其他程序占用，换一组试试。</value></data>
-  <data name="SwitchModifiersCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>切换设备的组合键</value></data>
-  <data name="SwitchHotkeysToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>用快捷键切换设备</value></data>
   <data name="ModifierMapTitle.Text" xml:space="preserve"><value>Mac 控制本机时的修饰键</value></data>
   <data name="ModifierPresetCombo.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Mac 控制本机时的修饰键</value></data>
   <data name="ModifierPresetMac.Content" xml:space="preserve"><value>Mac 习惯（推荐）</value></data>
@@ -142,9 +135,6 @@
   <data name="NetworkHeader.Text" xml:space="preserve"><value>网络与安全</value></data>
   <data name="TlsTitle.Text" xml:space="preserve"><value>加密传输 (TLS)</value></data>
   <data name="TlsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>加密传输</value></data>
-  <data name="PairedOnlyTitle.Text" xml:space="preserve"><value>仅允许已配对设备</value></data>
-  <data name="PairedOnlyDescription.Text" xml:space="preserve"><value>新设备首次连接时，需在两端确认 6 位验证码。</value></data>
-  <data name="PairedOnlyToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>仅允许已配对设备</value></data>
   <data name="ElevatedTitle.Text" xml:space="preserve"><value>被控时可操作管理员窗口、UAC 和锁屏</value></data>
   <data name="ElevatedInputToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>被控时可操作管理员窗口、UAC 和锁屏</value></data>
   <data name="FingerprintTitle.Text" xml:space="preserve"><value>本机指纹</value></data>
@@ -184,11 +174,9 @@
   <data name="HotkeyDialog.PrimaryButtonText" xml:space="preserve"><value>保存</value></data>
   <data name="HotkeyDialog.SecondaryButtonText" xml:space="preserve"><value>恢复默认</value></data>
   <data name="HotkeyInstructions.Text" xml:space="preserve"><value>按下新的组合键：Ctrl、Alt 或 Win 中至少一个，再加一个普通按键。</value></data>
-  <data name="TraySharingTitle.Text" xml:space="preserve"><value>键鼠共享</value></data>
-  <data name="TraySharingToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>键鼠共享</value></data>
   <data name="TrayLockTitle.Text" xml:space="preserve"><value>锁定在这台电脑</value></data>
   <data name="TrayLockToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>锁定在这台电脑</value></data>
-  <data name="TrayDevicesHeader.Text" xml:space="preserve"><value>设备</value></data>
+  <data name="TrayControlledHeader.Text" xml:space="preserve"><value>正在控制这台电脑</value></data>
   <data name="TrayOpenButton.Content" xml:space="preserve"><value>打开主窗口</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>设置</value></data>
   <data name="TraySettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>设置</value></data>

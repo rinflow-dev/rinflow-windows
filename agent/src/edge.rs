@@ -17,8 +17,8 @@
 //! cursor is pinned against the edge. A process can register raw mouse input
 //! for one window only, so crossing and the demo share this thread.
 //!
-//! The user's settings decide whether a push crosses at all: sharing can be
-//! paused, the lock shortcut (registered here) keeps the pointer on the
+//! The user's settings decide whether a push crosses at all: the lock
+//! (its shortcut is registered here) keeps the pointer on the
 //! current screen, corners can be excluded, and full-screen games can pause
 //! crossing. A push also has to last the switch delay.
 
@@ -96,10 +96,6 @@ const WM_ARRANGEMENT_CHANGED: u32 = WM_APP + 8;
 /// the tray panel's switch.
 const WM_SET_LOCK: u32 = WM_APP + 9;
 const HOTKEY_ID: i32 = 1;
-/// The switch shortcuts (arrow keys), registered while no peer is driven (the capture
-/// hooks take them otherwise): ids 2 to 5, in [`SWITCH_SIDES`] order.
-const SWITCH_HOTKEY_BASE: i32 = 2;
-const SWITCH_SIDES: [Side; 4] = [Side::Left, Side::Right, Side::Top, Side::Bottom];
 
 /// Peers whose pointer a game or a pointer-lock page holds (the core's
 /// `peer_pointer_lock`): driving them, motion goes to them whole and their
@@ -164,8 +160,7 @@ impl EdgeHandle {
         }
     }
 
-    /// Re-reads the settings: sharing paused gives a driven peer back, and
-    /// a new lock shortcut is registered.
+    /// Re-reads the settings: a new lock shortcut is registered.
     pub fn settings_changed(&self) {
         // SAFETY: posts to the edge thread's message queue.
         unsafe {
@@ -349,9 +344,6 @@ impl EdgeThread {
                     capture::release();
                     capture::finish();
                     UnregisterHotKey(window, HOTKEY_ID);
-                    for id in 0..SWITCH_SIDES.len() as i32 {
-                        UnregisterHotKey(window, SWITCH_HOTKEY_BASE + id);
-                    }
                     remove_input_window(window);
                 }
                 TRACKER.with(|tracker| {
@@ -416,8 +408,6 @@ struct Tracker {
     cooldown_until: Instant,
     /// The lock shortcut last registered (or tried).
     hotkey: Option<Hotkey>,
-    /// The modifiers the switch shortcuts are registered with.
-    switch_hotkeys: Option<u32>,
 }
 
 struct Hit {
@@ -455,19 +445,12 @@ impl Tracker {
             warm_until: None,
             cooldown_until: now,
             hotkey: None,
-            switch_hotkeys: None,
         }
     }
 
     fn settings_changed(&mut self) {
         let settings = self.settings.get();
-        if !settings.sharing {
-            self.cancel();
-            // A peer being driven gets its keyboard and mouse back.
-            capture::release();
-        }
         self.register_hotkey(settings.lock_hotkey);
-        self.register_switch_hotkeys(settings.switch_hotkeys.then_some(settings.switch_modifiers));
     }
 
     /// What a capture needs to move on to other devices.
@@ -477,77 +460,6 @@ impl Tracker {
             state: self.state.clone(),
             settings: self.settings.clone(),
         }
-    }
-
-    /// The switch shortcuts (the arrow keys with `modifiers`, `None` for
-    /// off) while this PC has the pointer; a driven peer's capture hooks see
-    /// them otherwise. A combination another program took first is reported
-    /// to the settings page (`switch_hotkeys_blocked`), the others still work.
-    fn register_switch_hotkeys(&mut self, modifiers: Option<u32>) {
-        if self.switch_hotkeys == modifiers {
-            return;
-        }
-        self.switch_hotkeys = modifiers;
-        let mut blocked = false;
-        for (index, side) in SWITCH_SIDES.iter().enumerate() {
-            let id = SWITCH_HOTKEY_BASE + index as i32;
-            // SAFETY: (un)registers this thread's window for the shortcut.
-            unsafe {
-                UnregisterHotKey(self.window, id);
-                if let Some(modifiers) = modifiers
-                    && RegisterHotKey(
-                        self.window,
-                        id,
-                        (modifiers | MOD_NOREPEAT) as HOT_KEY_MODIFIERS,
-                        capture::side_key(*side),
-                    ) == 0
-                {
-                    blocked = true;
-                    log!(
-                        "switch shortcut {}+{side:?} is taken by another program: {}",
-                        describe_modifiers(modifiers),
-                        io::Error::last_os_error()
-                    );
-                }
-            }
-        }
-        self.state.set_switch_hotkeys_blocked(blocked);
-    }
-
-    /// A switch shortcut: to the device on that side of this PC.
-    fn jump(&mut self, side: Side) {
-        if capture::active() {
-            capture::jump(side);
-            return;
-        }
-        let settings = self.settings.get();
-        if !settings.sharing || !settings.switch_hotkeys || locked() || self.demo {
-            return;
-        }
-        let Some(world) = self.arrangement.world() else {
-            return;
-        };
-        let Some(Some(peer_id)) = world.toward(None, side) else {
-            return;
-        };
-        if !self.state.is_connected(&peer_id) {
-            return;
-        }
-        let (Some(point), Some(target)) = (
-            world.landing(None, Some(&peer_id)),
-            self.arrangement.target(&peer_id),
-        ) else {
-            return;
-        };
-        self.cancel();
-        capture::begin_at(
-            &self.core,
-            &peer_id,
-            target,
-            point,
-            self.window,
-            self.context(),
-        );
     }
 
     fn register_hotkey(&mut self, hotkey: Hotkey) {
@@ -628,9 +540,9 @@ impl Tracker {
             return;
         }
         let settings = self.settings.get();
-        // Sharing paused or locked: nothing crosses. The demo only simulates
-        // a peer on this PC and keeps working.
-        if !self.demo && (!settings.sharing || locked()) {
+        // Locked: nothing crosses. The demo only simulates a peer on this PC
+        // and keeps working.
+        if !self.demo && locked() {
             self.cancel();
             return;
         }
@@ -1194,24 +1106,14 @@ unsafe extern "system" fn window_proc(
             with_tracker(Tracker::toggle_lock);
             return 0;
         }
-        WM_HOTKEY
-            if (SWITCH_HOTKEY_BASE as usize..SWITCH_HOTKEY_BASE as usize + SWITCH_SIDES.len())
-                .contains(&wparam) =>
-        {
-            let side = SWITCH_SIDES[wparam - SWITCH_HOTKEY_BASE as usize];
-            with_tracker(|tracker| tracker.jump(side));
-            return 0;
-        }
         WM_TOGGLE_LOCK => {
             with_tracker(Tracker::toggle_lock);
             return 0;
         }
         WM_END_CAPTURE => {
-            // Only a pointer that came back through a portal may go straight
-            // back without a push.
+            // A pointer that came back may go straight back without a push.
             if let Some(ended) = capture::finish()
                 && let Some(cursor) = ended.cursor
-                && !ended.jumped
             {
                 with_tracker(|tracker| tracker.returned(&ended.peer_id, cursor));
             }

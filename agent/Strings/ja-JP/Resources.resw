@@ -28,8 +28,6 @@
   <data name="SettingUnknown" xml:space="preserve"><value>不明な設定です: {0}</value></data>
   <data name="SettingInvalidValue" xml:space="preserve"><value>設定の値が無効です: {0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>テーマはシステム設定、ライト、ダークのいずれかにしてください</value></data>
-  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>切り替えのショートカットは、Ctrl+Alt+Shift または Ctrl+Alt と方向キーの組み合わせにしてください</value></data>
-  <data name="LockShortcutConflict" xml:space="preserve"><value>ロックのショートカットが切り替えのショートカットと重複しています</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>言語はシステム設定、簡体字中国語、英語、日本語のいずれかにしてください</value></data>
   <data name="SwitchDelayTooLong" xml:space="preserve"><value>切り替えの遅延は最大 1000 ミリ秒です</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>ショートカットには Ctrl、Alt、Win のいずれかと、通常のキーを含めてください</value></data>
@@ -46,7 +44,7 @@
   <data name="PeerIdentityChanged" xml:space="preserve"><value>デバイスの ID 証明書が変更されたため、接続を拒否しました。再インストールした場合は、デバイスのメニューで削除してからもう一度ペアリングしてください。</value></data>
   <data name="PairingDeclined" xml:space="preserve"><value>相手のデバイスがペアリングを拒否しました。</value></data>
   <data name="PairingTimedOut" xml:space="preserve"><value>ペアリングがタイムアウトしました。2 分以内に確認されませんでした。</value></data>
-  <data name="UnpairedDisconnected" xml:space="preserve"><value>ペアリングされていないデバイスを切断しました (「ペアリング済みのデバイスのみ」がオンです)。</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>ペアリングされていないデバイスを切断しました。先にペアリングしてください。</value></data>
   <data name="Unpaired" xml:space="preserve"><value>ペアリングを解除しました。</value></data>
   <data name="TrayInstallUpdate" xml:space="preserve"><value>アップデート {0} をインストール</value></data>
   <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} をインストールできます</value></data>

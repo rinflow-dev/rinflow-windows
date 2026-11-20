@@ -28,8 +28,6 @@
   <data name="SettingUnknown" xml:space="preserve"><value>未知的设置项：{0}</value></data>
   <data name="SettingInvalidValue" xml:space="preserve"><value>设置的值无效：{0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>主题只能是跟随系统、浅色或深色</value></data>
-  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>切换设备的快捷键只能是 Ctrl+Alt+Shift 或 Ctrl+Alt 加方向键</value></data>
-  <data name="LockShortcutConflict" xml:space="preserve"><value>锁定快捷键与切换设备的快捷键重复了</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>语言只能是跟随系统、简体中文、英语或日语</value></data>
   <data name="SwitchDelayTooLong" xml:space="preserve"><value>切换延迟最长 1000 毫秒</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>快捷键需要包含 Ctrl、Alt 或 Win，再加一个普通按键</value></data>
@@ -46,7 +44,7 @@
   <data name="PeerIdentityChanged" xml:space="preserve"><value>设备的身份证书变了，已拒绝连接。如果对方重装过，请在设备菜单里移除它再重新配对。</value></data>
   <data name="PairingDeclined" xml:space="preserve"><value>对方拒绝了配对。</value></data>
   <data name="PairingTimedOut" xml:space="preserve"><value>配对超时，没有在两分钟内确认。</value></data>
-  <data name="UnpairedDisconnected" xml:space="preserve"><value>未配对的设备已断开（已开启“仅允许已配对设备”）。</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>未配对的设备已断开，请先配对。</value></data>
   <data name="Unpaired" xml:space="preserve"><value>已取消配对。</value></data>
   <data name="TrayInstallUpdate" xml:space="preserve"><value>安装更新 {0}</value></data>
   <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} 可以安装了</value></data>

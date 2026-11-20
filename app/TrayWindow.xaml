@@ -39,21 +39,6 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <FontIcon VerticalAlignment="Center" FontSize="16" Glyph="&#xE962;" />
-                <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" x:Uid="TraySharingTitle" Text="键鼠共享" />
-                <ToggleSwitch
-                    x:Name="SharingToggle"
-                    Grid.Column="2"
-                    x:Uid="TraySharingToggle" AutomationProperties.Name="键鼠共享"
-                    Style="{StaticResource BareSwitchStyle}" />
-            </Grid>
-
-            <Grid MinHeight="48" Padding="12,0" ColumnSpacing="12" Style="{StaticResource CardStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <FontIcon VerticalAlignment="Center" FontSize="16" Glyph="&#xE72E;" />
                 <TextBlock Grid.Column="1" Style="{StaticResource RowTitleStyle}" x:Uid="TrayLockTitle" Text="锁定在这台电脑" />
                 <ToggleSwitch
@@ -63,51 +48,42 @@
                     Style="{StaticResource BareSwitchStyle}" />
             </Grid>
 
-            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-
-            <TextBlock
-                Margin="4,0,0,0"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                x:Uid="TrayDevicesHeader" Text="设备" />
-            <ItemsControl Margin="0,-4,0,0" ItemsSource="{x:Bind Devices}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:PeerItem">
-                        <Grid Padding="4,6" ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon
-                                VerticalAlignment="Center"
-                                FontSize="16"
-                                Glyph="{x:Bind Glyph}"
-                                Opacity="{x:Bind ContentOpacity}" />
-                            <TextBlock
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Opacity="{x:Bind ContentOpacity}"
-                                Text="{x:Bind Name}"
-                                TextTrimming="CharacterEllipsis" />
-                            <Ellipse
-                                Grid.Column="2"
-                                Width="8"
-                                Height="8"
-                                Margin="0,0,4,0"
-                                VerticalAlignment="Center"
-                                Fill="{ThemeResource SystemFillColorSuccessBrush}"
-                                Visibility="{x:Bind ConnectedVisibility}" />
-                            <TextBlock
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{x:Bind StatusText}"
-                                Visibility="{x:Bind OtherVisibility}" />
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <!-- Only while another device drives this PC: which one. -->
+            <StackPanel x:Name="ControlledPanel" Spacing="8" Visibility="Collapsed">
+                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <TextBlock
+                    Margin="4,0,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    x:Uid="TrayControlledHeader" Text="正在控制这台电脑" />
+                <ItemsControl Margin="0,-4,0,0" ItemsSource="{x:Bind Devices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:PeerItem">
+                            <Grid Padding="4,6" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    VerticalAlignment="Center"
+                                    FontSize="16"
+                                    Glyph="{x:Bind Glyph}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Text="{x:Bind Name}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind Latency}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </StackPanel>
 
         <Grid

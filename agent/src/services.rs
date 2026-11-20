@@ -80,16 +80,6 @@ impl Services {
         if values.contains_key("clipboard") {
             self.clipboard.set_enabled(settings.clipboard);
         }
-        if values.contains_key("sharing")
-            && let Some(core) = self.core.upgrade()
-        {
-            let _ = core.set_remote_control_allowed(settings.sharing);
-        }
-        if values.contains_key("paired_only")
-            && let Some(core) = self.core.upgrade()
-        {
-            let _ = core.set_require_pairing(settings.paired_only);
-        }
         if values.contains_key("language") {
             crate::i18n::set_language(&settings.language);
         }

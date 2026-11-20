@@ -70,7 +70,8 @@ app/
   MainWindow.Settings.cpp    the 设置 page and the lock-shortcut dialog
   MainWindow.Pairing.cpp     the 配对 dialog (the pairing code)
   MainWindow.Effect.cpp      the edge animation page (builds with EffectDemo only)
-  TrayWindow.xaml(.cpp)      the tray panel (acrylic, closes when it loses focus)
+  TrayWindow.xaml(.cpp)      the tray panel (acrylic, closes when it loses focus): the lock switch, and
+                             the device driving this PC while one does
   DeviceModel.{h,cpp}        the user's / nearby devices from the agent's snapshot, and their rows
   AgentClient.{h,cpp}        named-pipe client; starts the agent if needed
   PeerItem.{idl,h,cpp}       row model for the device lists
@@ -102,7 +103,7 @@ Everything is kept per user in `%LOCALAPPDATA%\Rinflow` (local, not roaming: the
 The canvas on the **设备** page draws this PC's monitors (accent outline) and every placed peer to scale, in logical points, like the display settings of Windows and macOS. The model, snapping and sync rules are in the [core architecture](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/architecture.md#arrangement).
 
 - **The user's devices.** **我的设备** lists the devices this PC has been connected to (or placed), online or not, with their round-trip time. **添加设备** lists the other Rinflow devices on the network; connecting one adds it. The **⋯** menu of a row connects or disconnects, places the device on a side, and **移除此设备** forgets it (disconnected, unplaced, unpaired; it shows up under 添加设备 again while online).
-- **Staying connected.** Paired devices (and placed ones while **仅允许已配对设备** is off) connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core architecture](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/architecture.md)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
+- **Staying connected.** Paired devices connect by themselves whenever they are on the network, and again after a drop: the core does it (`auto_connect`, see the [core architecture](https://github.com/rinflow-dev/rinflow-core/blob/main/docs/architecture.md)), the agent has no timer of its own. **断开连接** holds until **连接** is chosen again here, or the other device connects; the other device does not reconnect by itself either, and its error bar stays quiet.
 - **Sleep and network changes.** [power.rs](../agent/src/power.rs) tells the core when this PC is about to sleep (`PowerRegisterSuspendResumeNotification`, `PBT_APMSUSPEND`): sessions end in order, so a Mac driving this PC gets control back at once. On waking, and when an IPv4 address comes or goes (`NotifyUnicastIpAddressChange`, after 0.8 s without further changes), the core finds and reconnects the devices right away. A device that vanishes without closing (it slept, or lost the network) shows **对方没有响应…** until it is back.
 - **Placing a device.** The user's online devices that are not placed yet wait as chips in the strip under the canvas. Drag one next to this PC's screens. Placed devices can be dragged to another side, or along an edge to choose which part of it leads to them. This PC can be dragged too, once something is placed: that moves every placed peer the other way (each snapped back against this PC, the nearest one first). A press that does not move is not a drag. Only the screens themselves take the pointer, not the empty box around monitors of different sizes (which may lie over another device). After a drop the view stays as it was for the redraws that follow, so what was let go stays under the pointer: dropping this PC moves the view with it, since the peers are what really move. It fits anew when the window changes size, or when something would leave the canvas. Screens are drawn to scale but inset by 3 pixels on sides facing another device, so devices that touch show a small gap; the monitors of one computer stay flush against each other, with square corners where they meet, and read as one shape.
 - **Quick placement.** The **⋯** menu puts a device on the left, right, top or bottom, centred on that side, or removes it (**取消放置**). Dragging a placed device onto the strip under the canvas removes it too; a drop anywhere else, even outside the canvas, still places it.
@@ -151,9 +152,8 @@ Push the pointer against the edge where a connected peer is placed (see [Arrangi
 | Keys held while crossing | agent | Keys and buttons already held when the pointer leaves (a drag across the edge, a held Shift) are released on this PC, not sent to the peer. |
 | Moving on | agent, core | Where the driven device touches another placed device, the pointer moves straight into that one (`RemotePointer::step` reports the neighbour; the capture retargets the core). Modifiers held go along; other held keys are released on the old device. |
 | Arrangement changes | agent | Placed elsewhere while driven (on either device, often with this very pointer on the peer's arrangement), or displays changed: the pointer stays where it is on the peer (moved into the nearest display if its own is gone, and sent to the peer as an absolute position unless a game holds the pointer) and from then on comes back through the new portals (`capture::rearranged`, on `placement_changed` and `portals_changed`). Only a peer no longer placed ends the capture, as after Ctrl+Alt+Esc. The macOS client does the same. |
-| Switch shortcuts | agent | **用快捷键切换设备** (`switch_hotkeys`, on by default): Ctrl+Alt+Shift+arrow keys (or Ctrl+Alt+arrow keys, `switch_modifiers`) jump to the device on that side of the current one, landing in the middle of its nearest display (`arrangement::World`). Ctrl+Alt+Shift is the default because few programs use it with the arrow keys: Ctrl+Alt alone adds cursors in VS Code and rotates the screen with some graphics drivers. Registered with `RegisterHotKey` while this PC has the pointer; the capture hooks take them while it drives a peer, and holding the modifiers on chains jumps. A combination another program registered first shows as a notice on the settings row (`switch_hotkeys_blocked`). |
 | Speeds per device | agent | **鼠标和滚动…** in a device's **⋯** menu (`peer_input`): pointer speed 0.25–4×, scrolling speed 0.25–5×, reversed scrolling. Applied here while this PC drives that device, before the pointer is tracked, so the two never disagree on where it is. |
-| Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc and the switch shortcuts still work. |
+| Game on the peer | agent | While the peer says a game holds its pointer (`peer_pointer_lock`), every bit of motion goes to it and no edge leads anywhere; Ctrl+Alt+Esc still brings the pointer back. |
 | Taken over | core, agent | Only one device drives at a time. If a peer starts driving this PC while it drives another, or another device takes over the peer this PC drives, the core resets that peer and reports `control_revoked`. The edge thread then ends the capture. When a peer now drives this PC, the cursor stays where that peer puts it; otherwise it comes back as after Ctrl+Alt+Esc. Pushing the pointer into a peer while being driven takes this PC back: whoever drove it is told to stop. |
 
 The demo and real crossings share the edge thread: a process can register raw mouse input for only one window. While the demo is on, portals wrap around instead of crossing.
@@ -205,7 +205,7 @@ Turn on **同步剪贴板和文件** on the **设置** page. The clipboard then 
 | Changes | `AddClipboardFormatListener` on a message-only window on its own thread. A peer's clipboard written here is not reported back: the sequence number after the write is skipped. |
 | Privacy | Contents marked with `ExcludeClipboardContentFromMonitorProcessing` or `Clipboard Viewer Ignore`, or `CanIncludeInClipboardHistory` = 0 (password managers), are never shared. |
 | Copied files | Files copied in Explorer (`CF_HDROP`) are reported as a `text/uri-list`, with their names as text. The core sends a manifest, and the peer pulls the files while this PC runs. Files a peer copied land in `Downloads\Rinflow` (folders kept, names never overwritten). They are then put on the clipboard as `CF_HDROP` with a copy drop effect, so Ctrl+V in Explorer copies them. |
-| Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While sharing is off it is refused. A failed transfer shows as the error bar. |
+| Receiving files | The core's own limit is set to 0, so every transfer waits for the agent. Up to 512 MB it is taken at once. A larger one asks first in a message box. While **同步剪贴板和文件** is off it is refused. A failed transfer shows as the error bar. |
 | Progress | Files on their way, either way, show as cards on the **设备** page with their progress and a button to stop them (the snapshot's `transfers`, from the core's `files_receiving`, `files_progress`, `files_sending` and `files_send_ended`; `cancel_transfer`). When files arrive, a notification says so; clicking it opens `Downloads\Rinflow`. |
 | Setting | Off by default. Saved in `config.json`. The core always offers the clipboard and files to peers so the setting can change at run time. While it is off, the agent reports an empty clipboard, ignores peers' clipboards, clears any it receives so the core does not pass them on, and refuses offered files. |
 
@@ -257,7 +257,6 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 
 | Setting | Key | How it works |
 | --- | --- | --- |
-| 共享键盘和鼠标 (设备 page, tray panel) | `sharing` | Off pauses both directions: the edge thread does not cross, a peer being driven is given back, and the core refuses peers (`Core::set_remote_control_allowed(false)`): one that drives this PC, or starts to, gets `ControlRevoke` and none of its input is played. Sessions and the clipboard stay. |
 | 开机时启动 | (registry) | The `Rinflow` value under `HKCU\…\CurrentVersion\Run` starts the agent at sign-in. The registry is the truth; it is not stored in `config.json`. |
 | 关闭窗口时保留在托盘 | `keep_in_tray` | Off: closing the main window also quits the agent. |
 | 主题 | `theme` | `system`, `light` or `dark`, for both windows. |
@@ -265,7 +264,6 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 切换延迟 | `switch_delay_ms` | 0–500 ms (default 150): how long a push must last before it crosses. Crossing back within the effect's warm time needs no push. |
 | 屏幕角落不触发切换 | `corner_guard` | On: the effect's `corner_dead_zone` (48 pt) near each corner never crosses. |
 | 全屏游戏时暂停 | `pause_in_fullscreen` | No new push starts while `SHQueryUserNotificationState` reports a Direct3D full-screen game, a full-screen app or presentation mode. |
-| 用快捷键切换设备 | `switch_hotkeys`, `switch_modifiers` | On by default with Ctrl+Alt+Shift (`7`); Ctrl+Alt (`3`) is the other choice. The arrow keys with those modifiers move the pointer to the device on that side; see [Controlling another device](#controlling-another-device). |
 | Mac 控制本机时的修饰键 | `modifier_map` | Mac 习惯 (⌘ and ⌃ swapped) by default. See [Being controlled by another device](#being-controlled-by-another-device). |
 | 其他设备离开后隐藏光标 | `hide_cursor_on_leave` | On by default. See [Being controlled by another device](#being-controlled-by-another-device) (After the peer leaves). |
 | 在其他设备上工作时保持唤醒 | `keep_awake` | On by default. See [Presence](#presence). |
@@ -277,7 +275,6 @@ The **设置** page. Preferences live in the `settings` section of `config.json`
 | 同步剪贴板和文件 | `clipboard` | See [Clipboard](#clipboard). |
 | (none) | `port` | The core's UDP port for connections (`null`: 42421). Not in the settings, as on the Mac: devices learn each other's port through discovery, so nobody has to set it. `config.json` still takes one, for a network where 42421 cannot be used. Applies after Rinflow restarts; must not be the discovery port 42420. |
 | 加密传输 (TLS) | (none) | Always on and not switchable: every connection is encrypted. Off only when the core could not start (no certificate or port). See [Pairing and encryption](#pairing-and-encryption). |
-| 仅允许已配对设备 | `paired_only` | On (default): a device connects only after the users of both devices confirmed its pairing code once. Off: unknown devices connect without pairing (still encrypted). Applied at once: turning it on drops connected devices that are not paired. |
 | 本机指纹 | (none) | The SHA-256 fingerprint of this PC's certificate, shortened; the copy button copies all of it. |
 | 被控时可操作管理员窗口、UAC 和锁屏 | (machine-wide) | `HKLM\SOFTWARE\Rinflow\ElevatedInput`, set by the setup program (on by default). Changing it asks for an administrator. Disabled when the input service is not installed. See [Elevated windows, UAC prompts and the lock screen](#elevated-windows-uac-prompts-and-the-lock-screen). |
 | 自动检查更新 | `auto_update` | On by default. See [Updates](#updates). |
@@ -354,7 +351,7 @@ App → agent:
 | `{"type":"place_beside","peer_id":"…","side":"right"}` | Place a peer centred on one side: `left`, `right`, `top` or `bottom`. |
 | `{"type":"set_clipboard_sync","enabled":true}` | Share the clipboard with peers, or stop; saved in `config.json`. |
 | `{"type":"set_locked","locked":true}` | Lock the pointer to this PC, or unlock it, as the lock shortcut does (the snapshot's `locked`). |
-| `{"type":"update_settings","values":{"sharing":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
+| `{"type":"update_settings","values":{"keep_in_tray":false}}` | Change some settings (keys of [Settings](#settings), plus `launch_at_login`). Invalid values are refused with an `error` that can be shown to the user. |
 | `{"type":"forget_device","peer_id":"…"}` | Disconnect, unplace, unpair and stop listing a device. |
 | `{"type":"accept_pairing","peer_id":"…"}` | The user confirmed the pairing code. |
 | `{"type":"reject_pairing","peer_id":"…"}` | The user declined the pairing; the connection closes. |
@@ -384,11 +381,10 @@ A `state` message looks like this:
 - `layout` is what the arrangement draws, in logical points:
   - `displays` are this PC's monitors.
   - `devices` lists every known peer, online or not. Each has its `displays` in its own space (a default 1440 × 900 until it describes them), its `offset` in this PC's space (`null` while not placed), the `side` of this PC it touches, `remembered` (connected at least once, or placed: one of the user's devices) and `last_seen_ms` (Unix milliseconds).
-- `settings` holds the [Settings](#settings); `launch_at_login`, `control_port` (the port in use now), `locked` (the lock shortcut is on) and `agent_version` sit beside it.
+- `settings` holds the [Settings](#settings); `launch_at_login`, `control_port` (the port in use now), `locked` (the lock is on) and `agent_version` sit beside it.
 - `last_error` is omitted when there is none. A session the user or the peer ended normally does not set it, nor do file transfers that were declined or replaced by a newer copy. The app shows it when it changes, and `clear_error` removes it once the user closes it.
 - `quitting` turns true just before the agent exits because the user quit Rinflow: the app closes too and does not start the agent again.
 - `manual_addresses` lists the addresses the user added, as the core reports them: `{"address", "status"}` with `status` `searching`, `found` (with `peer_id` and `name`), `no_response`, or `unresolved` (with `error`).
-- `switch_hotkeys_blocked` is true when another program took one of the switch shortcuts first.
 - `update` is `{"status"}`, `status` one of `idle`, `checking`, `up_to_date`, `downloading`, `ready`, `installing` or `failed`, with `version` and `notes_url` once a newer version was found, `progress` (0 to 1) while downloading, and `error` (for the user) when the last step failed. See [Updates](#updates).
 - `transfers` lists files on their way: `{"transfer", "peer_id", "peer_name", "direction"` (`receiving` or `sending`), `"name"` (the first top-level item), `"items"`, `"count"` (files), `"done"`, `"total"}` (bytes).
 - `effect` holds the current parameters.
@@ -424,4 +420,4 @@ The agent sends whole snapshots instead of individual events, so the app never h
 
 ## Security
 
-All traffic between devices is encrypted with TLS 1.3, and each side knows the other's certificate. With **仅允许已配对设备** on (the default), only devices the user paired can connect. With it off, any Rinflow device on the network can connect: encrypted, but nobody checked who it is. The pipe between the app and the agent is local to the signed-in user (see [Agent IPC protocol](#agent-ipc-protocol)).
+All traffic between devices is encrypted with TLS 1.3, and each side knows the other's certificate. Only devices the user paired can connect: a new device first pairs, the users of both devices confirming a 6-digit code (there is no setting to skip this). The pipe between the app and the agent is local to the signed-in user (see [Agent IPC protocol](#agent-ipc-protocol)).

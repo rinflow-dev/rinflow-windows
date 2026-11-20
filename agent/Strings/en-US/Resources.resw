@@ -28,8 +28,6 @@
   <data name="SettingUnknown" xml:space="preserve"><value>Unknown setting: {0}</value></data>
   <data name="SettingInvalidValue" xml:space="preserve"><value>Invalid setting value: {0}</value></data>
   <data name="ThemeInvalid" xml:space="preserve"><value>Theme must be system, light, or dark</value></data>
-  <data name="SwitchModifiersInvalid" xml:space="preserve"><value>Switch shortcuts must be Ctrl+Alt+Shift or Ctrl+Alt with the arrow keys</value></data>
-  <data name="LockShortcutConflict" xml:space="preserve"><value>The lock shortcut is the same as a switch shortcut</value></data>
   <data name="LanguageInvalid" xml:space="preserve"><value>Language must be system, Simplified Chinese, English, or Japanese</value></data>
   <data name="SwitchDelayTooLong" xml:space="preserve"><value>Switch delay can be at most 1000 ms</value></data>
   <data name="ShortcutInvalid" xml:space="preserve"><value>Shortcuts must include Ctrl, Alt, or Win, plus a regular key</value></data>
@@ -46,7 +44,7 @@
   <data name="PeerIdentityChanged" xml:space="preserve"><value>The device's identity certificate changed, so the connection was refused. If it was reinstalled, remove it in the device menu and pair again.</value></data>
   <data name="PairingDeclined" xml:space="preserve"><value>The other device declined pairing.</value></data>
   <data name="PairingTimedOut" xml:space="preserve"><value>Pairing timed out. It wasn't confirmed within two minutes.</value></data>
-  <data name="UnpairedDisconnected" xml:space="preserve"><value>An unpaired device was disconnected ("Only paired devices" is on).</value></data>
+  <data name="UnpairedDisconnected" xml:space="preserve"><value>An unpaired device was disconnected. Pair it first.</value></data>
   <data name="Unpaired" xml:space="preserve"><value>Unpaired.</value></data>
   <data name="TrayInstallUpdate" xml:space="preserve"><value>Install update {0}</value></data>
   <data name="UpdateReadyTitle" xml:space="preserve"><value>Rinflow {0} is ready to install</value></data>

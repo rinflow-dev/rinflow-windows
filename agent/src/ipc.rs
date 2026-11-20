@@ -46,7 +46,11 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 /// replaces `shortcut_remap`.
 /// 18: `check_update`, `install_update`; the snapshot gains `update`, and
 /// the setting `auto_update`.
-/// 19: `set_locked` (the tray panel's switch for the lock shortcut's lock).
+/// 19: `set_locked` (the tray panel's switch for the lock shortcut's lock);
+/// the settings `sharing` (quitting Rinflow does that), `switch_hotkeys` and
+/// `switch_modifiers` are gone, and so is the snapshot's
+/// `switch_hotkeys_blocked`; the setting `paired_only` is gone too (pairing is
+/// always required).
 pub const PROTOCOL_VERSION: u32 = 19;
 
 /// The longest request line the agent reads, `\n` excluded. The app's

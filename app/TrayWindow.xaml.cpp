@@ -26,7 +26,7 @@ namespace
 {
     constexpr double PanelWidth = 300;
     constexpr double Gap = 10;
-    // Rows beyond this many devices are left out; the main window has all.
+    // Devices driving this PC beyond this many are left out.
     constexpr size_t MaxRows = 8;
 }
 
@@ -76,14 +76,6 @@ namespace winrt::Rinflow::implementation
             },
             [](bool) {});
 
-        SharingToggle().Toggled([weak](auto&&, auto&&)
-        {
-            auto self = weak.get();
-            if (self && !self->m_applying)
-            {
-                self->m_agent->UpdateSetting(L"sharing", JsonValue::CreateBooleanValue(self->SharingToggle().IsOn()));
-            }
-        });
         LockToggle().Toggled([weak](auto&&, auto&&)
         {
             auto self = weak.get();
@@ -121,6 +113,10 @@ namespace winrt::Rinflow::implementation
             {
                 self->m_wasActive = true;
             }
+        });
+        Root().Loaded([weak](auto&&, auto&&)
+        {
+            if (auto self = weak.get(); self && !self->m_closing) self->FitToContent();
         });
         Root().KeyDown([weak](auto&&, Input::KeyRoutedEventArgs const& args)
         {
@@ -173,7 +169,10 @@ namespace winrt::Rinflow::implementation
         m_scale = dpiX / 96.0;
 
         Root().Measure({ static_cast<float>(PanelWidth), std::numeric_limits<float>::infinity() });
-        double height = (std::max)(static_cast<double>(Root().DesiredSize().Height), 200.0);
+        // Exactly as tall as the content. Before the first layout pass the
+        // content measures nothing: a stand-in until Loaded fits it again.
+        double height = Root().DesiredSize().Height;
+        if (height < 1) height = 200;
         int w = static_cast<int>(std::lround(PanelWidth * m_scale));
         int h = static_cast<int>(std::lround(height * m_scale));
         int gap = static_cast<int>(std::lround(Gap * m_scale));
@@ -226,20 +225,25 @@ namespace winrt::Rinflow::implementation
         }
 
         m_applying = true;
-        bool sharing = settings.GetNamedBoolean(L"sharing", true);
-        if (SharingToggle().IsOn() != sharing) SharingToggle().IsOn(sharing);
         bool locked = state.GetNamedBoolean(L"locked", false);
         if (LockToggle().IsOn() != locked) LockToggle().IsOn(locked);
         m_applying = false;
 
-        auto model = RinflowApp::DeviceModel::FromState(state);
+        // Only while another device drives this PC: which one. Otherwise
+        // the panel has nothing to say about devices.
         auto before = m_devices.Size();
         m_devices.Clear();
-        m_devices.Append(RinflowApp::LocalRow(model.localName));
-        for (size_t i = 0; i < model.mine.size() && i < MaxRows; ++i)
+        for (auto const& device : RinflowApp::DeviceModel::FromState(state).mine)
         {
-            m_devices.Append(RinflowApp::DeviceRow(model.mine[i]));
+            if (!device.connected || !device.controlling || m_devices.Size() >= MaxRows) continue;
+            Rinflow::PeerItem row(device.id, device.name, L"", RinflowApp::DeviceGlyph(device.platform));
+            if (device.latencyMs)
+            {
+                row.Latency(*device.latencyMs == 0 ? hstring(L"<1 ms") : hstring(std::format(L"{} ms", *device.latencyMs)));
+            }
+            m_devices.Append(row);
         }
+        ControlledPanel().Visibility(m_devices.Size() > 0 ? Visibility::Visible : Visibility::Collapsed);
         if (m_devices.Size() != before)
         {
             FitToContent();

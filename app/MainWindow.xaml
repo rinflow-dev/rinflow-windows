@@ -247,32 +247,10 @@
 
                     <InfoBar
                         x:Name="LockBar"
-                        Margin="0,0,0,12"
                         IsClosable="False"
                         IsOpen="False"
                         Severity="Informational"
                         x:Uid="LockBar" Title="已锁定到当前屏幕" />
-
-                    <!-- Sharing on / off -->
-                    <Grid Height="56" Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon VerticalAlignment="Center" FontSize="20" Glyph="&#xE962;" />
-                        <TextBlock
-                            Grid.Column="1"
-                            Style="{StaticResource RowTitleStyle}"
-                            x:Uid="SharingTitle" Text="共享键盘和鼠标" />
-                        <TextBlock x:Name="SharingState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch
-                            x:Name="SharingToggle"
-                            Grid.Column="3"
-                            x:Uid="SharingToggle" AutomationProperties.Name="共享键盘和鼠标"
-                            Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
 
                     <!-- Files on their way (built in code, MainWindow.Transfers.cpp). -->
                     <StackPanel
@@ -586,39 +564,6 @@
                             <FontIcon FontSize="16" Glyph="&#xE70F;" />
                         </Button>
                     </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock x:Uid="SwitchHotkeysTitle" Style="{StaticResource RowTitleStyle}" Text="用快捷键切换设备" />
-                            <TextBlock x:Uid="SwitchHotkeysDescription" Style="{StaticResource RowDescriptionStyle}" Text="组合键加方向键，移到那一侧的设备。" />
-                            <TextBlock
-                                x:Name="SwitchHotkeysWarning"
-                                x:Uid="SwitchHotkeysWarning"
-                                Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                                Style="{StaticResource RowDescriptionStyle}"
-                                Text="部分组合键已被其他程序占用，换一组试试。"
-                                Visibility="Collapsed" />
-                        </StackPanel>
-                        <!-- RegisterHotKey modifier bits: Ctrl 2, Alt 1, Shift 4. -->
-                        <ComboBox
-                            x:Name="SwitchModifiersCombo"
-                            x:Uid="SwitchModifiersCombo"
-                            Grid.Column="1"
-                            MinWidth="200"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            AutomationProperties.Name="切换设备的组合键">
-                            <ComboBoxItem Content="Ctrl+Alt+Shift+↑↓←→" Tag="7" />
-                            <ComboBoxItem Content="Ctrl+Alt+↑↓←→" Tag="3" />
-                        </ComboBox>
-                        <TextBlock x:Name="SwitchHotkeysState" Grid.Column="2" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="SwitchHotkeysToggle" x:Uid="SwitchHotkeysToggle" Grid.Column="3" AutomationProperties.Name="用快捷键切换设备" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
                     <!-- What a Mac's modifier keys play as while it controls
                          this PC: a preset, or a choice per key (the custom
                          card below; MainWindow.Settings.cpp fills it). -->
@@ -734,19 +679,6 @@
                         <!-- Always on, so the row shows only when the core could not start. -->
                         <TextBlock x:Name="TlsState" Grid.Column="1" Foreground="{ThemeResource TextFillColorDisabledBrush}" Style="{StaticResource SwitchStateStyle}" />
                         <ToggleSwitch x:Name="TlsToggle" Grid.Column="2" x:Uid="TlsToggle" AutomationProperties.Name="加密传输" IsEnabled="False" Style="{StaticResource BareSwitchStyle}" />
-                    </Grid>
-                    <Grid Style="{StaticResource CardStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource RowTitleStyle}" x:Uid="PairedOnlyTitle" Text="仅允许已配对设备" />
-                            <TextBlock Style="{StaticResource RowDescriptionStyle}" x:Uid="PairedOnlyDescription" Text="新设备首次连接时，需在两端确认 6 位验证码。" />
-                        </StackPanel>
-                        <TextBlock x:Name="PairedOnlyState" Grid.Column="1" Style="{StaticResource SwitchStateStyle}" />
-                        <ToggleSwitch x:Name="PairedOnlyToggle" Grid.Column="2" x:Uid="PairedOnlyToggle" AutomationProperties.Name="仅允许已配对设备" Style="{StaticResource BareSwitchStyle}" />
                     </Grid>
                     <Grid Style="{StaticResource CardStyle}">
                         <Grid.ColumnDefinitions>

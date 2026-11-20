@@ -29,9 +29,6 @@ pub struct Settings {
     /// Share the clipboard with peers. Off by default: clipboards can hold
     /// passwords, and a device that is not paired could be on the other end.
     pub clipboard: bool,
-    /// Share the keyboard and mouse at all: cross into peers, and let peers
-    /// drive this PC. Off pauses both; sessions and the clipboard stay.
-    pub sharing: bool,
     /// Closing the settings window leaves the agent (and its tray icon)
     /// running. Off quits the agent with the window.
     pub keep_in_tray: bool,
@@ -49,9 +46,6 @@ pub struct Settings {
     /// The core's control port (UDP); `None` uses the core's default.
     /// Applies after a restart.
     pub port: Option<u16>,
-    /// Only paired devices may connect: others pair first (both users check
-    /// a code).
-    pub paired_only: bool,
     /// What a Mac's modifier keys play as while it drives this PC (see
     /// rinflow-core `remap.rs`). By default Command and Control swap: ⌘C
     /// copies, and the Mac's Control is the Windows key. The settings page
@@ -61,15 +55,6 @@ pub struct Settings {
     /// cursor is hidden where it was left, until this PC's own mouse moves
     /// or a peer drives it again (see `hider.rs`).
     pub hide_cursor_on_leave: bool,
-    /// The arrow keys with [`Settings::switch_modifiers`] move the pointer
-    /// to the device on that side.
-    pub switch_hotkeys: bool,
-    /// The modifiers of the switch shortcuts: one of [`SWITCH_MODIFIER_CHOICES`].
-    /// Ctrl+Alt+Shift by default, which few programs use with the arrow keys
-    /// (Ctrl+Alt alone adds cursors in VS Code and rotates the screen with
-    /// some graphics drivers); a combination taken by another program shows
-    /// in the settings (`switch_hotkeys_blocked`).
-    pub switch_modifiers: u32,
     /// While one of the other devices is in use, this PC's screen stays on
     /// and does not lock for being idle.
     pub keep_awake: bool,
@@ -121,11 +106,6 @@ impl PeerInput {
     }
 }
 
-/// The modifier combinations the switch shortcuts offer: Ctrl+Alt+Shift,
-/// Ctrl+Alt.
-pub const SWITCH_MODIFIER_CHOICES: [u32; 2] =
-    [MOD_CONTROL | MOD_ALT | MOD_SHIFT, MOD_CONTROL | MOD_ALT];
-
 /// Addresses the user may add, at most (the core's limit).
 pub const MAX_MANUAL_ADDRESSES: usize = 32;
 
@@ -133,7 +113,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             clipboard: false,
-            sharing: true,
             keep_in_tray: true,
             theme: "system".to_owned(),
             switch_delay_ms: 150,
@@ -141,11 +120,8 @@ impl Default for Settings {
             pause_in_fullscreen: false,
             lock_hotkey: Hotkey::default(),
             port: None,
-            paired_only: true,
             modifier_map: rinflow_core::ModifierMap::SWAP,
             hide_cursor_on_leave: true,
-            switch_hotkeys: true,
-            switch_modifiers: MOD_CONTROL | MOD_ALT | MOD_SHIFT,
             keep_awake: true,
             lock_sync: false,
             manual_addresses: Vec::new(),
@@ -205,14 +181,6 @@ impl Settings {
             .map_err(|error| trf(s::SettingInvalidValue, &[&error]))?;
         if !matches!(merged.theme.as_str(), "system" | "light" | "dark") {
             return Err(tr(s::ThemeInvalid).to_owned());
-        }
-        if !SWITCH_MODIFIER_CHOICES.contains(&merged.switch_modifiers) {
-            return Err(tr(s::SwitchModifiersInvalid).to_owned());
-        }
-        if merged.lock_hotkey.modifiers == merged.switch_modifiers
-            && (0x25..=0x28).contains(&merged.lock_hotkey.key)
-        {
-            return Err(tr(s::LockShortcutConflict).to_owned());
         }
         if !LANGUAGES.contains(&merged.language.as_str()) {
             return Err(tr(s::LanguageInvalid).to_owned());
@@ -416,7 +384,7 @@ mod tests {
     fn old_files_keep_their_values_and_gain_defaults() {
         let settings: Settings = serde_json::from_str(r#"{"clipboard":true}"#).unwrap();
         assert!(settings.clipboard);
-        assert!(settings.sharing && settings.keep_in_tray && settings.corner_guard);
+        assert!(settings.keep_in_tray && settings.corner_guard);
         assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.lock_hotkey, Hotkey::default());
     }
@@ -424,7 +392,7 @@ mod tests {
     #[test]
     fn one_bad_saved_value_keeps_the_others() {
         let saved = json!({
-            "sharing": false,
+            "keep_in_tray": false,
             "theme": "dark",
             "switch_delay_ms": 5000,
             "port": "not a port",
@@ -432,21 +400,20 @@ mod tests {
             "manual_addresses": ["192.168.1.20"]
         });
         let settings = Settings::from_saved(Some(&saved));
-        assert!(!settings.sharing);
+        assert!(!settings.keep_in_tray);
         assert_eq!(settings.theme, "dark");
         assert_eq!(settings.manual_addresses, ["192.168.1.20"]);
         assert_eq!(settings.switch_delay_ms, 150);
         assert_eq!(settings.port, None);
 
-        // Valid only together: the lock shortcut on the arrow keys with
-        // Ctrl+Alt+Shift, once the switch shortcuts use Ctrl+Alt.
-        let together = json!({
-            "switch_modifiers": MOD_CONTROL | MOD_ALT,
-            "lock_hotkey": {"modifiers": MOD_CONTROL | MOD_ALT | MOD_SHIFT, "key": 0x25}
+        // Settings of older versions that are gone now are ignored.
+        let older = json!({
+            "sharing": false,
+            "switch_hotkeys": false,
+            "switch_modifiers": 3,
+            "paired_only": false
         });
-        let settings = Settings::from_saved(Some(&together));
-        assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT);
-        assert_eq!(settings.lock_hotkey.key, 0x25);
+        assert_eq!(Settings::from_saved(Some(&older)), Settings::default());
 
         assert_eq!(Settings::from_saved(Some(&json!([1]))), Settings::default());
         assert_eq!(Settings::from_saved(None), Settings::default());
@@ -492,10 +459,10 @@ mod tests {
         let settings = Settings::default();
         let merged = settings
             .merged(&values(
-                json!({"sharing": false, "port": 24800, "theme": "dark"}),
+                json!({"keep_in_tray": false, "port": 24800, "theme": "dark"}),
             ))
             .unwrap();
-        assert!(!merged.sharing);
+        assert!(!merged.keep_in_tray);
         assert_eq!(merged.port, Some(24800));
         assert_eq!(merged.theme, "dark");
 
@@ -505,7 +472,7 @@ mod tests {
             json!({"port": 80}),
             json!({"port": 42420}),
             json!({"switch_delay_ms": 5000}),
-            json!({"sharing": "yes"}),
+            json!({"keep_in_tray": "yes"}),
             json!({"lock_hotkey": {"modifiers": 4, "key": 76}}),
             json!({"lock_hotkey": {"modifiers": 2, "key": 0x11}}),
         ] {
@@ -523,19 +490,6 @@ mod tests {
         let settings = Settings::default();
         assert_eq!(settings.modifier_map, rinflow_core::ModifierMap::SWAP);
         assert!(settings.keep_awake && settings.hide_cursor_on_leave);
-        assert!(settings.switch_hotkeys);
-        assert_eq!(settings.switch_modifiers, MOD_CONTROL | MOD_ALT | MOD_SHIFT);
-        assert!(
-            settings
-                .merged(&values(json!({"switch_modifiers": MOD_CONTROL | MOD_ALT})))
-                .is_ok()
-        );
-        for bad in [
-            json!({"switch_modifiers": MOD_WIN}),
-            json!({"switch_modifiers": 3, "lock_hotkey": {"modifiers": 3, "key": 0x25}}),
-        ] {
-            assert!(settings.merged(&values(bad.clone())).is_err(), "{bad}");
-        }
         assert!(!settings.lock_sync);
         let merged = settings
             .merged(&values(json!({

@@ -15,14 +15,12 @@
 //! the lock shortcut holds the pointer on the peer, portals lead nowhere.
 //!
 //! - Where the peer touches another placed peer, the pointer moves straight
-//!   on into that one (three devices in a row), and the switch shortcuts
-//!   (Ctrl+Alt+Shift+arrow keys by default) jump
-//!   to the device on that side (see `arrangement::World`).
+//!   on into that one (three devices in a row).
 //! - Motion and scrolling are scaled per peer (the `peer_input` setting) here,
 //!   where the pointer is tracked, so the two never disagree on where it is.
 //! - While a game or a pointer-lock page on the peer holds its pointer (the
 //!   core's `peer_pointer_lock`), all motion goes to it and edges lead
-//!   nowhere; the shortcuts still work.
+//!   nowhere; Ctrl+Alt+Esc still brings the pointer back.
 //!
 //! The keyboard and mouse come back to this PC, with a notification, when
 //! the hooks can no longer take them: Windows keeps an elevated window's
@@ -42,7 +40,7 @@ use crate::keymap;
 use crate::settings::{MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, PeerInput, SettingsStore};
 use crate::state::SharedState;
 use crate::win::wide;
-use rinflow_core::layout::{Motion, RemotePointer, Side};
+use rinflow_core::layout::{Motion, RemotePointer};
 use rinflow_core::{
     Core, LC_INPUT_FLAG_ABSOLUTE_POSITION, LC_INPUT_FLAG_KEY_REPEAT, LC_INPUT_KEY_DOWN,
     LC_INPUT_KEY_UP, LC_INPUT_MOUSE_BUTTON_DOWN, LC_INPUT_MOUSE_BUTTON_UP, LC_INPUT_MOUSE_MOVE,
@@ -85,31 +83,6 @@ const USAGE_CONTROL: [u32; 2] = [0xE0, 0xE4];
 const USAGE_SHIFT: [u32; 2] = [0xE1, 0xE5];
 const USAGE_ALT: [u32; 2] = [0xE2, 0xE6];
 const USAGE_GUI: [u32; 2] = [0xE3, 0xE7];
-const VK_LEFT: u32 = 0x25;
-const VK_UP: u32 = 0x26;
-const VK_RIGHT: u32 = 0x27;
-const VK_DOWN: u32 = 0x28;
-
-/// The side an arrow key points to.
-pub fn arrow_side(vk: u32) -> Option<Side> {
-    match vk {
-        VK_LEFT => Some(Side::Left),
-        VK_RIGHT => Some(Side::Right),
-        VK_UP => Some(Side::Top),
-        VK_DOWN => Some(Side::Bottom),
-        _ => None,
-    }
-}
-
-/// The arrow key for a side.
-pub fn side_key(side: Side) -> u32 {
-    match side {
-        Side::Left => VK_LEFT,
-        Side::Right => VK_RIGHT,
-        Side::Top => VK_UP,
-        Side::Bottom => VK_DOWN,
-    }
-}
 
 /// What a capture needs to move on to other devices.
 #[derive(Clone)]
@@ -259,8 +232,6 @@ struct Capture {
     ending: Option<Exit>,
     /// The lock shortcut's key is down (its auto-repeat toggles nothing).
     hotkey_down: bool,
-    /// The arrow key of a switch shortcut that is down (likewise).
-    switch_key_down: Option<u32>,
     /// Keys (HID usages) the previous peer saw pressed when the pointer
     /// moved on: their repeats and releases belong to nobody.
     stale_keys: HashSet<u32>,
@@ -274,19 +245,15 @@ struct Capture {
 enum Exit {
     /// Back on this PC, at this local point (logical points).
     Return(f64, f64),
-    /// Back on this PC by shortcut, at this local point.
-    Jump(f64, f64),
     /// Nowhere: a peer now drives this PC and places the cursor itself.
     Stay,
 }
 
 /// How a capture ended: the peer it drove, and where the cursor reappeared
-/// if it came back to this PC (through a portal unless it jumped by
-/// shortcut).
+/// if it came back to this PC.
 pub struct Ended {
     pub peer_id: String,
     pub cursor: Option<POINT>,
-    pub jumped: bool,
 }
 
 pub fn active() -> bool {
@@ -343,32 +310,6 @@ pub fn begin(
         notify,
         context,
     )
-}
-
-/// Jumps to `peer_id` by shortcut, the pointer arriving at the local point
-/// `(x, y)` (inside one of its displays). Giving control back without
-/// crossing returns the cursor to where it is now.
-pub fn begin_at(
-    core: &Weak<Core>,
-    peer_id: &str,
-    target: Target,
-    (x, y): (f64, f64),
-    notify: HWND,
-    context: Context,
-) -> bool {
-    if active() || !can_take_keyboard() {
-        return false;
-    }
-    let mut cursor = POINT { x: 0, y: 0 };
-    // SAFETY: writes the cursor position into `cursor`.
-    unsafe { GetCursorPos(&mut cursor) };
-    let Some(left_at) = displays::to_logical(&displays::monitors(), cursor.x, cursor.y) else {
-        return false;
-    };
-    let pointer = RemotePointer::enter_at(&target.peer, &target.portals, target.offset, x, y, None)
-        .with_neighbors(target.neighbors);
-    log!("driving {peer_id} by shortcut");
-    start(core, peer_id, pointer, left_at, cursor, notify, context)
 }
 
 /// Windows keeps keyboard input meant for an elevated window from this
@@ -494,7 +435,6 @@ fn start(
         notify,
         ending: None,
         hotkey_down: false,
-        switch_key_down: None,
         stale_keys: HashSet::new(),
         input,
         context,
@@ -672,7 +612,7 @@ pub fn finish() -> Option<Ended> {
     }
     let exit = capture.ending.unwrap_or_else(|| capture.home());
     let cursor = match exit {
-        Exit::Return(x, y) | Exit::Jump(x, y) => {
+        Exit::Return(x, y) => {
             let cursor = displays::to_physical(&displays::monitors(), x, y)
                 .map_or(capture.park, |(x, y)| POINT { x, y });
             // SAFETY: moves the cursor to a point on the desktop.
@@ -696,7 +636,6 @@ pub fn finish() -> Option<Ended> {
     Some(Ended {
         peer_id: capture.peer_id,
         cursor,
-        jumped: matches!(exit, Exit::Jump(..)),
     })
 }
 
@@ -711,15 +650,10 @@ pub fn pointer_released(peer_id: &str) {
     });
 }
 
-/// The switch shortcut toward `side`, pressed while a peer is driven.
-pub fn jump(side: Side) {
-    with_capture(|capture| capture.jump(side));
-}
-
 impl Capture {
-    /// Moves on to the placed peer `peer_id` (into a neighbour, or by
-    /// shortcut), the pointer arriving at the local point `(x, y)`. False
-    /// when that peer is not connected: then the pointer stays.
+    /// Moves on to the placed peer `peer_id` (into a neighbour), the pointer
+    /// arriving at the local point `(x, y)`. False when that peer is not
+    /// connected: then the pointer stays.
     fn move_on(&mut self, peer_id: &str, x: f64, y: f64) -> bool {
         if !self.context.state.is_connected(peer_id) {
             return false;
@@ -773,27 +707,6 @@ impl Capture {
         true
     }
 
-    /// A switch shortcut: on to the device on that side of this peer.
-    fn jump(&mut self, side: Side) {
-        if self.ending.is_some() || edge::locked() {
-            return;
-        }
-        let Some(world) = self.context.arrangement.world() else {
-            return;
-        };
-        let Some(to) = world.toward(Some(&self.peer_id), side) else {
-            return;
-        };
-        let Some((x, y)) = world.landing(Some(&self.peer_id), to.as_deref()) else {
-            return;
-        };
-        match to {
-            None => self.request_end(Exit::Jump(x, y)),
-            Some(peer_id) => {
-                let _ = self.move_on(&peer_id, x, y);
-            }
-        }
-    }
     /// Back on this PC, just inside the edge the pointer left through.
     fn home(&self) -> Exit {
         let (x, y) = self.pointer.return_point(self.left_at.0, self.left_at.1);
@@ -1061,23 +974,6 @@ impl Capture {
             self.request_end(self.home());
             return true;
         }
-        // The switch shortcuts (Ctrl+Alt+Shift+arrow keys by default): on to
-        // the device on that side. The peer saw the modifiers, never the
-        // arrow.
-        if Some(info.vkCode) == self.switch_key_down {
-            if !down {
-                self.switch_key_down = None;
-            }
-            return true;
-        }
-        if down
-            && let Some(side) = arrow_side(info.vkCode)
-            && self.is_switch_shortcut()
-        {
-            self.switch_key_down = Some(info.vkCode);
-            self.jump(side);
-            return true;
-        }
         // The lock shortcut toggles the lock here too; the peer never sees
         // the key (it did see the modifiers).
         let hotkey = edge::lock_hotkey();
@@ -1127,32 +1023,6 @@ impl Capture {
 
     fn held(&self, usages: &[u32]) -> bool {
         usages.iter().any(|usage| self.keys.contains(usage))
-    }
-
-    /// Exactly the switch shortcuts' modifiers are held (with an arrow key
-    /// going down), and the shortcuts are on.
-    fn is_switch_shortcut(&self) -> bool {
-        let settings = self.context.settings.get();
-        settings.switch_hotkeys
-            && self.modifier_bits() | self.local_modifier_bits() == settings.switch_modifiers
-    }
-
-    /// The modifier bits of keys held since before the capture began (the
-    /// modifiers of the switch shortcut that started it): held on, with
-    /// another arrow key, they jump on.
-    fn local_modifier_bits(&self) -> u32 {
-        let mut bits = 0;
-        for (keys, bit) in [
-            ([0xA2, 0xA3], MOD_CONTROL),
-            ([0xA0, 0xA1], MOD_SHIFT),
-            ([0xA4, 0xA5], MOD_ALT),
-            ([0x5B, 0x5C], MOD_WIN),
-        ] {
-            if keys.iter().any(|key| self.local_keys.contains(key)) {
-                bits |= bit;
-            }
-        }
-        bits
     }
 
     /// The `RegisterHotKey` modifier bits for the keys held down.
@@ -1381,7 +1251,7 @@ unsafe extern "system" fn cursor_window_proc(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rinflow_core::layout::{self, Display, Offset};
+    use rinflow_core::layout::{self, Display, Offset, Side};
 
     fn ms(value: u64) -> Duration {
         Duration::from_millis(value)

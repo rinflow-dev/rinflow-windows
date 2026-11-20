@@ -4,8 +4,9 @@
 
 namespace Rinflow
 {
-    // The panel the tray icon opens: the sharing and lock switches, the
-    // devices and the way to the main window. It closes when it loses focus.
+    // The panel the tray icon opens: the lock switch, the device driving
+    // this PC (if any) and the way to the main window. It closes when it
+    // loses focus.
     [default_interface]
     runtimeclass TrayWindow : Microsoft.UI.Xaml.Window
     {

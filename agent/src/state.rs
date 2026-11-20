@@ -162,9 +162,6 @@ pub struct Snapshot {
     pub manual_addresses: Vec<Value>,
     /// Files on their way, either way.
     pub transfers: Vec<TransferView>,
-    /// Another program took one or more of the switch shortcuts first: the
-    /// settings page suggests the other combination.
-    pub switch_hotkeys_blocked: bool,
     /// A newer version: found, downloading, ready to install (see `update.rs`).
     pub update: UpdateView,
 }
@@ -219,7 +216,6 @@ impl SharedState {
             quitting: false,
             manual_addresses: Vec::new(),
             transfers: Vec::new(),
-            switch_hotkeys_blocked: false,
             update: UpdateView::default(),
         })))
     }
@@ -227,12 +223,6 @@ impl SharedState {
     pub fn set_update(&self, view: UpdateView) {
         self.0
             .send_if_modified(|snapshot| replace(&mut snapshot.update, view));
-    }
-
-    /// Another program took one or more of the switch shortcuts first.
-    pub fn set_switch_hotkeys_blocked(&self, blocked: bool) {
-        self.0
-            .send_if_modified(|snapshot| replace(&mut snapshot.switch_hotkeys_blocked, blocked));
     }
 
     pub fn set_quitting(&self) {

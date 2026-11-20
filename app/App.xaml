@@ -24,7 +24,7 @@
                  their left instead (SwitchStateStyle). -->
             <x:Double x:Key="ToggleSwitchThemeMinWidth">0</x:Double>
 
-            <!-- A card: one settings row, a device row, the sharing switch.
+            <!-- A card: one settings row, a device row, the tray's lock switch.
                  Like Windows Settings, a little denser: 16 epx side padding,
                  56 epx rows, the in-page corner radius (4), cards 4 epx apart. -->
             <Style x:Key="CardStyle" TargetType="Grid">
